@@ -29,6 +29,9 @@ dependencies {
     // Security
     implementation("org.springframework.boot:spring-boot-starter-security")
 
+    // Validation
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+
     // Caching (Caffeine)
     implementation("org.springframework.boot:spring-boot-starter-cache")
     implementation("com.github.ben-manes.caffeine:caffeine")
@@ -47,6 +50,7 @@ dependencies {
     testImplementation("org.testcontainers:mariadb")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("io.projectreactor:reactor-test")
 }
 
 tasks.withType<Test> {
