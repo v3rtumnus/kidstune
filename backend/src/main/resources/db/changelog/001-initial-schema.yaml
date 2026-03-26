@@ -1,0 +1,487 @@
+databaseChangeLog:
+
+  # ── family ──────────────────────────────────────────────────────────────────
+  - changeSet:
+      id: "001-create-family"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: family
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: spotify_user_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_family_spotify_user_id
+              - column:
+                  name: spotify_refresh_token
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+
+  # ── child_profile ────────────────────────────────────────────────────────────
+  - changeSet:
+      id: "001-create-child-profile"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: child_profile
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: family_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_child_profile_family
+                    references: family(id)
+                    deleteCascade: true
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: avatar_icon
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: avatar_color
+                  type: VARCHAR(7)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: age_group
+                  type: ENUM('TODDLER','PRESCHOOL','SCHOOL')
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: child_profile
+            indexName: idx_child_profile_family_id
+            columns:
+              - column:
+                  name: family_id
+
+  # ── allowed_content ──────────────────────────────────────────────────────────
+  - changeSet:
+      id: "001-create-allowed-content"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: allowed_content
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_allowed_content_profile
+                    references: child_profile(id)
+                    deleteCascade: true
+              - column:
+                  name: spotify_uri
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content_type
+                  type: ENUM('MUSIC','AUDIOBOOK','MIXED')
+                  defaultValue: MUSIC
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scope
+                  type: ENUM('TRACK','ALBUM','PLAYLIST','ARTIST')
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: image_url
+                  type: TEXT
+              - column:
+                  name: artist_name
+                  type: VARCHAR(500)
+              - column:
+                  name: cached_metadata
+                  type: JSON
+              - column:
+                  name: added_by
+                  type: VARCHAR(255)
+              - column:
+                  name: resolved_at
+                  type: DATETIME(6)
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: allowed_content
+            indexName: idx_allowed_content_profile_id
+            columns:
+              - column:
+                  name: profile_id
+        - addUniqueConstraint:
+            tableName: allowed_content
+            constraintName: uq_allowed_content_profile_uri
+            columnNames: profile_id, spotify_uri
+
+  # ── resolved_album ───────────────────────────────────────────────────────────
+  - changeSet:
+      id: "001-create-resolved-album"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: resolved_album
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: allowed_content_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_resolved_album_allowed_content
+                    references: allowed_content(id)
+                    deleteCascade: true
+              - column:
+                  name: spotify_album_uri
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: image_url
+                  type: TEXT
+              - column:
+                  name: release_date
+                  type: VARCHAR(10)
+              - column:
+                  name: total_tracks
+                  type: INT
+              - column:
+                  name: content_type
+                  type: ENUM('MUSIC','AUDIOBOOK','MIXED')
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resolved_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: resolved_album
+            indexName: idx_resolved_album_allowed_content_id
+            columns:
+              - column:
+                  name: allowed_content_id
+
+  # ── resolved_track ───────────────────────────────────────────────────────────
+  - changeSet:
+      id: "001-create-resolved-track"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: resolved_track
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: resolved_album_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_resolved_track_resolved_album
+                    references: resolved_album(id)
+                    deleteCascade: true
+              - column:
+                  name: spotify_track_uri
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: artist_name
+                  type: VARCHAR(500)
+              - column:
+                  name: duration_ms
+                  type: BIGINT
+              - column:
+                  name: track_number
+                  type: INT
+              - column:
+                  name: disc_number
+                  type: INT
+              - column:
+                  name: image_url
+                  type: TEXT
+        - createIndex:
+            tableName: resolved_track
+            indexName: idx_resolved_track_album_id
+            columns:
+              - column:
+                  name: resolved_album_id
+
+  # ── favorite ─────────────────────────────────────────────────────────────────
+  - changeSet:
+      id: "001-create-favorite"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: favorite
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_favorite_profile
+                    references: child_profile(id)
+                    deleteCascade: true
+              - column:
+                  name: spotify_track_uri
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: track_title
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: track_image_url
+                  type: TEXT
+              - column:
+                  name: artist_name
+                  type: VARCHAR(500)
+              - column:
+                  name: added_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: favorite
+            indexName: idx_favorite_profile_id
+            columns:
+              - column:
+                  name: profile_id
+        - addUniqueConstraint:
+            tableName: favorite
+            constraintName: uq_favorite_profile_track
+            columnNames: profile_id, spotify_track_uri
+
+  # ── content_request ──────────────────────────────────────────────────────────
+  - changeSet:
+      id: "001-create-content-request"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: content_request
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_content_request_profile
+                    references: child_profile(id)
+                    deleteCascade: true
+              - column:
+                  name: spotify_uri
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content_type
+                  type: ENUM('MUSIC','AUDIOBOOK','MIXED')
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: image_url
+                  type: TEXT
+              - column:
+                  name: artist_name
+                  type: VARCHAR(500)
+              - column:
+                  name: status
+                  type: ENUM('PENDING','APPROVED','REJECTED','EXPIRED')
+                  defaultValue: PENDING
+                  constraints:
+                    nullable: false
+              - column:
+                  name: requested_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resolved_at
+                  type: DATETIME(6)
+              - column:
+                  name: resolved_by
+                  type: VARCHAR(255)
+              - column:
+                  name: parent_note
+                  type: TEXT
+              - column:
+                  name: digest_sent_at
+                  type: DATETIME(6)
+        - createIndex:
+            tableName: content_request
+            indexName: idx_content_request_profile_id
+            columns:
+              - column:
+                  name: profile_id
+        - createIndex:
+            tableName: content_request
+            indexName: idx_content_request_status
+            columns:
+              - column:
+                  name: status
+
+  # ── paired_device ────────────────────────────────────────────────────────────
+  - changeSet:
+      id: "001-create-paired-device"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: paired_device
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: family_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_paired_device_family
+                    references: family(id)
+                    deleteCascade: true
+              - column:
+                  name: device_token_hash
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_paired_device_token_hash
+              - column:
+                  name: device_name
+                  type: VARCHAR(255)
+              - column:
+                  name: device_type
+                  type: ENUM('KIDS','PARENT')
+                  constraints:
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: true
+                    foreignKeyName: fk_paired_device_profile
+                    references: child_profile(id)
+              - column:
+                  name: last_seen_at
+                  type: DATETIME(6)
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: paired_device
+            indexName: idx_paired_device_family_id
+            columns:
+              - column:
+                  name: family_id
+        - createIndex:
+            tableName: paired_device
+            indexName: idx_paired_device_profile_id
+            columns:
+              - column:
+                  name: profile_id

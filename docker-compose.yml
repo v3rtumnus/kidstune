@@ -1,0 +1,35 @@
+services:
+  kidstune-backend:
+    build: ./backend
+    container_name: kidstune-backend
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mariadb://host.docker.internal:3306/kidstune?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=kidstune
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_LIQUIBASE_CHANGE_LOG=classpath:db/changelog/db.changelog-master.yaml
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - KIDSTUNE_JWT_SECRET=${JWT_SECRET}
+      - KIDSTUNE_BASE_URL=https://kidstune.altenburger.io
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kidstune.rule=Host(`kidstune.altenburger.io`)"
+      - "traefik.http.routers.kidstune.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kidstune.loadbalancer.server.port=8080"
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    external: true

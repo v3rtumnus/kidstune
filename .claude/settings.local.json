@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew compileJava)",
+      "Bash(timeout 40 ./gradlew bootRun --args='--spring.profiles.active=local')",
+      "Bash(timeout 40 ./gradlew bootRun --args='--spring.profiles.active=local --debug')",
+      "Bash(./gradlew compileJava compileTestJava)",
+      "Bash(grep -vE \"^$|Daemon|Consider|^>\")",
+      "Bash(./gradlew dependencies:*)",
+      "Bash(./gradlew test:*)",
+      "Bash(docker info:*)"
+    ]
+  }
+}
