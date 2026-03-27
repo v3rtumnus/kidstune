@@ -15,7 +15,8 @@ pipeline {
         stage('Clone sources') {
             steps {
                 git credentialsId: 'github-ssh',
-                    url: 'git@github.com:v3rtumnus/kidstune.git'
+                    url: 'git@github.com:v3rtumnus/kidstune.git',
+                    branch: 'main'
             }
         }
 
