@@ -1,5 +1,7 @@
 package at.kidstune.profile;
 
+import at.kidstune.auth.DeviceType;
+import at.kidstune.auth.JwtTokenService;
 import at.kidstune.family.Family;
 import at.kidstune.family.FamilyRepository;
 import at.kidstune.profile.dto.ProfileRequest;
@@ -46,15 +48,19 @@ class ProfileIntTest {
 
     @LocalServerPort int serverPort;
     WebTestClient client;
+    String parentToken;
 
     @Autowired FamilyRepository familyRepository;
     @Autowired ProfileRepository profileRepository;
+    @Autowired JwtTokenService jwtTokenService;
 
     @BeforeEach
     void setUp() {
         client = WebTestClient.bindToServer()
                 .baseUrl("http://localhost:" + serverPort)
                 .build();
+
+        parentToken = jwtTokenService.createDeviceToken(FAMILY_ID, "test-device", DeviceType.PARENT);
 
         if (!familyRepository.existsById(FAMILY_ID)) {
             Family family = new Family();
@@ -73,7 +79,7 @@ class ProfileIntTest {
         ProfileRequest body = new ProfileRequest("Lena", AvatarIcon.FOX, AvatarColor.PURPLE, AgeGroup.PRESCHOOL);
 
         ProfileResponse response = client.post().uri("/api/v1/profiles")
-                .header("X-Family-Id", FAMILY_ID)
+                .header("Authorization", "Bearer " + parentToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .exchange()
@@ -94,13 +100,13 @@ class ProfileIntTest {
     @Test
     void get_returns_profiles_for_family() {
         client.post().uri("/api/v1/profiles")
-                .header("X-Family-Id", FAMILY_ID)
+                .header("Authorization", "Bearer " + parentToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new ProfileRequest("Tobias", AvatarIcon.BEAR, AvatarColor.BLUE, AgeGroup.SCHOOL))
                 .exchange().expectStatus().isCreated();
 
         client.get().uri("/api/v1/profiles")
-                .header("X-Family-Id", FAMILY_ID)
+                .header("Authorization", "Bearer " + parentToken)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBodyList(ProfileResponse.class)
@@ -113,7 +119,7 @@ class ProfileIntTest {
     @Test
     void put_updates_profile_and_returns_200() {
         ProfileResponse created = client.post().uri("/api/v1/profiles")
-                .header("X-Family-Id", FAMILY_ID)
+                .header("Authorization", "Bearer " + parentToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new ProfileRequest("OriginalName", AvatarIcon.OWL, AvatarColor.GREEN, AgeGroup.TODDLER))
                 .exchange()
@@ -125,7 +131,7 @@ class ProfileIntTest {
 
         ProfileRequest update = new ProfileRequest("UpdatedName", AvatarIcon.CAT, AvatarColor.PINK, AgeGroup.SCHOOL);
         ProfileResponse updated = client.put().uri("/api/v1/profiles/{id}", created.id())
-                .header("X-Family-Id", FAMILY_ID)
+                .header("Authorization", "Bearer " + parentToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(update)
                 .exchange()
@@ -147,7 +153,7 @@ class ProfileIntTest {
     @Test
     void delete_removes_profile_and_returns_204() {
         ProfileResponse created = client.post().uri("/api/v1/profiles")
-                .header("X-Family-Id", FAMILY_ID)
+                .header("Authorization", "Bearer " + parentToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new ProfileRequest("ToDelete", AvatarIcon.BUNNY, AvatarColor.ORANGE, AgeGroup.TODDLER))
                 .exchange()
@@ -158,7 +164,7 @@ class ProfileIntTest {
         assertThat(created).isNotNull();
 
         client.delete().uri("/api/v1/profiles/{id}", created.id())
-                .header("X-Family-Id", FAMILY_ID)
+                .header("Authorization", "Bearer " + parentToken)
                 .exchange()
                 .expectStatus().isNoContent();
 
@@ -170,7 +176,7 @@ class ProfileIntTest {
     @Test
     void post_with_blank_name_returns_400_validation_error() {
         client.post().uri("/api/v1/profiles")
-                .header("X-Family-Id", FAMILY_ID)
+                .header("Authorization", "Bearer " + parentToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(Map.of("name", "", "avatarIcon", "FOX", "avatarColor", "PURPLE", "ageGroup", "PRESCHOOL"))
                 .exchange()
@@ -180,13 +186,11 @@ class ProfileIntTest {
     }
 
     @Test
-    void post_without_family_id_header_returns_400() {
+    void post_without_auth_token_returns_401() {
         client.post().uri("/api/v1/profiles")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new ProfileRequest("Lena", AvatarIcon.FOX, AvatarColor.PURPLE, AgeGroup.PRESCHOOL))
                 .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.code").isEqualTo("MISSING_FAMILY_ID");
+                .expectStatus().isUnauthorized();
     }
 }
