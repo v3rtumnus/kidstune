@@ -40,6 +40,7 @@ pipeline {
             when { expression { env.BACKEND_CHANGED || params.FORCE_BACKEND } }
             steps {
                 dir('backend') {
+                    sh 'chmod +x gradlew'
                     sh './gradlew clean bootJar'
                     sh 'docker compose -f /var/kidstune-data/docker-compose.yml -p kidstune down'
                     sh 'cp build/libs/kidstune.jar /var/kidstune-data/docker'
@@ -52,6 +53,7 @@ pipeline {
             when { expression { env.KIDS_CHANGED || params.FORCE_KIDS_APP } }
             steps {
                 dir('kids-app') {
+                    sh 'chmod +x gradlew'
                     sh './gradlew test'
                     sh './gradlew assembleRelease'
                     // Store APK as artifact for sideloading
@@ -62,6 +64,7 @@ pipeline {
             when { expression { env.PARENT_CHANGED || params.FORCE_PARENT_APP } }
             steps {
                 dir('parent-app') {
+                    sh 'chmod +x gradlew'
                     sh './gradlew test'
                     sh './gradlew assembleRelease'
                 }
