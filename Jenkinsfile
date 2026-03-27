@@ -5,6 +5,12 @@ pipeline {
         pollSCM('*/5 * * * *')
     }
 
+    parameters {
+        booleanParam(name: 'FORCE_BACKEND', defaultValue: false, description: 'Force backend build regardless of Git changes')
+        booleanParam(name: 'FORCE_KIDS_APP', defaultValue: false, description: 'Force kids-app build regardless of Git changes')
+        booleanParam(name: 'FORCE_PARENT_APP', defaultValue: false, description: 'Force parent-app build regardless of Git changes')
+    }
+
     stages {
         stage('Clone sources') {
             steps {
@@ -30,7 +36,7 @@ pipeline {
         }
 
         stage('Backend') {
-            when { expression { env.BACKEND_CHANGED } }
+            when { expression { env.BACKEND_CHANGED || params.FORCE_BACKEND } }
             steps {
                 dir('backend') {
                     sh './gradlew clean bootJar'
@@ -42,7 +48,7 @@ pipeline {
             }
         }
         stage('Kids App') {
-            when { expression { env.KIDS_CHANGED } }
+            when { expression { env.KIDS_CHANGED || params.FORCE_KIDS_APP } }
             steps {
                 dir('kids-app') {
                     sh './gradlew test'
@@ -52,7 +58,7 @@ pipeline {
             }
         }
         stage('Parent App') {
-            when { expression { env.PARENT_CHANGED } }
+            when { expression { env.PARENT_CHANGED || params.FORCE_PARENT_APP } }
             steps {
                 dir('parent-app') {
                     sh './gradlew test'
