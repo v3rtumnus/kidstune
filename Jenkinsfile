@@ -69,7 +69,15 @@ pipeline {
                     sh 'chmod +x gradlew'
                     sh './gradlew test'
                     sh './gradlew assembleRelease'
-                    // Store APK as artifact for sideloading
+                }
+            }
+            post {
+                always {
+                    junit 'kids-app/build/test-results/**/*.xml'
+                }
+                success {
+                    archiveArtifacts artifacts: 'kids-app/build/outputs/apk/release/*.apk',
+                                     fingerprint: true
                 }
             }
         }
@@ -80,6 +88,15 @@ pipeline {
                     sh 'chmod +x gradlew'
                     sh './gradlew test'
                     sh './gradlew assembleRelease'
+                }
+            }
+            post {
+                always {
+                    junit 'parent-app/build/test-results/**/*.xml'
+                }
+                success {
+                    archiveArtifacts artifacts: 'parent-app/build/outputs/apk/release/*.apk',
+                                     fingerprint: true
                 }
             }
         }
