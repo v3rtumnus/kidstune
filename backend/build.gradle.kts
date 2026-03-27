@@ -53,6 +53,10 @@ dependencies {
     testImplementation("io.projectreactor:reactor-test")
 }
 
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    archiveFileName = "kidstune.jar"
+}
+
 tasks.withType<Test> {
     useJUnitPlatform()
     jvmArgs("-Dtc.host=npipe:////./pipe/dockerDesktopLinuxEngine")
