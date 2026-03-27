@@ -1,0 +1,15 @@
+package at.kidstune.content.dto;
+
+import at.kidstune.content.ContentScope;
+import at.kidstune.content.ContentType;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record AddContentRequest(
+        @NotBlank String spotifyUri,
+        @NotNull ContentScope scope,
+        @NotBlank String title,
+        String imageUrl,
+        String artistName,
+        ContentType contentTypeOverride   // null → defaults to MUSIC
+) {}

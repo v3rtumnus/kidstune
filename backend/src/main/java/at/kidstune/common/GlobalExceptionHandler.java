@@ -1,5 +1,6 @@
 package at.kidstune.common;
 
+import at.kidstune.content.ContentException;
 import at.kidstune.profile.ProfileException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -10,6 +11,12 @@ import org.springframework.web.server.ServerWebInputException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ContentException.class)
+    public ResponseEntity<ApiError> handleContentException(ContentException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(new ApiError(ex.getMessage(), ex.getCode()));
+    }
 
     @ExceptionHandler(ProfileException.class)
     public ResponseEntity<ApiError> handleProfileException(ProfileException ex) {
