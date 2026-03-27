@@ -64,5 +64,9 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    jvmArgs("-Dtc.host=npipe:////./pipe/dockerDesktopLinuxEngine")
+    // On Windows dev machines, point Testcontainers at the Docker Desktop Linux engine pipe.
+    // On Linux CI the default Unix socket (/var/run/docker.sock) is used automatically.
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+        jvmArgs("-Dtc.host=npipe:////./pipe/dockerDesktopLinuxEngine")
+    }
 }

@@ -5,6 +5,14 @@ pipeline {
         pollSCM('*/5 * * * *')
     }
 
+    environment {
+        // Testcontainers on Linux: use the Docker socket mounted into the Jenkins container.
+        DOCKER_HOST                          = 'unix:///var/run/docker.sock'
+        TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE = '/var/run/docker.sock'
+        // Disable Ryuk if it cannot bind back to the Jenkins container network.
+        TESTCONTAINERS_RYUK_DISABLED         = 'true'
+    }
+
     parameters {
         booleanParam(name: 'FORCE_BACKEND', defaultValue: false, description: 'Force backend build regardless of Git changes')
         booleanParam(name: 'FORCE_KIDS_APP', defaultValue: false, description: 'Force kids-app build regardless of Git changes')
@@ -41,11 +49,16 @@ pipeline {
             steps {
                 dir('backend') {
                     sh 'chmod +x gradlew'
-                    sh './gradlew clean bootJar'
+                    sh './gradlew clean test bootJar'
                     sh 'docker compose -f /var/kidstune-data/docker-compose.yml -p kidstune down'
                     sh 'cp build/libs/kidstune.jar /var/kidstune-data/docker'
                     sh 'docker compose -f /var/kidstune-data/docker-compose.yml -p kidstune build'
                     sh 'docker compose -f /var/kidstune-data/docker-compose.yml -p kidstune up -d'
+                }
+            }
+            post {
+                always {
+                    junit 'backend/build/test-results/test/*.xml'
                 }
             }
         }
