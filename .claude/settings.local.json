@@ -8,7 +8,8 @@
       "Bash(grep -vE \"^$|Daemon|Consider|^>\")",
       "Bash(./gradlew dependencies:*)",
       "Bash(./gradlew test:*)",
-      "Bash(docker info:*)"
+      "Bash(docker info:*)",
+      "Bash(find ./build -name TEST-*.xml)"
     ]
   }
 }
