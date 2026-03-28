@@ -1639,12 +1639,262 @@ VERIFICATION:
 
 ---
 
-## Phase 8 – Polish, Hardening & Documentation (Week 11)
+## Phase 8 – Web Admin UI (Week 11)
 
-### Prompt 8.1 – Kids App Animations
+### Prompt 8.1 – Web UI Foundation
 
 ```
-CONTEXT: Phase 8 of KidsTune. All features work. We add polish animations to make the
+CONTEXT: Phase 8 of KidsTune. The backend is fully implemented with all REST APIs (phases 1-7).
+We now add a Thymeleaf-based web admin UI served by the same Spring Boot backend, accessible
+at https://kidstune.altenburger.io/web from any browser. No separate module – everything lives
+in the existing backend.
+
+GOAL: When this task is done:
+- spring-boot-starter-thymeleaf added to backend/build.gradle.kts (reactive Thymeleaf for WebFlux)
+- HTMX 2.x and Bootstrap 5.x added as webjars dependencies and referenced in the base layout
+- Base layout template (src/main/resources/templates/web/layout.html) with:
+  - Top navigation bar: "KidsTune Admin" branding, logged-in family identifier, logout link
+  - Left sidebar with navigation links: Dashboard, Profiles, Requests, Devices, Import, Admin
+  - Main content area using Thymeleaf layout fragments
+- Web controllers in new package com.kidstune.web:
+  - WebLoginController:
+    - GET /web/login → login page with "Login with Spotify" button (reuses SpotifyOAuthService)
+    - GET /web/auth/callback → OAuth callback, creates WebSession with familyId, redirects to /web/dashboard
+    - POST /web/logout → invalidates WebSession, redirects to /web/login
+  - DashboardController:
+    - GET /web/dashboard → overview showing: total profiles, total content entries (sum across profiles),
+      pending content request count, paired device count, last 5 content additions as recent activity
+- Spring Security updated for dual auth mode:
+  - /web/** routes: session-based auth (WebSession + cookie), redirect to /web/login if unauthenticated
+  - /api/** routes: JWT Bearer token auth (unchanged from phase 1.4)
+  - Public: /web/login, /web/auth/callback, /actuator/health
+- Custom error pages (403, 404, 500) in templates/web/error/ with user-friendly messages
+- All Thymeleaf templates in src/main/resources/templates/web/
+
+REFERENCE: PROJECT_PLAN.md §2.3 (Spotify OAuth flow), §3.2 (backend tech stack),
+§6.1 (REST endpoints already implemented). CLAUDE.md pitfall #1 (Jakarta EE 11 imports).
+
+CONSTRAINTS:
+- Do NOT modify any existing REST API controllers, services, or security rules for /api/**
+- Do NOT touch Android apps
+- Web controllers call existing service layer directly – never HTTP-loop back to own REST API
+- Thymeleaf must work with Spring WebFlux (use reactive Thymeleaf, not Spring MVC)
+- HTMX for dynamic partial updates – no full SPA JS framework
+
+VERIFICATION:
+- ./gradlew compileJava → succeeds with Thymeleaf on classpath
+- GET http://localhost:8080/web/login (no session) → HTML login page with "Login with Spotify"
+- Complete OAuth flow in browser → redirected to /web/dashboard → overview stats displayed
+- GET /web/dashboard without session → 302 redirect to /web/login
+- GET /api/v1/profiles without JWT → 401 (existing API behavior unchanged)
+- GET /api/v1/profiles with valid JWT → 200 (existing behavior unchanged)
+- Unit tests for WebLoginController (mock SpotifyOAuthService)
+- Run ./gradlew test → all existing tests still pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local'
+  → curl http://localhost:8080/web/login → HTML returned
+```
+
+### Prompt 8.2 – Web UI Profile & Content Management
+
+```
+CONTEXT: Phase 8 of KidsTune. Web UI foundation exists (8.1). We add profile management
+and per-profile content management pages to the web admin UI.
+
+GOAL: When this task is done:
+- ProfileWebController (com.kidstune.web) with pages:
+  - GET /web/profiles → list all profiles for authenticated family (name, avatar, age group,
+    content count, bound device name); calls ProfileService.listProfiles(familyId)
+  - GET /web/profiles/new → create profile form (name, avatar icon/color, age group dropdowns)
+  - POST /web/profiles → create; validates same rules as REST API (max 6, unique name within family);
+    on error: re-render form with field errors; on success: redirect to /web/profiles
+  - GET /web/profiles/{id}/edit → edit form pre-populated with existing values
+  - POST /web/profiles/{id} → update; same validation; redirect to /web/profiles on success
+  - POST /web/profiles/{id}/delete → show HTMX confirmation modal; on confirm: delete + redirect
+- ContentWebController with pages:
+  - GET /web/profiles/{profileId}/content → content list table: title, artist, scope badge,
+    type badge, added date, delete button; query params: ?type=MUSIC|AUDIOBOOK, ?scope=ARTIST|...,
+    ?search=; calls ContentService.listContent()
+  - GET /web/profiles/{profileId}/content/add → Spotify search form with scope selector
+  - POST /web/profiles/{profileId}/content/search → HTMX endpoint: calls SpotifyApiClient.search(),
+    returns partial template (web/fragments/search-results.html) with result cards grouped by type
+  - POST /web/profiles/{profileId}/content → add selected item: scope dropdown + multi-profile
+    checkbox picker (for bulk-add to siblings); calls ContentService.addContent() or addContentBulk();
+    redirect to content list on success
+  - POST /web/profiles/{profileId}/content/{id}/delete → HTMX confirmation; on confirm: delete +
+    return updated table row removal (HTMX swap)
+- Thymeleaf templates:
+  - web/profiles/list.html, web/profiles/form.html (shared for create/edit)
+  - web/content/list.html, web/content/add.html
+  - web/fragments/search-results.html (HTMX partial for Spotify search results)
+  - web/fragments/confirm-modal.html (reusable HTMX confirmation dialog)
+- Avatar display: colored CSS circles with animal emoji character – no image files needed
+
+REFERENCE: PROJECT_PLAN.md §5.2.1 (Parent App screen flows – same features for web),
+§4.1 (ChildProfile entity fields), §4.2 (Content scope system).
+CLAUDE.md pitfall #7 (content is per-profile, not per-family).
+
+CONSTRAINTS:
+- Do NOT modify existing REST API
+- Do NOT touch Android apps
+- Reuse ProfileService and ContentService directly, not via HTTP
+- HTMX for search results (hx-post → partial HTML) and delete confirmations (hx-swap)
+- No pagination needed for content list (profiles won't have hundreds of entries in practice)
+
+VERIFICATION:
+- GET /web/profiles → shows all profiles with content count from DB
+- Create profile via web form → appears in list → also visible via GET /api/v1/profiles
+- Edit profile → updated values reflected in list
+- Delete profile → confirmation modal → profile removed; verify cascade in DB
+- GET /web/profiles/{id}/content → content table with type/scope filter params
+- Spotify search HTMX: POST /web/.../content/search → partial HTML returned (no full page)
+- Add content → visible in list + in GET /api/v1/profiles/{id}/content
+- Remove content → row removed without full page reload
+- Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
+```
+
+### Prompt 8.3 – Web UI Import, Devices & Request Queue
+
+```
+CONTEXT: Phase 8 of KidsTune. Profile and content management web pages exist (8.2). We add
+the remaining parent-feature pages: import from listening history, device management,
+and the content request approval queue.
+
+GOAL: When this task is done:
+- ImportWebController with pages:
+  - GET /web/import → step 1: profile selector with checkboxes, "Fetch Suggestions" button
+  - POST /web/import/suggestions → HTMX partial: calls SpotifyImportService.getImportSuggestions(),
+    returns suggestion cards grouped into: "Detected children's content" (pre-checked),
+    "Your playlists", "Other artists"; each card has per-profile toggle checkboxes
+    pre-selected based on age heuristic; returns web/fragments/import-suggestions.html
+  - POST /web/import → bulk-add all checked items by calling ContentService.addContentBulk()
+    per selected item; redirect to success page showing "Added X items for [profiles]"
+- DeviceWebController with pages:
+  - GET /web/devices → list all paired devices: name, type (KIDS/PARENT), bound profile name,
+    last_seen_at, online status indicator (online if last_seen_at < 5 min ago)
+  - POST /web/devices/{id}/unpair → HTMX confirmation → calls PairingService.unpairDevice();
+    removes row from table
+  - POST /web/devices/{id}/reassign → inline form (HTMX): profile dropdown → save;
+    calls PairingService.assignProfile(deviceId, profileId)
+  - GET /web/devices/pair → pairing code generation page
+  - POST /web/devices/pair → calls PairingService.generatePairingCode(); displays 6-digit code
+    in large typography with 5-minute countdown timer (JavaScript setTimeout updating a display)
+- RequestWebController with pages:
+  - GET /web/requests → tabbed page: PENDING, APPROVED, REJECTED, EXPIRED tabs (tab switch via HTMX)
+    PENDING tab: request cards showing child name+avatar emoji, content image, title, artist,
+    time-ago label; action buttons: [✓ Approve] [✓ Approve for all children] [✗ Reject];
+    Reject opens an inline form (HTMX) for optional parent note
+  - POST /web/requests/{id}/approve → calls ContentRequestService.approveRequest();
+    on success: remove card from pending tab (HTMX swap)
+  - POST /web/requests/{id}/approve-all → also adds to all other profiles in the family
+  - POST /web/requests/{id}/reject → calls ContentRequestService.rejectRequest(note);
+    on success: remove card from pending tab
+  - POST /web/requests/bulk-approve → approve all checked requests in PENDING tab
+  - APPROVED / REJECTED / EXPIRED tabs: simple tables loaded via HTMX on tab click
+
+REFERENCE: PROJECT_PLAN.md §5.2.1 (Approval Queue wireframe), §5.2.2 (Import flow),
+§6.1 (Content Requests lifecycle, Device Pairing endpoints).
+
+CONSTRAINTS:
+- Do NOT modify existing REST API or Android apps
+- Import wizard does NOT need WebSocket live progress – HTMX form submission is sufficient
+- Device online/offline status based on last_seen_at only (not real-time WebSocket tracking)
+- Reuse SpotifyImportService, ContentRequestService, PairingService directly from service layer
+
+VERIFICATION:
+- GET /web/import → profile checkboxes shown → POST suggestions → suggestion groups appear (HTMX)
+- Submit import → redirect to success page with correct added-item counts
+- GET /web/devices → devices listed with status indicators
+- Generate pairing code → code displayed with countdown; entering code on Kids App should pair
+- GET /web/requests → pending tab shows current pending requests
+- Approve single request → card removed from pending, AllowedContent row created in DB
+- Approve-for-all → AllowedContent created for every profile in family
+- Reject with note → note stored in DB, card removed from pending
+- Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
+```
+
+### Prompt 8.4 – Web UI Admin Data Tables
+
+```
+CONTEXT: Phase 8 of KidsTune. Parent-feature web pages exist (8.3). We add an admin section
+with read access and CRUD operations for all persisted entities – for debugging, data correction,
+and direct operational control without needing a DB client.
+
+GOAL: When this task is done:
+- AdminWebController (com.kidstune.web.admin) with pages for each entity:
+  Family:
+    - GET /web/admin/families → table: id (truncated), spotify_user_id (masked, last 6 chars),
+      created_at, profile count; no edit (OAuth-managed)
+  ChildProfile (cross-family admin view):
+    - GET /web/admin/profiles → paginated table of ALL profiles across ALL families (50/page):
+      family id, name, avatar, age_group, content count, created_at
+    - GET /web/admin/profiles/{id}/edit → edit form (name, avatar icon/color, age_group)
+    - POST /web/admin/profiles/{id} → save via ProfileService.updateProfile()
+    - POST /web/admin/profiles/{id}/delete → HTMX confirmation → hard delete
+  AllowedContent:
+    - GET /web/admin/content → paginated table (50/page): profile name, title, artist, scope badge,
+      type badge, spotify_uri (truncated), created_at; column header click = sort
+    - POST /web/admin/content/{id}/edit → editable fields: content_type override, scope (not URI)
+    - POST /web/admin/content/{id}/delete → HTMX confirmation → delete; cascades to ResolvedAlbum/Track
+  ResolvedAlbum + ResolvedTrack (read-only + re-resolve):
+    - GET /web/admin/resolved → table: allowed_content title, album count, last resolved_at;
+      expandable rows (HTMX hx-get) showing album list per entry
+    - GET /web/admin/resolved/{entryId}/albums → HTMX partial: album list for entry with track count
+    - GET /web/admin/resolved/albums/{albumId}/tracks → HTMX partial: track list for album
+    - POST /web/admin/resolved/{entryId}/re-resolve → triggers ContentResolver.resolveAsync(entryId),
+      returns success flash message; resolver runs in background as usual
+  Favorite:
+    - GET /web/admin/favorites → paginated table: profile name, track title, artist, added_at,
+      synced status; filter by profile via dropdown
+    - POST /web/admin/favorites/{id}/delete → HTMX confirmation → delete
+  ContentRequest:
+    - GET /web/admin/requests → paginated table: profile, title, status badge, requested_at,
+      resolved_at, parent_note; filter by status dropdown
+    - POST /web/admin/requests/{id}/expire → manually set status=EXPIRED
+    - POST /web/admin/requests/{id}/delete → HTMX confirmation → hard delete
+  PairedDevice:
+    - GET /web/admin/devices → table: device_name, device_type badge, profile name, last_seen_at,
+      created_at
+    - POST /web/admin/devices/{id}/delete → HTMX confirmation → delete (effectively unpairs)
+- Shared components:
+  - Reusable pagination fragment (previous/next links with page number display)
+  - Reusable HTMX confirmation modal fragment (message + confirm + cancel buttons)
+  - Column sort links (append ?sort=field&dir=asc|desc to current URL)
+- Admin section linked from sidebar as "Admin ▸" with sub-items in a collapsible group
+
+REFERENCE: PROJECT_PLAN.md §4.1 (all entity definitions, cascade rules), §4.2 (content scope).
+CLAUDE.md: cascade delete rules (profile → content → resolved → favorites, requests).
+
+CONSTRAINTS:
+- Admin section uses the SAME Spotify OAuth session auth as the rest of /web/** (no extra password)
+- Use existing services where they have suitable methods; use repositories directly only for
+  cross-family read queries that no service provides (e.g., list all profiles across all families)
+- ResolvedAlbum and ResolvedTrack are read-only – no edit forms, only delete via parent AllowedContent
+- Do NOT modify REST API or Android apps
+
+VERIFICATION:
+- GET /web/admin/families → families listed with masked spotify_user_id
+- GET /web/admin/content → paginated; clicking column header → results re-sorted
+- Edit AllowedContent type override → saved, visible in list
+- Delete AllowedContent → confirm modal → deleted; verify ResolvedAlbum rows also gone from DB
+- GET /web/admin/resolved → content tree; expand row via HTMX → albums listed; expand album → tracks listed
+- POST re-resolve → ContentResolver triggered; resolved_at updated (may need short delay to verify)
+- GET /web/admin/favorites → filter by profile → shows only that profile's favorites
+- GET /web/admin/requests → all statuses shown; filter by PENDING → only pending shown
+- GET /web/admin/devices → all paired devices listed
+- Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
+```
+
+---
+
+## Phase 9 – Polish, Hardening & Documentation (Week 12)
+
+### Prompt 9.1 – Kids App Animations
+
+```
+CONTEXT: Phase 9 of KidsTune. All features work. We add polish animations to make the
 kids app feel delightful.
 
 GOAL: When this task is done:
@@ -1676,10 +1926,10 @@ VERIFICATION:
 - Run ./gradlew test → all existing tests still pass
 ```
 
-### Prompt 8.2 – Kids App Edge Cases
+### Prompt 9.2 – Kids App Edge Cases
 
 ```
-CONTEXT: Phase 8 of KidsTune. We handle all error states in the kids app with friendly,
+CONTEXT: Phase 9 of KidsTune. We handle all error states in the kids app with friendly,
 kid-appropriate screens.
 
 GOAL: When this task is done:
@@ -1714,10 +1964,10 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 8.3 – Kids App Accessibility Audit
+### Prompt 9.3 – Kids App Accessibility Audit
 
 ```
-CONTEXT: Phase 8 of KidsTune. We audit and fix accessibility in the kids app.
+CONTEXT: Phase 9 of KidsTune. We audit and fix accessibility in the kids app.
 
 GOAL: When this task is done:
 - Every image and icon has a meaningful contentDescription:
@@ -1752,10 +2002,10 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 8.4 – Parent App Error Handling & Polish
+### Prompt 9.4 – Parent App Error Handling & Polish
 
 ```
-CONTEXT: Phase 8 of KidsTune. We add comprehensive error handling and polish to the parent app.
+CONTEXT: Phase 9 of KidsTune. We add comprehensive error handling and polish to the parent app.
 
 GOAL: When this task is done:
 - Network error states on all screens:
@@ -1794,10 +2044,10 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 8.5 – Backend Resilience & Observability
+### Prompt 9.5 – Backend Resilience & Observability
 
 ```
-CONTEXT: Phase 8 of KidsTune. We harden the backend for production use.
+CONTEXT: Phase 9 of KidsTune. We harden the backend for production use.
 
 GOAL: When this task is done:
 - Spotify API rate limit handling:
@@ -1843,10 +2093,10 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 8.6 – End-to-End Tests
+### Prompt 9.6 – End-to-End Tests
 
 ```
-CONTEXT: Phase 8 of KidsTune. All features implemented and hardened. We write E2E tests
+CONTEXT: Phase 9 of KidsTune. All features implemented and hardened. We write E2E tests
 covering critical user journeys.
 
 GOAL: When this task is done:
@@ -1878,10 +2128,10 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 8.7 – Documentation
+### Prompt 9.7 – Documentation
 
 ```
-CONTEXT: Phase 8 of KidsTune. Everything works. We write comprehensive documentation.
+CONTEXT: Phase 9 of KidsTune. Everything works. We write comprehensive documentation.
 
 GOAL: When this task is done:
 - README.md at project root covering:

@@ -1,0 +1,26 @@
+{
+  "items": [
+    {
+      "id": "bibi-album-1",
+      "name": "Bibi Blocksberg Vol. 1",
+      "uri": "spotify:album:bibi-album-1",
+      "images": [
+        {"url": "https://i.scdn.co/image/album1.jpg", "height": 300, "width": 300}
+      ],
+      "artists": [{"id": "bibi-artist-1", "name": "Bibi"}],
+      "release_date": "2020-06-01",
+      "type": "album"
+    },
+    {
+      "id": "bibi-album-2",
+      "name": "Bibi Blocksberg Vol. 2",
+      "uri": "spotify:album:bibi-album-2",
+      "images": [
+        {"url": "https://i.scdn.co/image/album2.jpg", "height": 300, "width": 300}
+      ],
+      "artists": [{"id": "bibi-artist-1", "name": "Bibi"}],
+      "release_date": "2021-03-15",
+      "type": "album"
+    }
+  ]
+}

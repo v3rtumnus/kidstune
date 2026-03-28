@@ -1274,7 +1274,8 @@ Phase 4 ─→ Kids App plays real music from Spotify via backend ← USABLE MVP
 Phase 5 ─→ Devices pair, sync automatically, profiles bind to devices
 Phase 6 ─→ Import from listening history, offline mode, Samsung Kids tested
 Phase 7 ─→ Kids can request content, parents get live notifications
-Phase 8 ─→ Production-hardened, documented, ready for daily use
+Phase 8 ─→ Web Admin UI accessible from any browser (parent features + admin CRUD)
+Phase 9 ─→ Production-hardened, documented, ready for daily use
 ```
 
 ---
@@ -1444,7 +1445,28 @@ Phase 8 ─→ Production-hardened, documented, ready for daily use
 
 ---
 
-### Phase 8 – Polish, Hardening & Documentation (Week 11)
+### Phase 8 – Web Admin UI (Week 11)
+
+**Goal:** A browser-accessible admin interface served by the Spring Boot backend. Provides all parent-facing features (no push notifications needed) plus direct CRUD access to all persisted entities for operational oversight and data management.
+
+| Module | Scope | Tests |
+|--------|-------|-------|
+| **Web UI: Foundation** | Add `spring-boot-starter-thymeleaf` + HTMX + Bootstrap 5 to backend. Dual auth: session cookies for `/web/**`, JWT unchanged for `/api/**`. Spotify OAuth web login flow (WebSession). Base layout template with sidebar navigation. Dashboard with overview stats. | Integration: OAuth flow → session → dashboard. Security: unauthenticated → redirect to login, existing API JWT tests unchanged |
+| **Web UI: Profiles & Content** | Profile CRUD pages (list, create, edit, delete with confirmation). Per-profile content list with type/scope/search filters. Spotify search via HTMX live results (no page reload). Scope picker and multi-profile target selector for adding content. | Integration: create profile via web → visible in REST API response. HTMX: search returns partial without full reload |
+| **Web UI: Import, Devices & Requests** | Import wizard (profile select → age-based pre-selected suggestions → bulk add with HTMX progress). Device management (list, unpair, reassign profile, generate + display pairing code). Content request queue (PENDING tab with approve/reject actions + optional note, history tab with APPROVED/REJECTED/EXPIRED). | Integration: approve request via web → AllowedContent created, WebSocket push dispatched to kids device |
+| **Web UI: Admin Data Tables** | Paginated, sortable CRUD tables for all entities: Family (read-only), ChildProfile, AllowedContent, ResolvedAlbum/Track (read-only + re-resolve trigger), Favorite, ContentRequest, PairedDevice. HTMX confirmation modals before all destructive operations. | Integration: admin delete → cascade verified. Re-resolve trigger → ContentResolver fires, resolved_at updated |
+
+**Milestone deliverable:** Browse to https://kidstune.altenburger.io/web from any computer:
+- Log in with Spotify → see dashboard with family stats
+- Create, edit, delete profiles without touching the phone
+- Search Spotify and manage per-profile content from a desktop browser
+- Run the import wizard, manage devices, generate pairing codes
+- Approve/reject pending content requests from the approval queue
+- View and edit any DB record in the admin section
+
+---
+
+### Phase 9 – Polish, Hardening & Documentation (Week 12)
 
 **Goal:** Production-quality app ready for daily family use. Edge cases handled, performance optimized, everything documented.
 

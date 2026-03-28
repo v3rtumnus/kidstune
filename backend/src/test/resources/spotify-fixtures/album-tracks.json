@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "id": "track-1",
+      "name": "Bibi und der Zaubertrank",
+      "uri": "spotify:track:track-1",
+      "explicit": false,
+      "artists": [{"id": "bibi-artist-1", "name": "Bibi"}],
+      "duration_ms": 1800000,
+      "type": "track"
+    },
+    {
+      "id": "track-2",
+      "name": "Bibi fliegt nach London",
+      "uri": "spotify:track:track-2",
+      "explicit": false,
+      "artists": [{"id": "bibi-artist-1", "name": "Bibi"}],
+      "duration_ms": 2100000,
+      "type": "track"
+    },
+    {
+      "id": "track-explicit",
+      "name": "Explicit Track (should be filtered)",
+      "uri": "spotify:track:track-explicit",
+      "explicit": true,
+      "artists": [{"id": "some-artist", "name": "Some Artist"}],
+      "duration_ms": 180000,
+      "type": "track"
+    }
+  ]
+}

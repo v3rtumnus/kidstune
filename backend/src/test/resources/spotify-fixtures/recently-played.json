@@ -1,0 +1,26 @@
+{
+  "items": [
+    {
+      "track": {
+        "id": "track-1",
+        "name": "Bibi und der Zaubertrank",
+        "uri": "spotify:track:track-1",
+        "explicit": false,
+        "artists": [{"id": "bibi-artist-1", "name": "Bibi"}],
+        "duration_ms": 1800000
+      },
+      "played_at": "2024-03-01T12:00:00Z"
+    },
+    {
+      "track": {
+        "id": "track-2",
+        "name": "Bibi fliegt nach London",
+        "uri": "spotify:track:track-2",
+        "explicit": false,
+        "artists": [{"id": "bibi-artist-1", "name": "Bibi"}],
+        "duration_ms": 2100000
+      },
+      "played_at": "2024-03-01T11:00:00Z"
+    }
+  ]
+}

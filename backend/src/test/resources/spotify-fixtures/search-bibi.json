@@ -1,0 +1,67 @@
+{
+  "artists": {
+    "items": [
+      {
+        "id": "bibi-artist-1",
+        "name": "Bibi",
+        "uri": "spotify:artist:bibi-artist-1",
+        "images": [
+          {"url": "https://i.scdn.co/image/bibi.jpg", "height": 640, "width": 640}
+        ],
+        "genres": ["children's music"],
+        "type": "artist"
+      },
+      {
+        "id": "bibi-artist-2",
+        "name": "Bibi & Tina",
+        "uri": "spotify:artist:bibi-artist-2",
+        "images": [
+          {"url": "https://i.scdn.co/image/bibitina.jpg", "height": 640, "width": 640}
+        ],
+        "genres": ["german children's music"],
+        "type": "artist"
+      }
+    ]
+  },
+  "albums": {
+    "items": [
+      {
+        "id": "bibi-album-1",
+        "name": "Bibi Blocksberg Hörspielbox",
+        "uri": "spotify:album:bibi-album-1",
+        "images": [
+          {"url": "https://i.scdn.co/image/album1.jpg", "height": 300, "width": 300}
+        ],
+        "artists": [{"id": "bibi-artist-1", "name": "Bibi"}],
+        "explicit": false,
+        "type": "album"
+      },
+      {
+        "id": "bibi-album-explicit",
+        "name": "Bibi EXPLICIT Edition",
+        "uri": "spotify:album:bibi-album-explicit",
+        "images": [
+          {"url": "https://i.scdn.co/image/album-exp.jpg", "height": 300, "width": 300}
+        ],
+        "artists": [{"id": "bibi-artist-1", "name": "Bibi"}],
+        "explicit": true,
+        "type": "album"
+      }
+    ]
+  },
+  "playlists": {
+    "items": [
+      {
+        "id": "bibi-playlist-1",
+        "name": "Bibi Hits für Kinder",
+        "uri": "spotify:playlist:bibi-playlist-1",
+        "images": [
+          {"url": "https://i.scdn.co/image/playlist1.jpg", "height": 300, "width": 300}
+        ],
+        "owner": {"display_name": "Spotify"},
+        "explicit": false,
+        "type": "playlist"
+      }
+    ]
+  }
+}
