@@ -72,6 +72,7 @@ VERIFICATION:
 - Verify all 8 tables exist in MariaDB: SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='kidstune';
 - cd backend && ./gradlew test → tests pass (write a basic integration test
   with Testcontainers that verifies app context loads and Liquibase migrations apply)
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 1.2 – Spotify OAuth
@@ -115,6 +116,7 @@ VERIFICATION:
   - Call getValidAccessToken → verify returns access token from mock
   - Simulate expired token → verify automatic refresh happens
 - curl http://localhost:8080/api/v1/auth/status → {"authenticated":false,"spotifyConnected":false}
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 1.3 – Profile CRUD
@@ -163,6 +165,7 @@ VERIFICATION:
   - DELETE /api/v1/profiles/{id} → 204, verify gone from DB
   - POST with missing name → 400 with validation error
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 1.4 – Spring Security JWT
@@ -212,6 +215,7 @@ VERIFICATION:
   - GET /api/v1/profiles with valid kids token → 403 (wrong role)
   - GET /actuator/health without token → 200 (public)
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ---
@@ -271,6 +275,7 @@ VERIFICATION:
 - Bulk add: POST /api/v1/content/bulk with 2 profileIds → verify 2 AllowedContent rows created
 - Duplicate prevention: POST same URI for same profile twice → 409 Conflict
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 2.2 – Content Type Heuristic
@@ -322,6 +327,7 @@ VERIFICATION:
 - Unit tests for KnownChildrenArtists: loads YAML, finds "Bibi & Tina", returns min_age 3
 - Integration test: POST content without type override → verify auto-classified correctly
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 2.3 – Spotify Search Proxy
@@ -374,6 +380,7 @@ VERIFICATION:
   - Verify caching: second search with same query → no second HTTP call to mock
   - Verify explicit content filtered out
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 2.4 – Parent App Project Setup + Login
@@ -785,6 +792,7 @@ VERIFICATION:
 - UI test: app launch → sync → BrowseScreen shows real album art from Coil (use mock HTTP for images)
 - Unit test: ContentRepository flows emit correct data for MUSIC/AUDIOBOOK filters
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 4.4 – Spotify Playback Integration
@@ -833,6 +841,7 @@ VERIFICATION:
 - Manual test on real device: tap a tile → music plays from Spotify → pause works → skip works
   → MiniPlayerBar updates → progress bar moves
 - Run ./gradlew test → all tests pass (unit tests that don't depend on real Spotify SDK)
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 4.5 – Kids App Real Favorites
@@ -927,6 +936,7 @@ VERIFICATION:
 - Integration test: list devices → shows newly paired device
 - Integration test: unpair → device token no longer works (401)
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 5.2 – Backend Delta Sync
@@ -967,6 +977,7 @@ VERIFICATION:
 - Integration test: add favorite → delta sync → favorite in "favoritesAdded"
 - Unit test: DeletionLog cleanup job removes entries older than 30 days
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 5.3 – Kids App Pairing Flow
@@ -1145,6 +1156,7 @@ VERIFICATION:
 - Integration test: POST /api/v1/content/import with 3 items, 2 profiles →
   verify 6 AllowedContent rows created, ContentResolver triggered 6 times
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 6.2 – Parent App Import Wizard
@@ -1303,6 +1315,7 @@ VERIFICATION:
 - UI test: Settings screen shows "Offline Playback Tips" section
 - README has clear offline playback instructions
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ---
@@ -1348,6 +1361,7 @@ VERIFICATION:
 - Integration test: sendToParent with 2 connected sessions → both receive message
 - Integration test: invalid token → connection rejected
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 7.2 – Backend Content Request Workflow
@@ -1403,6 +1417,7 @@ VERIFICATION:
 - Integration test: daily digest → builds correct summary for family with 3 pending requests
 - Integration test: bulk approve 3 requests → all become APPROVED
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 7.3 – Backend Scheduled Jobs Tests
@@ -1440,6 +1455,7 @@ VERIFICATION:
 - All edge case tests pass for both scheduled jobs
 - Boundary conditions explicitly tested (exactly 7 days, exactly 4 hours)
 - Run ./gradlew test → all tests pass including 15+ new test cases
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 7.4 – Kids App Discover Screen
@@ -1824,6 +1840,7 @@ VERIFICATION:
 - Unit test: structured log output contains requestId, familyId in JSON
 - Integration test: /actuator/health returns all custom indicators
 - Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 8.6 – End-to-End Tests
@@ -1858,6 +1875,7 @@ CONSTRAINTS:
 VERIFICATION:
 - All 4 Maestro tests pass on emulators or real devices
 - e2e-tests/README.md has clear execution instructions
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
 ### Prompt 8.7 – Documentation
