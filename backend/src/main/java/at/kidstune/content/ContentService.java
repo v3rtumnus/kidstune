@@ -16,12 +16,16 @@ import java.util.stream.Stream;
 @Service
 public class ContentService {
 
-    private final ContentRepository contentRepository;
-    private final ScopeResolver     scopeResolver;
+    private final ContentRepository     contentRepository;
+    private final ScopeResolver         scopeResolver;
+    private final ContentTypeClassifier classifier;
 
-    public ContentService(ContentRepository contentRepository, ScopeResolver scopeResolver) {
+    public ContentService(ContentRepository contentRepository,
+                          ScopeResolver scopeResolver,
+                          ContentTypeClassifier classifier) {
         this.contentRepository = contentRepository;
         this.scopeResolver     = scopeResolver;
+        this.classifier        = classifier;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -59,8 +63,9 @@ public class ContentService {
                 throw new ContentException(
                         "Content already exists for this profile", "DUPLICATE_CONTENT", HttpStatus.CONFLICT);
             }
+            ContentType type = resolveContentType(request.contentTypeOverride(), request.spotifyItemInfo());
             AllowedContent entity = buildEntity(profileId, request.spotifyUri(), request.scope(),
-                    request.title(), request.imageUrl(), request.artistName(), request.contentTypeOverride());
+                    request.title(), request.imageUrl(), request.artistName(), type);
             return ContentResponse.from(contentRepository.save(entity));
         });
     }
@@ -69,11 +74,12 @@ public class ContentService {
 
     public Mono<List<ContentResponse>> addContentBulk(BulkAddContentRequest request) {
         return db(() -> {
+            ContentType type = resolveContentType(request.contentTypeOverride(), request.spotifyItemInfo());
             List<ContentResponse> results = new ArrayList<>();
             for (String profileId : request.profileIds()) {
                 if (!contentRepository.existsByProfileIdAndSpotifyUri(profileId, request.spotifyUri())) {
                     AllowedContent entity = buildEntity(profileId, request.spotifyUri(), request.scope(),
-                            request.title(), request.imageUrl(), request.artistName(), request.contentTypeOverride());
+                            request.title(), request.imageUrl(), request.artistName(), type);
                     results.add(ContentResponse.from(contentRepository.save(entity)));
                 }
             }
@@ -105,9 +111,19 @@ public class ContentService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /**
+     * Manual override always takes precedence.
+     * If no override, classify via heuristic.
+     * If no item info provided, default to MUSIC.
+     */
+    private ContentType resolveContentType(ContentType override, SpotifyItemInfo itemInfo) {
+        if (override != null) return override;
+        return classifier.classify(itemInfo);   // classify(null) → MUSIC
+    }
+
     private AllowedContent buildEntity(String profileId, String spotifyUri, ContentScope scope,
                                        String title, String imageUrl, String artistName,
-                                       ContentType contentTypeOverride) {
+                                       ContentType contentType) {
         AllowedContent entity = new AllowedContent();
         entity.setProfileId(profileId);
         entity.setSpotifyUri(spotifyUri);
@@ -115,7 +131,7 @@ public class ContentService {
         entity.setTitle(title);
         entity.setImageUrl(imageUrl);
         entity.setArtistName(artistName);
-        entity.setContentType(contentTypeOverride != null ? contentTypeOverride : ContentType.MUSIC);
+        entity.setContentType(contentType);
         return entity;
     }
 

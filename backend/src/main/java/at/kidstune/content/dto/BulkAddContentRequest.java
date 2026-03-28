@@ -2,6 +2,7 @@ package at.kidstune.content.dto;
 
 import at.kidstune.content.ContentScope;
 import at.kidstune.content.ContentType;
+import at.kidstune.content.SpotifyItemInfo;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -15,5 +16,6 @@ public record BulkAddContentRequest(
         String imageUrl,
         String artistName,
         ContentType contentTypeOverride,
+        SpotifyItemInfo spotifyItemInfo,
         @NotEmpty List<@NotBlank String> profileIds
 ) {}

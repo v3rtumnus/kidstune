@@ -1,0 +1,32 @@
+kidstune:
+  known-children-artists:
+    - name: "Bibi & Tina"
+      min-age: 3
+    - name: "Bibi Blocksberg"
+      min-age: 3
+    - name: "Benjamin Blümchen"
+      min-age: 2
+    - name: "Die drei ??? Kids"
+      min-age: 6
+    - name: "Die drei ???"
+      min-age: 10
+    - name: "Rolf Zuckowski"
+      min-age: 0
+    - name: "Conni"
+      min-age: 3
+    - name: "Paw Patrol"
+      min-age: 2
+    - name: "Peppa Pig"
+      min-age: 2
+    - name: "Die Schule der magischen Tiere"
+      min-age: 6
+    - name: "Feuerwehrmann Sam"
+      min-age: 2
+    - name: "Bob der Baumeister"
+      min-age: 2
+    - name: "Yakari"
+      min-age: 4
+    - name: "TKKG"
+      min-age: 8
+    - name: "Tom und das Erdbeermarmeladebrot mit Honig"
+      min-age: 4

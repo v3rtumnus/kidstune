@@ -17,12 +17,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.testcontainers.containers.MariaDBContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -57,16 +57,16 @@ class ContentIntTest {
 
     @MockitoBean SpotifyApiClient spotifyApiClient;
 
-    static final String FAMILY_ID  = UUID.randomUUID().toString();
-    static final String PROFILE_ID = UUID.randomUUID().toString();
+    static final String FAMILY_ID   = UUID.randomUUID().toString();
+    static final String PROFILE_ID  = UUID.randomUUID().toString();
     static final String PROFILE_ID2 = UUID.randomUUID().toString();
 
     @LocalServerPort int serverPort;
     WebTestClient client;
     String parentToken;
 
-    @Autowired JwtTokenService  jwtTokenService;
-    @Autowired FamilyRepository familyRepository;
+    @Autowired JwtTokenService   jwtTokenService;
+    @Autowired FamilyRepository  familyRepository;
     @Autowired ProfileRepository profileRepository;
     @Autowired ContentRepository contentRepository;
 
@@ -84,13 +84,13 @@ class ContentIntTest {
             f.setSpotifyUserId("spotify-user-" + FAMILY_ID);
             familyRepository.save(f);
         }
-        ensureProfile(PROFILE_ID, "Lena");
+        ensureProfile(PROFILE_ID,  "Lena");
         ensureProfile(PROFILE_ID2, "Tobias");
 
         contentRepository.deleteAll(contentRepository.findByProfileId(PROFILE_ID));
         contentRepository.deleteAll(contentRepository.findByProfileId(PROFILE_ID2));
 
-        // Default SpotifyApiClient stubs – return no matches so checkContent defaults to denied
+        // Default stubs – no Spotify matches → checkContent defaults to denied
         when(spotifyApiClient.getAlbumUriForTrack(anyString()))
                 .thenReturn(Mono.just("spotify:album:no-match"));
         when(spotifyApiClient.getArtistUrisForTrack(anyString()))
@@ -103,9 +103,7 @@ class ContentIntTest {
 
     @Test
     void post_creates_content_and_returns_201() {
-        AddContentRequest body = trackRequest("spotify:track:abc", "My Song");
-
-        ContentResponse response = postContent(PROFILE_ID, body)
+        ContentResponse response = postContent(PROFILE_ID, trackRequest("spotify:track:abc", "My Song"))
                 .expectStatus().isCreated()
                 .expectBody(ContentResponse.class)
                 .returnResult().getResponseBody();
@@ -123,7 +121,7 @@ class ContentIntTest {
     void post_with_content_type_override_persists_override() {
         AddContentRequest body = new AddContentRequest(
                 "spotify:album:book1", ContentScope.ALBUM, "My Audiobook",
-                null, "Author Name", ContentType.AUDIOBOOK);
+                null, "Author Name", ContentType.AUDIOBOOK, null);
 
         ContentResponse response = postContent(PROFILE_ID, body)
                 .expectStatus().isCreated()
@@ -132,6 +130,54 @@ class ContentIntTest {
 
         assertThat(response).isNotNull();
         assertThat(response.contentType()).isEqualTo(ContentType.AUDIOBOOK);
+    }
+
+    // ── Classification ────────────────────────────────────────────────────────
+
+    @Test
+    void post_without_override_classifies_hoerspiel_genre_as_audiobook() {
+        SpotifyItemInfo itemInfo = new SpotifyItemInfo(
+                "album", List.of("hörspiel"), "Bibi Blocksberg Folge 1", 5, 120_000L);
+        AddContentRequest body = new AddContentRequest(
+                "spotify:album:hoerspiel1", ContentScope.ALBUM, "Bibi Blocksberg",
+                null, null, null, itemInfo);
+
+        ContentResponse response = postContent(PROFILE_ID, body)
+                .expectStatus().isCreated()
+                .expectBody(ContentResponse.class)
+                .returnResult().getResponseBody();
+
+        assertThat(response).isNotNull();
+        assertThat(response.contentType()).isEqualTo(ContentType.AUDIOBOOK);
+    }
+
+    @Test
+    void post_with_override_ignores_heuristic() {
+        // hörspiel genre would classify as AUDIOBOOK, but override forces MUSIC
+        SpotifyItemInfo itemInfo = new SpotifyItemInfo(
+                "album", List.of("hörspiel"), null, 5, 120_000L);
+        AddContentRequest body = new AddContentRequest(
+                "spotify:album:override1", ContentScope.ALBUM, "Override Test",
+                null, null, ContentType.MUSIC, itemInfo);
+
+        ContentResponse response = postContent(PROFILE_ID, body)
+                .expectStatus().isCreated()
+                .expectBody(ContentResponse.class)
+                .returnResult().getResponseBody();
+
+        assertThat(response).isNotNull();
+        assertThat(response.contentType()).isEqualTo(ContentType.MUSIC);
+    }
+
+    @Test
+    void post_without_override_and_no_item_info_defaults_to_music() {
+        ContentResponse response = postContent(PROFILE_ID, trackRequest("spotify:track:noinfo", "Unknown"))
+                .expectStatus().isCreated()
+                .expectBody(ContentResponse.class)
+                .returnResult().getResponseBody();
+
+        assertThat(response).isNotNull();
+        assertThat(response.contentType()).isEqualTo(ContentType.MUSIC);
     }
 
     // ── Duplicate prevention ──────────────────────────────────────────────────
@@ -174,7 +220,7 @@ class ContentIntTest {
     void get_with_type_filter_returns_matching_content() {
         postContent(PROFILE_ID, new AddContentRequest(
                 "spotify:album:audio", ContentScope.ALBUM, "Audiobook",
-                null, null, ContentType.AUDIOBOOK)).expectStatus().isCreated();
+                null, null, ContentType.AUDIOBOOK, null)).expectStatus().isCreated();
         postContent(PROFILE_ID, trackRequest("spotify:track:music", "Music")).expectStatus().isCreated();
 
         client.get().uri("/api/v1/profiles/{id}/content?type=AUDIOBOOK", PROFILE_ID)
@@ -190,7 +236,8 @@ class ContentIntTest {
     void get_with_scope_filter_returns_matching_content() {
         postContent(PROFILE_ID, trackRequest("spotify:track:t1", "Track")).expectStatus().isCreated();
         postContent(PROFILE_ID, new AddContentRequest(
-                "spotify:album:a1", ContentScope.ALBUM, "Album", null, null, null)).expectStatus().isCreated();
+                "spotify:album:a1", ContentScope.ALBUM, "Album",
+                null, null, null, null)).expectStatus().isCreated();
 
         client.get().uri("/api/v1/profiles/{id}/content?scope=ALBUM", PROFILE_ID)
                 .header("Authorization", "Bearer " + parentToken)
@@ -255,7 +302,7 @@ class ContentIntTest {
     void bulk_add_creates_one_row_per_profile() {
         BulkAddContentRequest bulk = new BulkAddContentRequest(
                 "spotify:artist:bibi", ContentScope.ARTIST, "Bibi und Tina",
-                null, null, null, List.of(PROFILE_ID, PROFILE_ID2));
+                null, null, null, null, List.of(PROFILE_ID, PROFILE_ID2));
 
         List<ContentResponse> responses = client.post().uri("/api/v1/content/bulk")
                 .header("Authorization", "Bearer " + parentToken)
@@ -275,14 +322,13 @@ class ContentIntTest {
 
     @Test
     void bulk_add_skips_duplicate_profiles_silently() {
-        // Pre-add for profile 1
         postContent(PROFILE_ID, new AddContentRequest(
                 "spotify:artist:bibi", ContentScope.ARTIST, "Bibi und Tina",
-                null, null, null)).expectStatus().isCreated();
+                null, null, null, null)).expectStatus().isCreated();
 
         BulkAddContentRequest bulk = new BulkAddContentRequest(
                 "spotify:artist:bibi", ContentScope.ARTIST, "Bibi und Tina",
-                null, null, null, List.of(PROFILE_ID, PROFILE_ID2));
+                null, null, null, null, List.of(PROFILE_ID, PROFILE_ID2));
 
         List<ContentResponse> responses = client.post().uri("/api/v1/content/bulk")
                 .header("Authorization", "Bearer " + parentToken)
@@ -293,7 +339,6 @@ class ContentIntTest {
                 .expectBodyList(ContentResponse.class)
                 .returnResult().getResponseBody();
 
-        // Only profile 2 gets a new row; profile 1 already has it
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).profileId()).isEqualTo(PROFILE_ID2);
     }
@@ -306,7 +351,8 @@ class ContentIntTest {
                 .expectStatus().isCreated();
 
         ContentCheckResponse check = client.get()
-                .uri("/api/v1/profiles/{profileId}/content/check/{uri}", PROFILE_ID, "spotify:track:allowed")
+                .uri("/api/v1/profiles/{profileId}/content/check/{uri}",
+                        PROFILE_ID, "spotify:track:allowed")
                 .header("Authorization", "Bearer " + parentToken)
                 .exchange()
                 .expectStatus().isOk()
@@ -321,7 +367,8 @@ class ContentIntTest {
     @Test
     void check_unlisted_track_returns_denied() {
         ContentCheckResponse check = client.get()
-                .uri("/api/v1/profiles/{profileId}/content/check/{uri}", PROFILE_ID, "spotify:track:unknown")
+                .uri("/api/v1/profiles/{profileId}/content/check/{uri}",
+                        PROFILE_ID, "spotify:track:unknown")
                 .header("Authorization", "Bearer " + parentToken)
                 .exchange()
                 .expectStatus().isOk()
@@ -352,7 +399,7 @@ class ContentIntTest {
     }
 
     private AddContentRequest trackRequest(String uri, String title) {
-        return new AddContentRequest(uri, ContentScope.TRACK, title, null, null, null);
+        return new AddContentRequest(uri, ContentScope.TRACK, title, null, null, null, null);
     }
 
     private void ensureProfile(String profileId, String name) {
