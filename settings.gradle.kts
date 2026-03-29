@@ -1,5 +1,8 @@
 rootProject.name = "kidstune"
 
 // Backend is a standalone Gradle project included here for monorepo builds.
-// Android modules (kids-app, parent-app, shared) will be added in later phases.
 includeBuild("backend")
+
+// Android apps – each is a standalone Android project with its own Gradle wrapper.
+// Use `cd parent-app && ./gradlew assembleDebug` to build individual apps.
+includeBuild("parent-app")

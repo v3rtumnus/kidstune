@@ -84,10 +84,14 @@ pipeline {
         stage('Parent App') {
             when { expression { env.PARENT_CHANGED || params.FORCE_PARENT_APP } }
             steps {
-                dir('parent-app') {
-                    sh 'chmod +x gradlew'
-                    sh './gradlew test'
-                    sh './gradlew assembleRelease'
+                withCredentials([
+                    string(credentialsId: 'kidstune-backend-url', variable: 'BACKEND_URL'),
+                ]) {
+                    dir('parent-app') {
+                        sh 'chmod +x gradlew'
+                        sh './gradlew test'
+                        sh './gradlew assembleRelease'
+                    }
                 }
             }
             post {
