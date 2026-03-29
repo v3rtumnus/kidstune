@@ -16,7 +16,6 @@ pipeline {
     parameters {
         booleanParam(name: 'FORCE_BACKEND', defaultValue: false, description: 'Force backend build regardless of Git changes')
         booleanParam(name: 'FORCE_KIDS_APP', defaultValue: false, description: 'Force kids-app build regardless of Git changes')
-        booleanParam(name: 'FORCE_PARENT_APP', defaultValue: false, description: 'Force parent-app build regardless of Git changes')
     }
 
     stages {
@@ -36,9 +35,6 @@ pipeline {
                         returnStdout: true).trim()
                     env.KIDS_CHANGED = sh(
                         script: "git diff --name-only HEAD~1 | grep '^kids-app/\\|^shared/' || true",
-                        returnStdout: true).trim()
-                    env.PARENT_CHANGED = sh(
-                        script: "git diff --name-only HEAD~1 | grep '^parent-app/\\|^shared/' || true",
                         returnStdout: true).trim()
                 }
             }
@@ -77,29 +73,6 @@ pipeline {
                 }
                 success {
                     archiveArtifacts artifacts: 'kids-app/build/outputs/apk/release/*.apk',
-                                     fingerprint: true
-                }
-            }
-        }
-        stage('Parent App') {
-            when { expression { env.PARENT_CHANGED || params.FORCE_PARENT_APP } }
-            steps {
-                withCredentials([
-                    string(credentialsId: 'kidstune-backend-url', variable: 'BACKEND_URL'),
-                ]) {
-                    dir('parent-app') {
-                        sh 'chmod +x gradlew'
-                        sh './gradlew test'
-                        sh './gradlew assembleRelease'
-                    }
-                }
-            }
-            post {
-                always {
-                    junit 'parent-app/build/test-results/**/*.xml'
-                }
-                success {
-                    archiveArtifacts artifacts: 'parent-app/build/outputs/apk/release/*.apk',
                                      fingerprint: true
                 }
             }

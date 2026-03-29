@@ -2,13 +2,13 @@
 
 ## 1. Executive Summary
 
-**KidsTune** is a two-app system that gives children a safe, controlled Spotify listening experience while providing parents full control over allowed content. The apps run inside Samsung Kids on repurposed smartphones, ensuring children can only access age-appropriate audio content – never videos, never unrestricted browsing.
+**KidsTune** is a system that gives children a safe, controlled Spotify listening experience while providing parents full control over allowed content. Children use a dedicated Android app running inside Samsung Kids on repurposed smartphones; parents manage everything via a responsive web dashboard served by the backend.
 
 | Component | Description |
 |-----------|-------------|
 | **KidsTune Kids** | Child-facing audio player with large visual tiles, profile selection, favorites |
-| **KidsTune Parent** | Admin app for content curation, approval requests, profile management |
-| **KidsTune Backend** | Self-hosted Spring Boot 4 API (Docker) syncing state between devices |
+| **KidsTune Web Dashboard** | Browser-based admin UI for content curation, approval requests, device management (served by the backend, accessible from any device) |
+| **KidsTune Backend** | Self-hosted Spring Boot 4 API (Docker) serving both the REST API and the web dashboard |
 
 **Key Design Principle:** Children interact with audio only – never video, never unrestricted browsing. The UI is designed for pre-readers (large images, minimal text, color-coded categories).
 
@@ -18,20 +18,20 @@
 
 ```
 ┌──────────────────────┐     ┌──────────────────────┐
-│   KidsTune Kids      │     │   KidsTune Parent     │
-│   (Old Smartphone    │     │   (Parent's Phone)    │
-│    in Samsung Kids)  │     │                       │
-│                      │     │  - Content curation   │
-│  - Profile selector  │     │  - Approval queue     │
-│  - Audio playback    │     │  - Profile management │
-│  - Favorites         │     │  - Push notifications │
-│  - Content requests  │     │    (Foreground Svc)   │
+│   KidsTune Kids      │     │   KidsTune Web        │
+│   (Old Smartphone    │     │   Dashboard           │
+│    in Samsung Kids)  │     │   (Any Browser)       │
 │                      │     │                       │
-│  Spotify App Remote  │     │  Spotify Web API      │
-│  SDK (playback)      │     │  (search & metadata)  │
+│  - Profile selector  │     │  - Content curation   │
+│  - Audio playback    │     │  - Approval queue     │
+│  - Favorites         │     │  - Profile management │
+│  - Content requests  │     │  - Device management  │
+│                      │     │  - Email notifications│
+│  Spotify App Remote  │     │    on new requests    │
+│  SDK (playback)      │     │                       │
 └──────────┬───────────┘     └──────────┬────────────┘
            │                            │
-           │     REST + WebSocket       │
+           │       REST + WebSocket     │  (served by backend)
            └────────────┬───────────────┘
                         │
               ┌─────────▼──────────┐
@@ -41,6 +41,10 @@
               │  - Spring Boot 4   │
               │  - MariaDB         │
               │    (existing)      │
+              │  - Thymeleaf/HTMX  │
+              │    Web Dashboard   │
+              │  - Spring Mail     │
+              │    (SMTP)          │
               │  - WebSocket hub   │
               │  - Spotify token   │
               │    management      │
@@ -62,7 +66,7 @@ A self-hosted backend (rather than direct device-to-device sync) provides:
 
 | API | Used By | Purpose |
 |-----|---------|---------|
-| **Spotify Web API** | Backend + Parent App | Search, metadata, artist catalog, playlist contents, user listening history |
+| **Spotify Web API** | Backend | Search, metadata, artist catalog, playlist contents, user listening history |
 | **Spotify App Remote SDK** | Kids App | Playback control (play, pause, skip, seek). Requires Spotify app installed on device |
 
 **Important constraint:** The Spotify App Remote SDK controls the Spotify app running on the same device. The kids' phone must have Spotify installed, but children never open it directly – Samsung Kids only shows KidsTune Kids as an allowed app. Spotify runs as a background process exclusively.
@@ -80,14 +84,14 @@ A self-hosted backend (rather than direct device-to-device sync) provides:
 │                    INITIAL SETUP (one-time)                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  1. Parent opens Parent App                                     │
+│  1. Parent opens web dashboard (browser)                        │
 │     └─→ Spotify OAuth PKCE login                                │
 │         └─→ Backend stores refresh_token server-side            │
 │                                                                 │
-│  2. Parent creates child profiles via Parent App                │
+│  2. Parent creates child profiles via web dashboard             │
 │     └─→ Backend stores profiles with avatars + age groups       │
 │                                                                 │
-│  3. Parent taps "Pair New Device"                               │
+│  3. Parent clicks "Pair New Device" in web dashboard            │
 │     └─→ Backend generates 6-digit pairing code (5 min expiry)  │
 │                                                                 │
 │  4. Parent enters pairing code on Kids App (on kids' device)    │
@@ -96,6 +100,7 @@ A self-hosted backend (rather than direct device-to-device sync) provides:
 │             └─→ Kids App stores device token in encrypted prefs│
 │                                                                 │
 │  5. Parent assigns a child profile to the paired device         │
+│     (via web dashboard → Devices)                               │
 │                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │                    ONGOING OPERATION                             │
@@ -119,7 +124,7 @@ This means:
 
 ## 3. Tech Stack
 
-### 3.1 Android Apps (both Kids and Parent)
+### 3.1 Kids App (Android)
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
@@ -131,7 +136,7 @@ This means:
 | Local DB | **Room** | SQLite abstraction, offline cache for allowed content |
 | Image Loading | **Coil 3** | Kotlin-first, Compose-native, lightweight |
 | Navigation | **Compose Navigation** | Type-safe, single-activity architecture |
-| Spotify | **Spotify App Remote SDK** (Kids) / **Web API via backend** (Parent) | See §2.2 |
+| Spotify | **Spotify App Remote SDK** (playback control) | See §2.2 |
 | Testing | **JUnit 5 + Turbine + MockK** | Modern test stack for coroutines/flows |
 | UI Testing | **Compose Test** + **Robolectric** | Fast UI tests without emulator |
 
@@ -141,9 +146,11 @@ This means:
 |-------|-----------|-----------|
 | Framework | **Spring Boot 4.0.4 / Java 21** | Latest major release (Spring Framework 7), enhanced observability, GraalVM-ready |
 | API | **Spring WebFlux** (REST + WebSocket) | Reactive for real-time approval notifications |
+| Web UI | **Thymeleaf** (reactive) + **HTMX 2.x** + **Bootstrap 5** | Server-rendered dashboard with dynamic partial updates, zero JS framework |
+| Email | **Spring Mail** (configurable SMTP) | Email notifications for content requests with one-click approve links |
 | Database | **MariaDB** (existing instance) | Already running on homeserver – no additional container needed |
 | Migration | **Liquibase** | Existing knowledge, XML/YAML changelog format |
-| Auth | **Spring Security 7** + custom device tokens (JWT) | No external auth provider needed |
+| Auth | **Spring Security 7** + custom device tokens (JWT) + session cookies (web) | Dual auth: JWT for API, session for web dashboard |
 | Spotify Client | **Spring WebClient** | Async HTTP for Spotify Web API calls |
 | Caching | **Caffeine** | In-memory cache for Spotify metadata (album art, track lists) |
 | Build | **Gradle (Kotlin DSL)** | Consistent with Android projects, single build tool across monorepo |
@@ -172,8 +179,9 @@ This means:
 │ spotify_user_id │  │    │ family_id (FK)       │
 │ spotify_refresh_ │  │    │ name                 │
 │   token (encr.) │  │    │ avatar_icon          │
-│ created_at      │  │    │ avatar_color         │
-│ updated_at      │  │    │ age_group (ENUM:     │
+│ notification_   │  │    │ avatar_color         │
+│   emails (TEXT) │  │    │ age_group (ENUM:     │
+│ created_at      │  │    │   TODDLER 0-3,       │
 └─────────────────┘  │    │   TODDLER 0-3,       │
                      │    │   PRESCHOOL 4-6,      │
                      │    │   SCHOOL 7-12)        │
@@ -212,7 +220,9 @@ This means:
           │ family_id (FK)   │     │ resolved_at          │
           │ device_token_hash│     │ resolved_by          │
           │ device_name      │     │ parent_note          │
-          │ device_type      │     └──────────────────────┘
+          │ device_type      │     │ approve_token (UUID) │  ← one-time email link token
+          │  (KIDS/PARENT)   │     │ digest_sent_at       │
+          │ profile_id (FK)  │     └──────────────────────┘
           │  (KIDS/PARENT)   │
           │ profile_id (FK)  │
           │  (null for PARENT│
@@ -435,8 +445,8 @@ First App Launch (after pairing)
   │
   └─ From now on: app launches directly to Home screen
      └─→ No profile selector shown again
-     └─→ Profile can only be reassigned via Parent App
-         (Parent App → Devices → [device] → Reassign Profile)
+     └─→ Profile can only be reassigned via the Web Dashboard
+         (Web Dashboard → Devices → [device] → Reassign Profile)
 ```
 
 **Why one-time binding?**
@@ -710,79 +720,61 @@ The Discover screen allows children to search the full Spotify catalog, but NOT 
 
 ---
 
-### 5.2 KidsTune Parent App
+### 5.2 KidsTune Web Dashboard
 
-#### 5.2.1 Screen Flow
+#### 5.2.1 Page Structure
+
+The web dashboard is a responsive Thymeleaf + HTMX + Bootstrap 5 app served at `/web/**` by the Spring Boot backend. It uses session-based auth (Spotify OAuth) and is mobile-friendly.
 
 ```
-┌─────────────┐    ┌───────────────────────────────┐
-│   Login      │───>│   Dashboard                   │
-│   (Spotify   │    │                               │
-│    OAuth)    │    │  ┌─────────────────────────┐  │
-│              │    │  │ 🔔 Pending Requests (3)  │  │  ← Prominent badge
-│              │    │  └─────────────────────────┘  │
-│              │    │                               │
-│              │    │  Profiles:                    │
-│              │    │  ┌─────────┐  ┌─────────┐    │
-│              │    │  │ 🐻 Luna  │  │ 🦊 Max   │    │
-│              │    │  │ 12 items │  │ 34 items │    │
-│              │    │  └─────────┘  └─────────┘    │
-│              │    │                               │
-│              │    │  [📱 Manage Devices]           │
-│              │    │  [📥 Import from History]      │
-│              │    │  [⚙️  Settings]                │
-│              │    └───────────────────────────────┘
-└──────────────┘
+/web/login            → Spotify OAuth login page
+/web/dashboard        → Overview: pending count badge, profile cards, recent activity
+/web/profiles         → List, create, edit, delete child profiles
+/web/profiles/{id}/content → Content per profile (list, search/add, remove)
+/web/requests         → Approval queue (PENDING / APPROVED / REJECTED / EXPIRED tabs)
+/web/import           → Import wizard (listening history → age-based suggestions → bulk add)
+/web/devices          → Paired devices list, generate pairing code, reassign profile
+/web/approve/{token}  → One-click approve link from email (public, no login required)
+/web/admin/**         → Admin CRUD tables for all entities (operational oversight)
+```
+
+Sidebar navigation with links to all sections. Left sidebar collapses to icons on small screens. All destructive actions use HTMX confirmation modals.
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  KidsTune Dashboard                          [Logout] [Family] │
+├──────────────┬─────────────────────────────────────────────────┤
+│  Dashboard   │  🔔 3 pending content requests                  │
+│  Profiles    │  ──────────────────────────────────────────────  │
+│  Requests    │  Profiles:                                      │
+│  Import      │  [🐻 Luna – 12 items]   [🦊 Max – 34 items]    │
+│  Devices     │                                                 │
+│  Admin ▸     │  Recent activity:                               │
+│              │  • Bibi & Tina added for Luna (2 min ago)       │
+│              │  • Luna requested Frozen OST (5 min ago)        │
+└──────────────┴─────────────────────────────────────────────────┘
+```
+
+The approval queue shows pending requests with inline approve/reject buttons (HTMX):
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  Pending Requests (3)   [Approve All]                          │
+│  ──────────────────────────────────────────────────────────── │
+│  [img] Frozen OST               🐻 Luna  •  2 minutes ago     │
+│        [✓ Approve for Luna]  [✓ For all children]  [✗ Reject] │
+│  ──────────────────────────────────────────────────────────── │
+│  [img] Moana OST                🦊 Max   •  15 minutes ago    │
+│        [✓ Approve for Max]   [✓ For all children]  [✗ Reject] │
+└────────────────────────────────────────────────────────────────┘
+```
          │
-         ▼ (tap on profile)
-┌───────────────────────────────┐    ┌───────────────────────────────┐
-│   Profile: 🐻 Luna             │    │   Add Content (for Luna)      │
-│                               │    │                               │
-│  [➕ Add Content]              │    │  🔍 [Search Spotify...]       │
-│  [📋 View Content (12)]       │    │                               │
-│  [🔔 Requests (2 pending)]    │    │  Artists:                     │
-│  [✏️  Edit Profile]            │    │  ┌───────────────────────┐   │
-│                               │    │  │ [img] Bibi & Tina     │   │
-│  Content overview:            │    │  │  [+ Add ▼]             │   │
-│  • 4 Artists                  │    │  │   ├─ Only for Luna     │   │
-│  • 5 Albums                   │    │  │   ├─ For all children  │   │
-│  • 2 Playlists                │    │  │   └─ Pick profiles...  │   │
-│  • 1 Track                    │    │  └───────────────────────┘   │
-│                               │    │                               │
-└───────────────────────────────┘    └───────────────────────────────┘
-
-┌───────────────────────────────┐    ┌───────────────────────────────┐
-│   Approval Queue              │    │   Profile Management          │
-│                               │    │                               │
-│  ┌───────────────────────┐    │    │  ┌─────────┐  ┌─────────┐    │
-│  │ [img] Frozen OST      │    │    │  │ 🐻 Luna  │  │ 🦊 Max   │    │
-│  │ Requested by: 🐻 Luna │    │    │  │ Age: 4-6 │  │ Age: 7-12│    │
-│  │ 2 minutes ago         │    │    │  │ Device:  │  │ Device:  │    │
-│  │                       │    │    │  │ Galaxy A3│  │ Galaxy S7│    │
-│  │  Add for:             │    │    │  │ 12 items │  │ 34 items │    │
-│  │  [🐻 Luna only]       │    │    │  │ [Edit]   │  │ [Edit]   │    │
-│  │  [All children]       │    │    │  └─────────┘  └─────────┘    │
-│  │  [❌ Reject]           │    │    │                               │
-│  └───────────────────────┘    │    │  [+ Add Child Profile]        │
-│  ┌───────────────────────┐    │    └───────────────────────────────┘
-│  │ [img] Moana OST      │    │
-│  │ Requested by: 🦊 Max  │    │
-│  │ 15 minutes ago        │    │
-│  │                       │    │
-│  │  Add for:             │    │
-│  │  [🦊 Max only]        │    │
-│  │  [All children]       │    │
-│  │  [❌ Reject]           │    │
-│  └───────────────────────┘    │
-└───────────────────────────────┘
-```
-
 #### 5.2.2 Initial Import Flow
 
-To ease migration from existing Spotify usage:
+To ease migration from existing Spotify usage, the web dashboard includes an import wizard:
 
 ```
-1. Parent taps "Import from Listening History"
+1. Parent opens /web/import in browser
 2. Parent selects target profile(s):
    ┌─────────────────────────────────────┐
    │  Import for which profile(s)?       │
@@ -861,211 +853,58 @@ known_children_artists:
 
 #### 5.2.3 Notification System for Content Requests
 
-The notification system uses a **three-layer architecture** to ensure parents are always notified about content requests, regardless of whether the Parent App is actively running.
+When a child submits a content request, the backend notifies **all configured parents** via email (guaranteed) and real-time browser push (when dashboard is open).
+
+**Parent email configuration:**
+
+Each `Family` stores a comma-separated list of `notification_emails` (configurable via web dashboard → Settings). Every address in this list receives all notification emails, ensuring both parents in a household are notified.
+
+**Channel 1 – Email (guaranteed delivery):**
+
+The backend sends an email via Spring Mail immediately when a `PENDING` request is created. SMTP is fully configurable via `spring.mail.*` in `application.yml` (Gmail, Mailgun, self-hosted Postfix, etc.).
+
+The email is sent to **all `notification_emails`** for the family and contains:
+- Child name + avatar emoji + content title and artist
+- One-click **[Approve]** button linking to `/web/approve/{approveToken}`
+- **[View in Dashboard]** link to `/web/requests`
+
+The `approve_token` is a UUID stored on `ContentRequest`, generated at creation. `/web/approve/{token}` is **public** (no login required), approves the request, triggers content resolution, and redirects to a confirmation page. The token is single-use; first parent to click wins (subsequent clicks show "already approved"). Token expires after 7 days with the request.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                 THREE-LAYER NOTIFICATION STRATEGY                │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Layer 1: REAL-TIME (WebSocket)                                 │
-│  ├─ Foreground Service maintains WebSocket connection            │
-│  ├─ Instant notification within ~1 second                       │
-│  ├─ Works when: app is open OR backgrounded                     │
-│  └─ Fails when: app force-killed, phone rebooted, service killed│
-│                                                                 │
-│  Layer 2: PERIODIC POLLING (WorkManager)                        │
-│  ├─ WorkManager polls GET /api/v1/content-requests?status=PENDING│
-│  ├─ Runs every 15 minutes, survives app kills and reboots       │
-│  ├─ Creates local notification if new pending requests found    │
-│  └─ Works ALWAYS – even if app was never opened after reboot    │
-│                                                                 │
-│  Layer 3: DAILY DIGEST (Backend-triggered)                      │
-│  ├─ Backend cron job runs at 19:00 daily                        │
-│  ├─ If pending requests exist older than 4 hours:               │
-│  │   sends summary via WebSocket (Layer 1) or                   │
-│  │   picked up by next poll (Layer 2)                           │
-│  ├─ Bundles all open requests into one notification:            │
-│  │   "🐻 Luna and 🦊 Max have 4 open wishes"                   │
-│  └─ Prevents individual requests from being forgotten           │
-│                                                                 │
-│  Layer 0: PASSIVE (App open)                                    │
-│  └─ Dashboard always shows badge with pending count on launch   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+Kids App         Backend                    All Parents (email)
+   │                │                         │         │
+   │ POST /request  │                         │         │
+   ├───────────────>│                         │         │
+   │                │ Spring Mail             │         │
+   │                │ → all notification_emails         │
+   │                ├────────────────────────>│─────────┤
+   │                │                         │         │
+   │                │  parent clicks [Approve]│         │
+   │                │<────────────────────────┤         │
+   │  WS push       │ approveRequest(token)   │         │
+   │<───────────────┤                         │         │
 ```
 
-**Layer 1 – Real-time WebSocket (best case):**
+**Channel 2 – WebSocket browser push (real-time when dashboard is open):**
 
-```
-Kids App                  Backend                      Parent App
-   │                         │                             │
-   │ POST /content-request   │                             │
-   ├────────────────────────>│                             │
-   │                         │  WebSocket push             │
-   │                         ├────────────────────────────>│
-   │                         │                     ┌───────┴───────┐
-   │                         │                     │ Foreground Svc│
-   │                         │                     │   │           │
-   │                         │                     │   ▼           │
-   │                         │                     │ Android Notif │
-   │                         │                     │ [Approve]     │
-   │                         │                     │ [Reject]      │
-   │                         │                     └───────┬───────┘
-   │                         │                             │
-   │                         │  PUT /content-request       │
-   │                         │    {status: APPROVED}       │
-   │                         │<────────────────────────────┤
-   │  WebSocket push         │                             │
-   │  "Request approved!"    │                             │
-   │<────────────────────────┤                             │
-```
+When any parent has the web dashboard open, the backend pushes `CONTENT_REQUEST` events via WebSocket, causing the pending badge to update in real time without a page reload.
 
-**Foreground Service implementation:**
+**Daily digest email (catch-all for forgotten requests):**
 
-```kotlin
-class NotificationService : Service() {
-    // Runs as Android Foreground Service with persistent notification:
-    // "KidsTune Parent – Connected and listening for requests"
-
-    // Maintains WebSocket connection to:
-    // wss://kidstune.altenburger.io/ws/parent/{familyId}
-
-    // On WebSocket message received:
-    //   - CONTENT_REQUEST: create high-priority notification with
-    //     child avatar, content artwork, [Approve] [Reject] buttons
-    //   - DAILY_DIGEST: create summary notification bundling all
-    //     pending requests
-
-    // Action buttons handled by ApproveRejectReceiver (BroadcastReceiver)
-    //   → sends PUT to backend directly without opening app
-
-    // Automatic reconnection with exponential backoff:
-    //   1s → 2s → 4s → 8s → 16s → 30s (max)
-
-    // Heartbeat: ping every 30s to detect stale connections
-}
-```
-
-**Layer 2 – WorkManager polling (guaranteed fallback):**
-
-```kotlin
-class PendingRequestPollWorker : CoroutineWorker() {
-    // Registered as PeriodicWorkRequest (every 15 minutes)
-    // with Constraints(requiredNetworkType = CONNECTED)
-
-    // WorkManager survives:
-    //   - App force-killed (swipe from recents)
-    //   - Phone reboot (re-scheduled automatically)
-    //   - Doze mode (executes in maintenance windows)
-
-    // Logic:
-    //   1. GET /api/v1/content-requests?status=PENDING
-    //   2. Compare with locally stored "last seen request IDs"
-    //   3. If new requests found:
-    //      a. Store new IDs in SharedPreferences
-    //      b. Build Android notification:
-    //         - Single request: "🐻 Luna wants to listen to 'Frozen'"
-    //                           [Approve] [Reject]
-    //         - Multiple new: "🐻 Luna and 🦊 Max have 3 new wishes"
-    //                         [Open App]
-    //   4. If WebSocket (Layer 1) is connected and healthy: skip
-    //      (avoid duplicate notifications)
-}
-```
-
-**Layer 2 is critical because:**
-- It works even if the Parent App was never opened after a phone reboot
-- WorkManager is the most reliable background execution mechanism on Android
-- It's immune to aggressive battery optimization (Samsung, Xiaomi, etc.)
-- The 15-minute delay is acceptable for content requests (not time-critical)
-
-**Layer 3 – Daily digest (catch-all for forgotten requests):**
-
-The backend runs a scheduled job daily at 19:00 (configurable):
+A backend cron job at 19:00 sends a summary email to all `notification_emails` if there are `PENDING` requests older than 4 hours where `digest_sent_at IS NULL`. The digest lists all open requests with individual approve links.
 
 ```java
 @Scheduled(cron = "0 0 19 * * *")
 public void sendDailyDigest() {
-    // For each family:
-    //   1. Find all PENDING requests older than 4 hours
-    //   2. If any exist, build a DAILY_DIGEST message:
-    //      {
-    //        type: "DAILY_DIGEST",
-    //        payload: {
-    //          pendingCount: 4,
-    //          profiles: [
-    //            { name: "Luna", avatar: "bear", requestCount: 2,
-    //              titles: ["Frozen OST", "Moana OST"] },
-    //            { name: "Max", avatar: "fox", requestCount: 2,
-    //              titles: ["Cars 3", "Star Wars OST"] }
-    //          ],
-    //          oldestRequestAge: "2 days"
-    //        }
-    //      }
-    //   3. Send via WebSocket (if parent connected)
-    //   4. Mark digest as sent (so Layer 2 polling picks it up
-    //      even if WebSocket is down → uses a flag on the backend)
+    // For each family with PENDING requests older than 4 hours
+    //   where digest_sent_at IS NULL:
+    //   1. Build summary email with all pending requests + approve links
+    //   2. Send via Spring Mail to all family.notification_emails
+    //   3. Set digest_sent_at = now() on affected requests
 }
 ```
 
-The digest is picked up by whichever layer is active:
-- Layer 1 (WebSocket): immediate notification with summary
-- Layer 2 (polling): next poll detects the digest flag, builds summary notification
-- Layer 0 (passive): dashboard shows badge on next app open
-
-**Deduplication:** All layers check before creating a notification:
-- Layer 1 tags notifications with `requestId` → Android replaces existing notification for same request
-- Layer 2 stores "last notified request IDs" in SharedPreferences → skips already-notified requests
-- Layer 2 checks if Layer 1 is connected and has already delivered the notification → skips if so
-- Daily digest uses a separate notification channel and always replaces the previous digest
-
-**BOOT_COMPLETED receiver:**
-
-```kotlin
-class BootReceiver : BroadcastReceiver() {
-    // Registered in AndroidManifest for BOOT_COMPLETED
-    // On device boot:
-    //   1. Re-register WorkManager periodic poll (Layer 2)
-    //      (WorkManager usually survives reboots, but belt-and-suspenders)
-    //   2. Start Foreground Service (Layer 1) if user has opted in
-}
-```
-
-**Setup wizard (first launch):**
-
-```
-┌─────────────────────────────────────┐
-│  Notification Setup                 │
-│                                     │
-│  KidsTune needs permission to       │
-│  notify you when your children      │
-│  request new content.               │
-│                                     │
-│  ☑ Real-time notifications          │
-│    (keeps a small background        │
-│     service running)                │
-│                                     │
-│  ☑ Periodic check every 15 min     │
-│    (works even if app is closed)    │
-│                                     │
-│  ☑ Daily summary at 19:00          │
-│    (reminds you of open requests)   │
-│                                     │
-│  [Continue →]                       │
-│  → requests battery optimization    │
-│    exemption (Android system dialog)│
-└─────────────────────────────────────┘
-```
-
-All three layers are enabled by default. The real-time layer (1) can be disabled if the user prefers not to have a persistent foreground notification. Layers 2 and 3 always remain active – they are the minimum guarantee.
-
-**Why not Firebase Cloud Messaging (FCM)?**
-- Self-hosted approach avoids Google dependency (consistent with homeserver philosophy)
-- Layer 2 (WorkManager polling) provides the same reliability guarantee as FCM
-- No FCM server key management or Google Cloud project needed
-- Works on de-Googled devices or custom ROMs
-- If ever desired, FCM can be added as a Layer 1.5 (wake-up signal only, no payload) without architectural changes – the backend just needs to send a "you have pending requests" ping via FCM, and the app fetches details from the backend as usual
+**Deduplication:** Individual request emails are only sent once at creation. The daily digest only fires once per request cycle (tracked via `digest_sent_at`). Dashboard badge always reflects current pending count from DB.
 
 ---
 
@@ -1268,14 +1107,13 @@ wss://kidstune.altenburger.io/ws/kids/{deviceId}
 
 ```
 Phase 1 ─→ Backend boots, DB migrates, Spotify OAuth works
-Phase 2 ─→ Parent App can search Spotify and manage content per-profile (backend + UI)
+Phase 2 ─→ Web Dashboard live: search Spotify, manage content per-profile, email notifications
 Phase 3 ─→ Kids App renders mock content, full UI navigation testable on device
 Phase 4 ─→ Kids App plays real music from Spotify via backend ← USABLE MVP
 Phase 5 ─→ Devices pair, sync automatically, profiles bind to devices
 Phase 6 ─→ Import from listening history, offline mode, Samsung Kids tested
-Phase 7 ─→ Kids can request content, parents get live notifications
-Phase 8 ─→ Web Admin UI accessible from any browser (parent features + admin CRUD)
-Phase 9 ─→ Production-hardened, documented, ready for daily use
+Phase 7 ─→ Kids can request content, parents get email + browser push notifications
+Phase 8 ─→ Production-hardened, admin data tables, documented, ready for daily use
 ```
 
 ---
@@ -1300,28 +1138,29 @@ Phase 9 ─→ Production-hardened, documented, ready for daily use
 
 ---
 
-### Phase 2 – Content Management Backend + Parent App Shell (Weeks 2-3)
+### Phase 2 – Content Management Backend + Web Dashboard (Weeks 2-3)
 
-**Goal:** A functional Parent App connected to the backend, where you can search Spotify and add content per-profile.
+**Goal:** A functional web dashboard accessible from any browser, where you can search Spotify and manage content per-profile. Parents receive email notifications for content requests.
 
 | Module | Scope | Tests |
 |--------|-------|-------|
 | **Backend: Content Management** | AllowedContent CRUD per-profile, bulk-add to multiple profiles, scope resolution algorithm (see §4.2), content check endpoint, Caffeine caching for Spotify metadata | Unit: scope resolution logic with all 4 scope types (30+ test cases), multi-profile bulk add. Integration: full scenarios with mock Spotify API |
 | **Backend: Content Type Detection** | Heuristic classifier (see §4.3), known children's artists YAML config, manual override support | Unit: genre matching, duration heuristic, name pattern matching, edge cases (50+ test cases) |
 | **Backend: Spotify Search Proxy** | Search endpoint wrapping Spotify Web API, result grouping by type (artist/album/playlist), explicit content filtering | Unit: result grouping and filtering. Integration: mock Spotify search responses |
-| **Parent App: Project Setup** | Kotlin/Compose scaffold, Hilt DI, Ktor client configured for backend, navigation graph, Material 3 theme | UI test: app launches, navigation works |
-| **Parent App: Spotify Login** | OAuth PKCE flow launching browser, callback handling, token passed to backend, logged-in state persistence | UI test: login screen renders. Integration: full OAuth flow with backend |
-| **Parent App: Dashboard** | Profile cards on dashboard (name, avatar, content count), navigation to profile detail | UI test: dashboard shows profiles from backend |
-| **Parent App: Content Search & Add** | Search UI with debounced input, result display grouped by type, scope selection, profile target picker (single profile / all children / pick specific), add flow with confirmation toast | UI test: search → results → select scope → pick profiles → add → confirmation. Unit: ViewModel state machine |
-| **Parent App: Content List & Remove** | View allowed content per-profile, filter by type and scope, swipe-to-delete | UI test: list renders, filters work, delete works |
+| **Web Dashboard: Foundation** | Thymeleaf + HTMX + Bootstrap 5 added to backend. Dual auth: session cookies for `/web/**`, JWT for `/api/**`. Spotify OAuth web login. Base layout template with sidebar. Dashboard with stats overview. | Integration: OAuth → session → dashboard. Security: unauthenticated → redirect to login |
+| **Web Dashboard: Profiles & Content** | Profile CRUD pages. Per-profile content list with filters. Spotify search via HTMX live results. Scope picker + multi-profile selector for adding content. HTMX delete with confirmation. | Integration: create profile via web → visible in REST API. HTMX search returns partial |
+| **Web Dashboard: Approval Queue** | Request queue with PENDING/APPROVED/REJECTED/EXPIRED tabs. Approve/reject with optional note. Approve-for-all-children. HTMX card removal on action. | Integration: approve via web → AllowedContent created |
+| **Backend: Email Notifications** | Spring Mail configuration. Email on request creation (to all `notification_emails`). Token-based one-click `/web/approve/{token}` (public endpoint). Daily digest at 19:00. | Unit: email content, token generation. Integration: request created → email sent (MockSmtp) |
+| **Web Dashboard: Settings** | Family settings page: configure `notification_emails` (comma-separated, one per parent). | UI test: save emails → verified in DB |
 
-**Milestone deliverable:** Parent App is installed on your phone. You can:
+**Milestone deliverable:** Browse to `https://kidstune.altenburger.io/web` from any device. You can:
 - Log in with Spotify
 - See child profiles on the dashboard
 - Search "Bibi & Tina" → see grouped results (artists, albums, playlists)
 - Add "Bibi & Tina" as artist to Luna's profile → content visible in Luna's list
 - Add same artist to Max's profile with one more tap
 - Remove content from a single profile
+- When a content request arrives: email delivered to all configured parents with one-click approve link
 
 ---
 
@@ -1389,10 +1228,10 @@ Phase 9 ─→ Production-hardened, documented, ready for daily use
 | **Backend: Sync Endpoints (delta)** | Delta sync endpoint (`/api/v1/sync/{profileId}/delta?since=...`) delivering only changed/added/removed pre-resolved content trees since last sync. Full sync already implemented in Phase 4. | Integration: add content via parent → resolve → delta sync returns only new entry with full album/track tree |
 | **Kids App: Pairing Flow** | Enter pairing code screen (large number pad, kid-friendly), device registration, JWT storage in EncryptedSharedPreferences, replaces hardcoded profile | UI test: pairing code entry. Integration: end-to-end with backend |
 | **Kids App: Sync Manager** | WorkManager-based background sync on app launch + periodic (every 15 min when online). Delta sync preferred, full sync as fallback. Offline queue for favorites and content requests. Room DB updated transactionally. Conflict resolution: server wins for content, merge for favorites. | Unit: merge logic, offline queue, delta application. Integration: offline → online sync recovery, delta correctly applies additions/removals |
-| **Parent App: Device Management** | View paired devices with last-seen status, unpair device, reassign profile, generate new pairing code with large display for easy reading | UI test: device list, pairing code display |
+| **Web Dashboard: Device Management** | View paired devices with last-seen status, unpair device, reassign profile, generate new pairing code with large display | Integration: generate code via web → enter on kids device → paired |
 
 **Milestone deliverable:** The proper setup flow works:
-- Parent App generates pairing code → displayed as large numbers
+- Web dashboard generates pairing code → displayed as large numbers
 - Kids device shows pairing screen → enter code → device paired to Luna's profile
 - Parent adds new album for Luna → within 15 minutes, it appears on Luna's device
 - Parent removes content → disappears from Luna's device on next sync
@@ -1401,82 +1240,58 @@ Phase 9 ─→ Production-hardened, documented, ready for daily use
 
 ### Phase 6 – Import, Offline & Samsung Kids (Week 8)
 
-**Goal:** Complete onboarding experience (import from Spotify history), robust offline behavior, verified Samsung Kids compatibility.
+**Goal:** Complete onboarding experience (import from Spotify history via web dashboard), robust offline behavior, verified Samsung Kids compatibility.
 
 | Module | Scope | Tests |
 |--------|-------|-------|
 | **Backend: Listening History Import** | Fetch recently played + top artists + playlists from Spotify, apply children's content heuristic with age-based pre-selection, return grouped results | Unit: heuristic detection accuracy, age-range matching. Integration: mock Spotify history responses |
-| **Parent App: Import Flow** | Import wizard: select profiles → view pre-selected content with per-profile toggles → review → bulk add with progress indicator | UI test: full import flow |
+| **Web Dashboard: Import Wizard** | Import wizard page: select profiles → HTMX-loaded suggestion cards with per-profile checkboxes (age-based pre-selection) → bulk add with progress | Integration: full import flow via web → AllowedContent rows created |
 | **Kids App: Offline Hardening** | Stress-test offline behavior: airplane mode from cold start (should show all cached content), Wi-Fi loss mid-playback (should continue), favorites added offline queued correctly, content request queued offline. Visual offline indicator (subtle cloud icon). | Unit: offline queue persistence. Integration: simulate network loss mid-sync → recovery. Manual: airplane mode end-to-end walkthrough |
 | **Kids App: Samsung Kids Testing** | Verify: Activity lifecycle inside Samsung Kids, audio focus handling when Samsung Kids pauses/resumes, Spotify background process survives Samsung Kids transitions, correct behavior on Samsung Kids time limit reached | Manual test: documented procedure + verification checklist with screenshots |
 | **Documentation: Samsung Kids Setup** | Step-by-step guide with screenshots: install apps, configure Samsung Kids, add KidsTune Kids as allowed app, verify Spotify runs in background | Published as README section |
 
 **Milestone deliverable:** Full end-to-end onboarding works:
-- Parent opens Parent App for the first time → Spotify login → Import from history → Bibi & Tina pre-selected for both kids, Die drei ??? only for Max → import → done in 2 minutes
+- Parent opens web dashboard for the first time → Spotify login → Import from history → Bibi & Tina pre-selected for both kids, Die drei ??? only for Max → import → done in 2 minutes
 - Kids devices work reliably inside Samsung Kids
 - Kids can listen to cached content even without Wi-Fi
 - Complete setup guide exists for reproducibility
 
 ---
 
-### Phase 7 – Content Requests & Live Notifications (Weeks 9-10)
+### Phase 7 – Content Requests & Notifications (Weeks 9-10)
 
-**Goal:** Children can discover and request new content. Parents are reliably notified via a three-layer system (real-time WebSocket, periodic WorkManager polling, daily digest) – even when the Parent App isn't actively running.
+**Goal:** Children can discover and request new content. Parents receive email notifications with one-click approve links, plus real-time browser push when the dashboard is open.
 
 | Module | Scope | Tests |
 |--------|-------|-------|
 | **Backend: WebSocket Hub** | Spring WebFlux WebSocket handler, connection registry per familyId/deviceId, heartbeat/ping-pong (30s), automatic stale connection cleanup, reconnection support | Integration: connection lifecycle, message delivery after reconnection |
-| **Backend: Content Requests** | ContentRequest CRUD with status lifecycle (PENDING → APPROVED/REJECTED/EXPIRED). Max 3 pending per profile (429 on excess). On approval: auto-create AllowedContent + trigger ContentResolver + WebSocket notify. Reject with optional parent note. Bulk operations. | Integration: full lifecycle, 429 limit, bulk operations |
-| **Backend: Scheduled Jobs** | `expireStaleRequests()` daily at 03:00 (PENDING > 7 days → EXPIRED). `sendDailyDigest()` daily at 19:00 (summarize pending > 4h, push via WebSocket + set flag for polling). | Unit: expiry boundary conditions. Integration: digest generation |
+| **Backend: Content Requests** | ContentRequest CRUD with status lifecycle (PENDING → APPROVED/REJECTED/EXPIRED). Max 3 pending per profile (429 on excess). On approval: auto-create AllowedContent + trigger ContentResolver + WebSocket notify to kids device. Reject with optional parent note. Bulk operations. `approve_token` generated on creation. | Integration: full lifecycle, 429 limit, bulk operations |
+| **Backend: Email Notifications** | Spring Mail sends email to all `family.notification_emails` on request creation: child name, content title, [Approve] link with `approve_token`, [View Dashboard] link. Public `/web/approve/{token}` endpoint (no auth). `sendDailyDigest()` at 19:00 for pending > 4h. `expireStaleRequests()` at 03:00 (PENDING > 7 days → EXPIRED). | Unit: email content, token expiry. Integration: MockSmtp verifies email sent with correct approve URL. Digest boundary conditions. |
 | **Kids App: Discover Screen** | Search with voice input, request button (disabled at 3 pending), "My wishes" section with kid-friendly time context (no spinners), rejected items shown 24h then hidden, expired items silently removed, celebration animation on approval, NEW badge on fresh content | UI test: full flow including limit state. Unit: time context strings |
-| **Parent App: Layer 1 – Foreground Service** | WebSocket connection, auto-reconnect with backoff, real-time notification with [Approve] [Reject] action buttons, daily digest notification, ApproveRejectReceiver for background approval | Integration: WS message → notification → action button → API call |
-| **Parent App: Layer 2 – WorkManager Polling** | PendingRequestPollWorker every 15 min, polls `/pending/count`, deduplicates against Layer 1, creates notifications for new requests. Survives app kill + reboot. | Integration: service dead → WorkManager fires → notification shown |
-| **Parent App: Layer 3 – Boot + Setup** | BootReceiver re-registers WorkManager + optionally restarts Foreground Service on boot. Setup wizard explains layers, requests battery optimization exemption. | Integration: simulate boot → verify WorkManager active |
-| **Parent App: Approval Queue** | Request list with per-child approve/reject, bulk operations, expired requests tab with retroactive approve, parent note on reject, dashboard badge count | UI test: approve/reject, bulk, expired tab |
+| **Web Dashboard: Approval Queue** | Already built in Phase 2. In this phase: wire up real-time badge update via WebSocket push (HTMX hx-trigger on SSE or polling fragment). | Integration: WS push → badge updates in open browser |
 
 **Milestone deliverable:** The approval workflow is live with guaranteed delivery:
 - Luna searches "Frozen" on her device → taps "Request" (2 of 3 slots used)
-- **Best case (Layer 1):** Within 2 seconds, parent's phone shows notification with [Approve] [Reject]
-- **App not running (Layer 2):** Within 15 minutes, WorkManager polls and shows notification
-- **Parent forgot (Layer 3):** At 19:00, daily digest: "Luna and Max have 3 open wishes"
-- Parent taps [Approve] from notification shade (without opening app)
+- **All parents get email immediately** with [Approve] link – no app needed, works from any device
+- **Dashboard is open:** Pending badge updates in real time via WebSocket
+- **Forgotten requests:** At 19:00, digest email lists all pending requests with approve links
+- Parent clicks [Approve] in email → content added without login → confirmation page shown
 - Luna's device shows celebration animation → Frozen Soundtrack now playable
 - After 7 days without response: request silently expires, Luna can re-request
 
 ---
 
-### Phase 8 – Web Admin UI (Week 11)
+### Phase 8 – Admin Data Tables, Polish & Documentation (Weeks 11-12)
 
-**Goal:** A browser-accessible admin interface served by the Spring Boot backend. Provides all parent-facing features (no push notifications needed) plus direct CRUD access to all persisted entities for operational oversight and data management.
-
-| Module | Scope | Tests |
-|--------|-------|-------|
-| **Web UI: Foundation** | Add `spring-boot-starter-thymeleaf` + HTMX + Bootstrap 5 to backend. Dual auth: session cookies for `/web/**`, JWT unchanged for `/api/**`. Spotify OAuth web login flow (WebSession). Base layout template with sidebar navigation. Dashboard with overview stats. | Integration: OAuth flow → session → dashboard. Security: unauthenticated → redirect to login, existing API JWT tests unchanged |
-| **Web UI: Profiles & Content** | Profile CRUD pages (list, create, edit, delete with confirmation). Per-profile content list with type/scope/search filters. Spotify search via HTMX live results (no page reload). Scope picker and multi-profile target selector for adding content. | Integration: create profile via web → visible in REST API response. HTMX: search returns partial without full reload |
-| **Web UI: Import, Devices & Requests** | Import wizard (profile select → age-based pre-selected suggestions → bulk add with HTMX progress). Device management (list, unpair, reassign profile, generate + display pairing code). Content request queue (PENDING tab with approve/reject actions + optional note, history tab with APPROVED/REJECTED/EXPIRED). | Integration: approve request via web → AllowedContent created, WebSocket push dispatched to kids device |
-| **Web UI: Admin Data Tables** | Paginated, sortable CRUD tables for all entities: Family (read-only), ChildProfile, AllowedContent, ResolvedAlbum/Track (read-only + re-resolve trigger), Favorite, ContentRequest, PairedDevice. HTMX confirmation modals before all destructive operations. | Integration: admin delete → cascade verified. Re-resolve trigger → ContentResolver fires, resolved_at updated |
-
-**Milestone deliverable:** Browse to https://kidstune.altenburger.io/web from any computer:
-- Log in with Spotify → see dashboard with family stats
-- Create, edit, delete profiles without touching the phone
-- Search Spotify and manage per-profile content from a desktop browser
-- Run the import wizard, manage devices, generate pairing codes
-- Approve/reject pending content requests from the approval queue
-- View and edit any DB record in the admin section
-
----
-
-### Phase 9 – Polish, Hardening & Documentation (Week 12)
-
-**Goal:** Production-quality app ready for daily family use. Edge cases handled, performance optimized, everything documented.
+**Goal:** Admin CRUD tables for operational oversight, production-quality polish, everything documented.
 
 | Module | Scope |
 |--------|-------|
+| **Web Dashboard: Admin Data Tables** | Paginated, sortable CRUD tables for all entities: Family (read-only), ChildProfile, AllowedContent, ResolvedAlbum/Track (read-only + re-resolve trigger), Favorite, ContentRequest, PairedDevice. HTMX confirmation modals before all destructive operations. |
 | **Kids App: Animations** | Shared element transition (tile → Now Playing cover art), button press scale animations, page swipe physics, shimmer loading states, favorite heart bounce animation |
 | **Kids App: Edge Cases** | Spotify app not installed → friendly message with setup instructions, Spotify not logged in → prompt to hand device to parent, Spotify premium expired → graceful error, device storage full → warn and suggest clearing Spotify cache |
 | **Kids App: Accessibility** | Content descriptions on all images, touch target audit (≥72dp), color contrast check (WCAG AA), test with TalkBack screen reader |
-| **Parent App: Error Handling** | Network error states with retry buttons, Spotify token expiry → automatic re-auth flow, empty states for all list screens (friendly illustrations), input validation with inline errors |
-| **Parent App: Profile Management Polish** | Edit profile (change name, avatar, age group), view content summary per profile, quick-add content from one profile to another ("also add to Max?") |
+| **Web Dashboard: Error Handling** | Network error states with user-friendly messages, Spotify token expiry → automatic re-auth redirect, empty states for all list pages, input validation with field errors |
 | **Backend: Resilience** | Spotify API rate limit handling (429 → exponential backoff with queuing), per-device request throttling (prevent kids from spamming searches), circuit breaker on Spotify API client |
 | **Backend: Observability** | Structured JSON logging for Grafana Loki, health check endpoints (DB connectivity, Spotify API reachable, WebSocket hub stats, active connections), Spring Boot Actuator metrics for Prometheus/Grafana |
 | **End-to-End Tests** | Maestro YAML test suites for critical journeys: (1) fresh setup → pair → import → play, (2) parent adds content → appears on kids device, (3) kid requests → parent approves from notification → kid can play |
@@ -1602,20 +1417,11 @@ pipeline {
                 }
             }
         }
-        stage('Parent App') {
-            when { expression { env.PARENT_CHANGED } }
-            steps {
-                dir('parent-app') {
-                    sh './gradlew test'
-                    sh './gradlew assembleRelease'
-                }
-            }
-        }
     }
 }
 ```
 
-**Note:** Changes to `shared/` trigger rebuilds for both Android apps, since they depend on it.
+**Note:** Changes to `shared/` trigger a rebuild of the kids-app. The web dashboard is part of the backend build, so changes to `backend/` redeploy the web dashboard automatically.
 
 ---
 
@@ -1643,6 +1449,20 @@ kidstune/
 │   │   │   ├── db.changelog-master.yaml     # Liquibase master changelog
 │   │   │   ├── 001-initial-schema.yaml      # All tables
 │   │   │   └── 002-known-artists-seed.yaml  # Seed data
+│   │   ├── templates/web/                   # Thymeleaf templates
+│   │   │   ├── layout.html                  # Base layout with sidebar
+│   │   │   ├── login.html
+│   │   │   ├── dashboard.html
+│   │   │   ├── profiles/                    # list.html, form.html
+│   │   │   ├── content/                     # list.html, add.html
+│   │   │   ├── requests/                    # queue.html (tabs)
+│   │   │   ├── devices/                     # list.html, pair.html
+│   │   │   ├── import/                      # wizard.html
+│   │   │   ├── approve.html                 # Public one-click approve page
+│   │   │   ├── admin/                       # Admin CRUD tables
+│   │   │   ├── fragments/                   # Reusable HTMX partials
+│   │   │   └── error/                       # 403, 404, 500 pages
+│   │   ├── static/                          # Bootstrap + HTMX webjars (or CDN refs)
 │   │   ├── known-artists.yml                # Configurable children's artist list
 │   │   └── application.yml
 │   ├── src/test/
@@ -1672,28 +1492,6 @@ kidstune/
 │   │   │   └── components/                  # ContentTile, FavoriteButton, PageIndicator
 │   │   ├── playback/                        # Spotify App Remote SDK wrapper
 │   │   └── sync/                            # WorkManager sync jobs, offline queue
-│   └── app/src/test/
-│
-├── parent-app/
-│   ├── app/src/main/java/com/kidstune/parent/
-│   │   ├── di/
-│   │   ├── data/                            # API client, repositories
-│   │   ├── domain/                          # Use cases
-│   │   ├── ui/
-│   │   │   ├── auth/                        # Spotify login
-│   │   │   ├── dashboard/                   # Main dashboard
-│   │   │   ├── content/                     # Search, add, manage content
-│   │   │   ├── import_/                     # Import from listening history
-│   │   │   ├── profiles/                    # Profile management
-│   │   │   ├── devices/                     # Device management & pairing
-│   │   │   ├── requests/                    # Approval queue
-│   │   │   └── theme/
-│   │   └── notification/
-│   │       ├── NotificationService.kt       # Layer 1: Foreground Service with WebSocket
-│   │       ├── PendingRequestPollWorker.kt  # Layer 2: WorkManager periodic polling (15 min)
-│   │       ├── BootReceiver.kt              # Re-registers WorkManager + restarts service on boot
-│   │       ├── NotificationHelper.kt        # Android notification creation + deduplication
-│   │       └── ApproveRejectReceiver.kt     # BroadcastReceiver for notification action buttons
 │   └── app/src/test/
 │
 ├── shared/                                  # Shared Kotlin module
@@ -1780,9 +1578,10 @@ FLUSH PRIVILEGES;
    - docker compose up -d
    - Verify: curl https://kidstune.altenburger.io/actuator/health
 
-4. PARENT APP SETUP (on parent's phone)
-   - Install APK via ADB sideload or Jenkins artifact download
-   - Open app → Spotify OAuth login
+4. WEB DASHBOARD SETUP (from any browser)
+   - Browse to https://kidstune.altenburger.io/web
+   - Spotify OAuth login
+   - Settings → configure notification_emails (one per parent)
    - Create child profiles (name, avatar animal + color, age group)
    - Import existing children's content from listening history
    - Add additional artists/playlists as needed via search
@@ -1810,12 +1609,12 @@ FLUSH PRIVILEGES;
 
 | Task | How | Frequency |
 |------|-----|-----------|
-| **Adding new content** | Parent App → Search → Add (takes seconds) | As needed |
-| **Approving requests** | Tap notification → Approve/Reject | As they come in |
-| **App updates** | Jenkins builds APK → sideload via ADB | On code changes |
-| **Backend updates** | `docker compose pull && docker compose up -d` | On code changes |
+| **Adding new content** | Web Dashboard → Profile → Search → Add (takes seconds) | As needed |
+| **Approving requests** | Click [Approve] link in email, or open web dashboard | As they come in |
+| **Backend updates** | Jenkins builds → `docker compose up -d` auto-deployed | On code changes |
+| **Kids App updates** | Jenkins builds APK → sideload via ADB or Jenkins artifact | On code changes |
 | **Spotify offline content** | Periodically download new content in Spotify app for offline use | Monthly |
-| **Review allowed content** | Parent App → Content List → review and clean up | Quarterly |
+| **Review allowed content** | Web Dashboard → Profile → Content List → review and clean up | Quarterly |
 
 ---
 
@@ -1827,10 +1626,10 @@ FLUSH PRIVILEGES;
 | Spotify rate limits hit | Low | Medium | Backend caches all metadata in Caffeine; search results cached 1h; artist catalogs cached 6h; track mappings cached 24h |
 | Kids' device loses connectivity | High | Low | Full offline support via Room cache + Spotify offline downloads; graceful degradation; sync resumes automatically |
 | Spotify revokes dev app in "development mode" | Very Low | High | Stay under 25 users (easy for family); if ever needed, apply for extended quota |
-| Content type heuristic misclassifies | Medium | Low | Parent can manually override in Parent App; heuristic improves with expanded known-artists list |
+| Content type heuristic misclassifies | Medium | Low | Parent can manually override in web dashboard; heuristic improves with expanded known-artists list |
 | Kids break out of Samsung Kids | Very Low | Low | Samsung Kids is well-tested; additional fallback via Lock Task Mode available if needed |
-| WebSocket disconnects on parent device | Medium | **Low** | Three-layer fallback: Layer 1 (WebSocket) for real-time, Layer 2 (WorkManager polling every 15 min) guaranteed even when app is killed, Layer 3 (daily digest at 19:00) catches anything forgotten |
-| Android kills parent Foreground Service | Medium | **Low** | Layer 2 (WorkManager) is immune to service kills, Doze mode, and reboots. BootReceiver re-registers on boot. Battery optimization exemption requested on setup. |
+| Email delivery fails (SMTP outage) | Low | Low | Parent can still open web dashboard directly; daily digest retries next day; approve link is permanent until request expires |
+| Parent misses email (spam filter) | Low | Low | Daily digest at 19:00 provides a second chance; dashboard always shows pending count when opened |
 | MariaDB JSON column performance | Very Low | Low | `cached_metadata` is read-only cache; actual queries use indexed relational columns |
 | Spring Boot 4 ecosystem maturity | Low | Medium | Pin exact version (4.0.4); well-tested by community; migration guide available |
 
@@ -1841,7 +1640,7 @@ FLUSH PRIVILEGES;
 - **Sleep timer** – straightforward addition to player screen (countdown + fade-out)
 - **Time limits** – daily listening quota per profile, enforced in-app (more granular than Samsung Kids limits)
 - **Home Assistant integration** – expose playback state as HA sensor via MQTT, control via automations
-- **Web admin panel** – React dashboard as alternative to Parent App for desktop management
+- **Push notifications to parent phone** – add PWA notifications via browser push API (no FCM needed), triggered by existing WebSocket messages
 - **Multiple family support** – backend already scoped by `family_id`, just needs registration flow
 - **Playback history for parents** – track what each child listened to and for how long
 - **Content recommendations** – suggest new content based on allowed artists via Spotify's recommendation API
@@ -1922,7 +1721,7 @@ and: curl http://localhost:8080/actuator/health → should return 200
       for parent endpoints. Write integration tests: 401 without token, 200 with."
 ```
 
-#### Phase 2 – Content Management + Parent App
+#### Phase 2 – Content Management + Web Dashboard
 ```
 2.1: "Implement AllowedContent CRUD per-profile in the content/ package. Include
       scope field (TRACK/ALBUM/PLAYLIST/ARTIST). Implement scope resolution

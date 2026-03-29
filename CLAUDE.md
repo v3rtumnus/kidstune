@@ -2,21 +2,22 @@
 
 ## Project Overview
 
-KidsTune is a two-app + backend system providing children a safe, controlled Spotify listening experience. Parents manage content whitelists per-child-profile; kids see only approved audio content via a simplified UI running inside Samsung Kids on repurposed Samsung smartphones.
+KidsTune is a kids app + backend + web dashboard system providing children a safe, controlled Spotify listening experience. Parents manage content whitelists per-child-profile via a responsive web dashboard; kids see only approved audio content via a simplified Android UI running inside Samsung Kids on repurposed Samsung smartphones.
 
 ## Architecture
 
 ```
-kids-app (Kotlin/Compose) ──REST+WS──→ backend (Spring Boot 4 / Java 21) ←──REST+WS── parent-app (Kotlin/Compose)
-                                            │
-                                        MariaDB
-                                     (existing instance)
+kids-app (Kotlin/Compose) ──REST+WS──→ backend (Spring Boot 4 / Java 21)
+                                            │          │
+                                        MariaDB    Web Dashboard (Thymeleaf/HTMX)
+                                     (existing)   ← accessible from any browser
 ```
 
-- **Monorepo** with four Gradle modules: `backend/`, `kids-app/`, `parent-app/`, `shared/`
-- `shared/` is a Kotlin module with DTOs, enums, and API route constants used by both Android apps
+- **Monorepo** with three Gradle modules: `backend/`, `kids-app/`, `shared/`
+- `shared/` is a Kotlin module with DTOs, enums, and API route constants used by the kids-app
 - Backend connects to an existing MariaDB instance (not containerized with the app)
 - Kids App stores a **pre-resolved content tree** locally in Room for full offline support
+- Web Dashboard is served by the backend at `/web/**` using Thymeleaf + HTMX + Bootstrap 5
 
 ## Tech Stack
 
@@ -29,7 +30,7 @@ kids-app (Kotlin/Compose) ──REST+WS──→ backend (Spring Boot 4 / Java 2
 - **Caffeine** for in-memory Spotify metadata caching
 - **Gradle Kotlin DSL** for build
 
-### Android Apps (`kids-app/`, `parent-app/`)
+### Android App (`kids-app/`)
 - **Kotlin 2.x** / target SDK 35
 - **Jetpack Compose** with Material 3
 - **MVI architecture** (Model-View-Intent) with unidirectional data flow
@@ -74,7 +75,7 @@ Parent notifications use a **three-layer fallback**:
 All layers deduplicate: Layer 2 skips if Layer 1 already delivered. Notifications tagged with `requestId` for Android replacement.
 
 ### One-Time Profile Binding
-Each kids' device is permanently bound to one child profile at first launch. No profile switching. Profile can only be reassigned via the Parent App.
+Each kids' device is permanently bound to one child profile at first launch. No profile switching. Profile can only be reassigned via the Web Dashboard (Devices → Reassign Profile).
 
 ## Project Structure
 
@@ -111,18 +112,6 @@ kidstune/
 │       ├── ui/                     # Compose screens: setup, home, browse, player, discover
 │       ├── playback/               # Spotify App Remote SDK wrapper
 │       └── sync/                   # WorkManager sync + offline queue
-│
-├── parent-app/                     # Parent-facing Android app
-│   └── app/src/main/java/com/kidstune/parent/
-│       ├── di/
-│       ├── data/
-│       ├── domain/
-│       ├── ui/                     # auth, dashboard, content, import, profiles, devices, requests
-│       └── notification/           # Three-layer notification system:
-│                                    #   Layer 1: Foreground Service + WebSocket (real-time)
-│                                    #   Layer 2: WorkManager polling (survives app kill)
-│                                    #   Layer 3: Daily digest from backend cron
-│                                    #   + BootReceiver, ApproveRejectReceiver
 │
 ├── shared/                         # Shared Kotlin module (DTOs, constants)
 │   └── src/main/kotlin/com/kidstune/shared/
@@ -233,7 +222,7 @@ kidstune/
 
 7. **Content is per-profile, not per-family.** AllowedContent has `profile_id` FK. When adding content for "all children", create one AllowedContent row per profile.
 
-8. **Three-layer notification system, not FCM.** The Parent App uses: Layer 1 = Foreground Service with WebSocket (real-time), Layer 2 = WorkManager periodic polling every 15 min (survives app kill + reboot), Layer 3 = daily digest from backend cron. No Firebase dependency. All layers must deduplicate to avoid double notifications.
+8. **Email-based notifications, not FCM or Android push.** When a content request is created, the backend sends email to all `family.notification_emails` via Spring Mail. Email contains a one-click `/web/approve/{token}` link (public, no login). Daily digest at 19:00. WebSocket browser push updates the dashboard badge in real time. No Android parent app, no Firebase.
 
 9. **Jetpack Compose uses Material 3.** Do not import Material 2 (`androidx.compose.material`). Use `androidx.compose.material3` throughout.
 
@@ -257,9 +246,7 @@ cd kids-app
 ./gradlew test                       # Run unit + Robolectric tests
 ./gradlew connectedAndroidTest       # Run instrumented tests on device
 
-cd parent-app
-./gradlew assembleDebug
-./gradlew test
+# Web dashboard is part of the backend build – no separate build step needed
 ```
 
 ### Full Project
