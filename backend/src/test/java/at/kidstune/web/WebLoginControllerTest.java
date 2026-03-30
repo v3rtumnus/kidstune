@@ -2,6 +2,7 @@ package at.kidstune.web;
 
 import at.kidstune.auth.SpotifyConfig;
 import at.kidstune.auth.SpotifyTokenService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,7 +28,8 @@ class WebLoginControllerTest {
     // ── loginPage ────────────────────────────────────────────────────────────
 
     @Test
-    void `loginPage returns web-login view name`() {
+    @DisplayName("loginPage returns web-login view name")
+    void loginPageReturnsWebLoginViewName() {
         StepVerifier.create(controller.loginPage())
                 .expectNext("web/login")
                 .verifyComplete();
@@ -36,7 +38,8 @@ class WebLoginControllerTest {
     // ── spotifyLogin ─────────────────────────────────────────────────────────
 
     @Test
-    void `spotifyLogin stores pkce verifier in session and redirects to Spotify`() {
+    @DisplayName("spotifyLogin stores pkce verifier in session and redirects to Spotify")
+    void spotifyLoginStoresPkceVerifierAndRedirects() {
         when(spotifyConfig.getAccountsBaseUrl()).thenReturn("https://accounts.spotify.com");
         when(spotifyConfig.getClientId()).thenReturn("test-client-id");
         when(spotifyConfig.getWebRedirectUri()).thenReturn("https://example.com/web/auth/callback");
@@ -66,7 +69,8 @@ class WebLoginControllerTest {
     // ── callback ─────────────────────────────────────────────────────────────
 
     @Test
-    void `callback with missing PKCE state redirects to login with error`() {
+    @DisplayName("callback with missing PKCE state redirects to login with error")
+    void callbackWithMissingPkceStateRedirectsToLoginWithError() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/web/auth/callback?code=abc&state=unknown").build());
 
@@ -80,7 +84,8 @@ class WebLoginControllerTest {
     }
 
     @Test
-    void `callback with valid PKCE state stores familyId in session and redirects to dashboard`() {
+    @DisplayName("callback with valid PKCE state stores familyId in session and redirects to dashboard")
+    void callbackWithValidPkceStateStoresFamilyIdAndRedirects() {
         when(spotifyConfig.getWebRedirectUri()).thenReturn("https://example.com/web/auth/callback");
         when(tokenService.exchangeCodeAndPersist("code123", "verifier", "https://example.com/web/auth/callback"))
                 .thenReturn(reactor.core.publisher.Mono.just("family-id-001"));
@@ -98,15 +103,17 @@ class WebLoginControllerTest {
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
         assertThat(exchange.getResponse().getHeaders().getFirst("Location")).isEqualTo("/web/dashboard");
 
-        exchange.getSession().subscribe(session ->
-                assertThat(session.getAttribute(WebSessionAuthFilter.SESSION_FAMILY_ID))
-                        .isEqualTo("family-id-001"));
+        exchange.getSession().subscribe(session -> {
+            String familyId = session.getAttribute(WebSessionAuthFilter.SESSION_FAMILY_ID);
+            assertThat(familyId).isEqualTo("family-id-001");
+        });
     }
 
     // ── logout ───────────────────────────────────────────────────────────────
 
     @Test
-    void `logout invalidates session and redirects to login`() {
+    @DisplayName("logout invalidates session and redirects to login")
+    void logoutInvalidatesSessionAndRedirects() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.post("/web/logout").build());
 

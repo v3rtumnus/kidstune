@@ -237,10 +237,10 @@ class SpotifyProxyIntTest {
             .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
     }
 
-    private static String loadFixture(String filename) throws IOException {
+    private static String loadFixture(String filename) throws IOException, java.net.URISyntaxException {
         var url = SpotifyProxyIntTest.class.getClassLoader()
                 .getResource("spotify-fixtures/" + filename);
         assertThat(url).as("fixture not found: " + filename).isNotNull();
-        return Files.readString(Path.of(Objects.requireNonNull(url).getPath()), StandardCharsets.UTF_8);
+        return Files.readString(Path.of(Objects.requireNonNull(url).toURI()), StandardCharsets.UTF_8);
     }
 }
