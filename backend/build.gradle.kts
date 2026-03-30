@@ -21,6 +21,13 @@ dependencies {
     // Web & reactive
     implementation("org.springframework.boot:spring-boot-starter-webflux")
 
+    // Web dashboard (Thymeleaf reactive + HTMX + Bootstrap 5)
+    implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
+    implementation("nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect:3.3.0")
+    implementation("org.webjars:bootstrap:5.3.3")
+    implementation("org.webjars.npm:htmx.org:2.0.4")
+    implementation("org.webjars:webjars-locator-lite:1.0.1")
+
     // Persistence
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     runtimeOnly("org.mariadb.jdbc:mariadb-java-client")

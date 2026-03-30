@@ -3,26 +3,71 @@ package at.kidstune.config;
 import at.kidstune.auth.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.util.matcher.PathPatternParserServerWebExchangeMatcher;
+import reactor.core.publisher.Mono;
+
+import java.net.URI;
 
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-    public static final String KIDS_ROLE = "KIDS";
+    public static final String KIDS_ROLE   = "KIDS";
     public static final String PARENT_ROLE = "PARENT";
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
+    // ── Web dashboard security (session-based) ───────────────────────────────
+    // Order(1): evaluated first; only matches /web/** requests.
+    // Authentication is handled by WebSessionAuthFilter (@Component WebFilter)
+    // which runs globally before this chain and sets the security context from
+    // the WebSession familyId attribute.
+
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    @Order(1)
+    public SecurityWebFilterChain webFilterChain(ServerHttpSecurity http) {
+        return http
+                .securityMatcher(new PathPatternParserServerWebExchangeMatcher("/web/**"))
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .authorizeExchange(exchanges -> exchanges
+                        // Login / callback / approve links are public
+                        .pathMatchers(
+                                "/web/login",
+                                "/web/auth/spotify-login",
+                                "/web/auth/callback",
+                                "/web/approve/**"
+                        ).permitAll()
+                        .anyExchange().authenticated()
+                )
+                .exceptionHandling(eh -> eh
+                        .authenticationEntryPoint((exchange, ex) -> {
+                            exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+                            exchange.getResponse().getHeaders().setLocation(URI.create("/web/login"));
+                            return Mono.empty();
+                        })
+                )
+                .build();
+    }
+
+    // ── API / everything else (JWT-based) ────────────────────────────────────
+    // Order(2): evaluated after the web chain; handles /api/** and static resources.
+
+    @Bean
+    @Order(2)
+    public SecurityWebFilterChain apiFilterChain(ServerHttpSecurity http) {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
@@ -32,6 +77,7 @@ public class SecurityConfig {
 
                         // ── Public ───────────────────────────────────────────
                         .pathMatchers("/actuator/health").permitAll()
+                        .pathMatchers("/webjars/**").permitAll()
                         .pathMatchers(
                                 "/api/v1/auth/spotify/**",
                                 "/api/v1/auth/pair/confirm",

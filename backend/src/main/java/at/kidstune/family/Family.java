@@ -25,6 +25,10 @@ public class Family {
     @Column(name = "spotify_refresh_token")
     private String spotifyRefreshToken;
 
+    /** Comma-separated list of email addresses for parent notifications. */
+    @Column(name = "notification_emails", columnDefinition = "TEXT")
+    private String notificationEmails;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -56,6 +60,9 @@ public class Family {
 
     public String getSpotifyRefreshToken() { return spotifyRefreshToken; }
     public void setSpotifyRefreshToken(String spotifyRefreshToken) { this.spotifyRefreshToken = spotifyRefreshToken; }
+
+    public String getNotificationEmails() { return notificationEmails; }
+    public void setNotificationEmails(String notificationEmails) { this.notificationEmails = notificationEmails; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

@@ -144,10 +144,14 @@ public class SpotifyTokenService {
      * @return the stored Family ID
      */
     public Mono<String> exchangeCodeAndPersist(String code, String codeVerifier) {
+        return exchangeCodeAndPersist(code, codeVerifier, spotifyConfig.getRedirectUri());
+    }
+
+    public Mono<String> exchangeCodeAndPersist(String code, String codeVerifier, String redirectUri) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type",    "authorization_code");
         form.add("code",          code);
-        form.add("redirect_uri",  spotifyConfig.getRedirectUri());
+        form.add("redirect_uri",  redirectUri);
         form.add("client_id",     spotifyConfig.getClientId());
         form.add("code_verifier", codeVerifier);
 

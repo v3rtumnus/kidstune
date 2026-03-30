@@ -1,0 +1,14 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: "002-family-notification-emails"
+      author: "kidstune"
+      changes:
+        - addColumn:
+            tableName: family
+            columns:
+              - column:
+                  name: notification_emails
+                  type: TEXT
+                  constraints:
+                    nullable: true

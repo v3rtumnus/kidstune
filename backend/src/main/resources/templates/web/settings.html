@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Einstellungen</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Einstellungen</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Benachrichtigungs-E-Mails</h5>
+                </div>
+                <div class="card-body">
+
+                    <div class="alert alert-success" role="alert" th:if="${saved}">
+                        Einstellungen erfolgreich gespeichert.
+                    </div>
+
+                    <p class="text-muted small mb-3">
+                        Alle Elternteile, die Benachrichtigungen &uuml;ber Inhaltsanfragen erhalten sollen.
+                        Mehrere Adressen mit Komma trennen.
+                        Jede eingetragene Adresse erh&auml;lt alle Benachrichtigungs-E-Mails.
+                    </p>
+
+                    <form th:action="@{/web/settings}" method="post">
+                        <div class="mb-3">
+                            <label for="notificationEmails" class="form-label fw-semibold">
+                                E-Mail-Adresse(n)
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="notificationEmails"
+                                   name="notificationEmails"
+                                   placeholder="elternteil1@beispiel.de, elternteil2@beispiel.de"
+                                   th:value="${notificationEmails}">
+                            <div class="form-text">
+                                Beispiel: <code>mama@beispiel.de, papa@beispiel.de</code>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Speichern</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>

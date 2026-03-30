@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anmelden - KidsTune</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+    <style>
+        body { background: #1a1a2e; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-card { max-width: 400px; width: 100%; }
+        .brand-title { font-size: 2rem; font-weight: 700; color: #1db954; }
+        .brand-sub { color: rgba(255,255,255,.6); }
+        .btn-spotify { background: #1db954; color: #fff; border: none; font-weight: 600; padding: .75rem 2rem; font-size: 1rem; }
+        .btn-spotify:hover { background: #1aa34a; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="login-card text-center p-4">
+        <div class="mb-4">
+            <div class="brand-title">KidsTune</div>
+            <div class="brand-sub">Eltern-Dashboard</div>
+        </div>
+
+        <div class="card bg-dark border-0 shadow">
+            <div class="card-body p-4">
+                <h5 class="card-title text-white mb-1">Willkommen</h5>
+                <p class="text-white-50 small mb-4">Melde dich mit deinem Spotify-Konto an, um die Musik deiner Kinder zu verwalten.</p>
+
+                <th:block th:if="${param.error != null}">
+                    <div class="alert alert-danger py-2 small" role="alert">
+                        <span th:if="${param.error[0] == 'expired'}">Sitzung abgelaufen. Bitte versuche es erneut.</span>
+                        <span th:if="${param.error[0] == 'auth_failed'}">Anmeldung fehlgeschlagen. Bitte versuche es erneut.</span>
+                        <span th:unless="${param.error[0] == 'expired' or param.error[0] == 'auth_failed'}">Ein Fehler ist aufgetreten. Bitte versuche es erneut.</span>
+                    </div>
+                </th:block>
+
+                <a th:href="@{/web/auth/spotify-login}" class="btn btn-spotify w-100 rounded-pill">
+                    Mit Spotify anmelden
+                </a>
+
+                <p class="text-white-50 small mt-3 mb-0">
+                    Ein Spotify-Premium-Konto ist f&uuml;r die Wiedergabe auf den Kinderger&auml;ten erforderlich.
+                </p>
+            </div>
+        </div>
+    </div>
+    <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

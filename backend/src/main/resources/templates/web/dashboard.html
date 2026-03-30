@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>&Uuml;bersicht</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">&Uuml;bersicht</h1>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-primary" th:text="${profileCount}">0</div>
+                    <div class="text-muted small">Profile</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-success" th:text="${contentCount}">0</div>
+                    <div class="text-muted small">Inhalte</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold" th:classappend="${pendingRequestCount > 0} ? 'text-danger' : 'text-secondary'"
+                         th:text="${pendingRequestCount}">0</div>
+                    <div class="text-muted small">Offene Anfragen</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-info" th:text="${deviceCount}">0</div>
+                    <div class="text-muted small">Verbundene Ger&auml;te</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending requests alert -->
+    <div class="alert alert-warning d-flex align-items-center" role="alert"
+         th:if="${pendingRequestCount > 0}">
+        <div>
+            <strong th:text="${pendingRequestCount + (pendingRequestCount == 1 ? ' offene Anfrage' : ' offene Anfragen')}"></strong>
+            warten auf deine Best&auml;tigung.
+            <a th:href="@{/web/requests}" class="alert-link ms-1">Jetzt pr&uuml;fen</a>
+        </div>
+    </div>
+
+    <!-- Recent activity -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Zuletzt hinzugef&uuml;gt</h5>
+        </div>
+        <div class="card-body p-0">
+            <div th:if="${recentActivity.isEmpty()}" class="text-muted text-center py-4">
+                Noch keine Inhalte hinzugef&uuml;gt. <a th:href="@{/web/profiles}">Inhalte f&uuml;r ein Profil hinzuf&uuml;gen.</a>
+            </div>
+            <ul class="list-group list-group-flush" th:unless="${recentActivity.isEmpty()}">
+                <li class="list-group-item d-flex justify-content-between align-items-center"
+                    th:each="item : ${recentActivity}">
+                    <div>
+                        <div class="fw-semibold" th:text="${item.title}"></div>
+                        <small class="text-muted" th:text="${item.artistName}"></small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-secondary me-1" th:text="${item.scope}"></span>
+                        <span class="badge"
+                              th:classappend="${item.contentType.name() == 'MUSIC'} ? 'bg-primary' : 'bg-success'"
+                              th:text="${item.contentType}"></span>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>
