@@ -10,7 +10,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 **Implementation Progress:**
 - ✅ Phase 1 complete (1.1 – 1.4)
 - ✅ Phase 2 backend complete (2.1 – 2.3)
-- ⬅️ **NEXT: Prompt 2.4 – Web Dashboard Foundation**
+- ✅ Prompt 2.4 – Web Dashboard Foundation
+- ⬅️ **NEXT: Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue**
 
 ---
 
@@ -392,7 +393,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 2.4 – Web Dashboard Foundation ⬅️ NEXT
+### Prompt 2.4 – Web Dashboard Foundation ✅
 
 ```
 CONTEXT: Phase 2 of KidsTune. Backend has content management (2.1-2.3) and Spotify proxy.
@@ -453,7 +454,7 @@ VERIFICATION:
   → curl http://localhost:8080/web/login → HTML returned
 ```
 
-### Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue
+### Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue ⬅️ NEXT
 
 ```
 CONTEXT: Phase 2 of KidsTune. Web dashboard foundation exists (2.4). We add profile
