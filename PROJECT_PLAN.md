@@ -475,6 +475,23 @@ The Kids App runs inside **Samsung Kids** on the repurposed Samsung smartphone. 
 5. Set the Samsung Kids PIN
 6. Optionally configure daily time limits
 
+**Known Samsung Kids containment gap – Spotify media notification bypass:**
+
+When Samsung Kids' time limit expires, it shows a lock screen but on many One UI versions does not fully block the notification shade. The Spotify app registers its own media notification (the track player visible when swiping down), and tapping it fires a `PendingIntent` that can open Spotify directly — bypassing Samsung Kids' app whitelist.
+
+KidsTune closes this gap by registering its own `MediaSession` / `MediaBrowserService`:
+- KidsTune's MediaSession mirrors Spotify's playback state (track metadata, play/pause, position) by subscribing to `SpotifyAppRemote.PlayerApi.subscribeToPlayerState()`
+- Android shows KidsTune's media notification instead of Spotify's
+- Tapping the notification opens KidsTune (an allowed app), not Spotify
+- When a future usage time limit expires, KidsTune can dismiss its own notification entirely
+
+**Implementation notes:**
+- Use `androidx.media3` MediaSession (not the deprecated `MediaSessionCompat`)
+- KidsTune does NOT manage audio focus — Spotify still owns playback; KidsTune only mirrors state
+- Track artwork must be downloaded as a `Bitmap` asynchronously on track change (use Coil)
+- Playback position is calculated locally (`snapshotPosition + elapsedTime`) for smooth seek bar
+- On App Remote disconnect: set MediaSession to `STATE_STOPPED` and clear metadata
+
 **Fallback for non-Samsung devices:** The app includes an optional Lock Task Mode implementation that can be activated via ADB for devices without Samsung Kids:
 ```bash
 # One-time setup (requires factory reset):

@@ -1374,6 +1374,68 @@ VERIFICATION:
   ☐ Child cannot exit to Spotify or other apps
 ```
 
+### Prompt 6.5 – MediaSession / Media Notification Ownership
+
+```
+CONTEXT: Phase 6 of KidsTune. Samsung Kids compatibility is verified (6.4). There is a known
+containment gap: when Samsung Kids' time limit expires, its lock screen does not fully block the
+notification shade on most One UI versions. Spotify registers its own media notification, and
+tapping it fires a PendingIntent that opens Spotify directly — bypassing Samsung Kids' app
+whitelist. KidsTune closes this by owning the media notification itself.
+
+GOAL: When this task is done:
+- KidsTune registers a MediaSession (androidx.media3) inside a MediaBrowserService:
+  - MediaBrowserService runs as a foreground service, started when the kids app starts
+    and kept alive while the app is in use
+  - Service is declared in AndroidManifest with the MEDIA_CONTENT_CONTROL permission and
+    the correct intent filter (MediaBrowserServiceCompat action)
+- KidsTune mirrors Spotify's playback state into its own MediaSession:
+  - Subscribe to SpotifyAppRemote.PlayerApi.subscribeToPlayerState() in the service
+  - On each PlayerState update:
+    - Update MediaMetadata: track title, artist, album, duration, artwork (Bitmap via Coil)
+    - Update PlaybackState: STATE_PLAYING / STATE_PAUSED / STATE_STOPPED, playback position
+    - Playback position calculated as snapshotPosition + elapsedTime for smooth seek bar
+  - On App Remote disconnect: set state to STATE_STOPPED, clear metadata
+- The media notification is KidsTune's (not Spotify's):
+  - Android shows KidsTune's notification in the shade instead of Spotify's
+  - Tapping the notification opens KidsTune (via a PendingIntent to MainActivity) — NOT Spotify
+  - Play/pause and skip buttons in the notification call back into the service, which then
+    calls PlayerApi.resume() / PlayerApi.pause() / PlayerApi.skipNext() on the App Remote
+- Artwork loading:
+  - Load track image_url as Bitmap using Coil's ImageLoader.execute() (suspend, not compose)
+  - Set on MediaMetadata.Builder via putBitmap(METADATA_KEY_ALBUM_ART, bitmap)
+  - Cache the last loaded bitmap to avoid re-downloading on repeated state updates for the same track
+- Seek bar interaction:
+  - MediaSession receives ACTION_SEEK_TO → call PlayerApi.seekTo(position)
+- On KidsTune app foreground: connect App Remote, start mirroring
+- On KidsTune app background / process death: service continues running, maintains MediaSession
+
+REFERENCE: PROJECT_PLAN.md §5.1.4 (Samsung Kids containment gap, MediaSession implementation notes).
+
+CONSTRAINTS:
+- Use androidx.media3 MediaSession, NOT the deprecated MediaSessionCompat
+- KidsTune does NOT manage audio focus — Spotify owns playback, KidsTune only mirrors state
+- Do NOT attempt to cancel or dismiss Spotify's own MediaSession — Android will use KidsTune's
+  because it is the active session; don't fight Spotify's internals
+- Do NOT modify backend
+- Service must survive the activity being backgrounded (foreground service with ongoing notification)
+- Test on a real Samsung device if possible — media session priority behaviour is device-specific
+
+VERIFICATION:
+- Play a track via KidsTune → notification shade shows KidsTune's player (not Spotify's)
+  with correct track title, artist, artwork
+- Tap play/pause in notification → Spotify responds correctly
+- Tap the notification body → KidsTune app opens (not Spotify)
+- Pause in KidsTune UI → notification updates to paused state within ~200ms
+- Skip track → notification updates to new track metadata including artwork
+- Kill App Remote connection (force-stop Spotify) → notification clears / shows stopped state
+- Unit test: PlayerState subscriber correctly maps to MediaMetadata + PlaybackState
+- Unit test: artwork caching — same image_url on consecutive state updates → Coil called once
+- Manual test on Samsung device: Samsung Kids time limit expires → swipe down notification shade →
+  KidsTune notification visible → tap → KidsTune opens, NOT Spotify
+- Run ./gradlew test → all tests pass
+```
+
 ---
 
 ## Phase 7 – Content Requests & Live Notifications (Weeks 9-10)
