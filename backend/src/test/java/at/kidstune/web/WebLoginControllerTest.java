@@ -104,7 +104,7 @@ class WebLoginControllerTest {
         assertThat(exchange.getResponse().getHeaders().getFirst("Location")).isEqualTo("/web/dashboard");
 
         exchange.getSession().subscribe(session -> {
-            String familyId = session.getAttribute(WebSessionAuthFilter.SESSION_FAMILY_ID);
+            String familyId = session.getAttribute(WebSessionSecurityContextRepository.SESSION_FAMILY_ID);
             assertThat(familyId).isEqualTo("family-id-001");
         });
     }
@@ -119,7 +119,7 @@ class WebLoginControllerTest {
 
         // Populate session so there's something to invalidate
         exchange.getSession().subscribe(session ->
-                session.getAttributes().put(WebSessionAuthFilter.SESSION_FAMILY_ID, "some-family"));
+                session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, "some-family"));
 
         StepVerifier.create(controller.logout(exchange))
                 .verifyComplete();

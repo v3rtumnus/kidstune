@@ -106,7 +106,7 @@ public class WebLoginController {
 
             return tokenService.exchangeCodeAndPersist(code, verifier, spotifyConfig.getWebRedirectUri())
                     .flatMap(familyId -> exchange.getSession().flatMap(s -> {
-                        s.getAttributes().put(WebSessionAuthFilter.SESSION_FAMILY_ID, familyId);
+                        s.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
                         exchange.getResponse().setStatusCode(HttpStatus.FOUND);
                         exchange.getResponse().getHeaders().setLocation(URI.create("/web/dashboard"));
                         return exchange.getResponse().setComplete();

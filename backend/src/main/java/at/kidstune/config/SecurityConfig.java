@@ -1,6 +1,7 @@
 package at.kidstune.config;
 
 import at.kidstune.auth.JwtAuthenticationFilter;
+import at.kidstune.web.WebSessionSecurityContextRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -23,22 +24,27 @@ public class SecurityConfig {
     public static final String PARENT_ROLE = "PARENT";
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final WebSessionSecurityContextRepository webSessionSecurityContextRepository;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          WebSessionSecurityContextRepository webSessionSecurityContextRepository) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.webSessionSecurityContextRepository = webSessionSecurityContextRepository;
     }
 
     // ── Web dashboard security (session-based) ───────────────────────────────
     // Order(1): evaluated first; only matches /web/** requests.
-    // Authentication is handled by WebSessionAuthFilter (@Component WebFilter)
-    // which runs globally before this chain and sets the security context from
-    // the WebSession familyId attribute.
+    // Authentication is loaded by WebSessionSecurityContextRepository, which reads
+    // the familyId WebSession attribute written by WebLoginController after OAuth.
+    // SecurityContextServerWebExchangeWebFilter populates the Reactor context with
+    // that authentication before AuthorizationWebFilter runs.
 
     @Bean
     @Order(1)
     public SecurityWebFilterChain webFilterChain(ServerHttpSecurity http) {
         return http
                 .securityMatcher(new PathPatternParserServerWebExchangeMatcher("/web/**"))
+                .securityContextRepository(webSessionSecurityContextRepository)
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
