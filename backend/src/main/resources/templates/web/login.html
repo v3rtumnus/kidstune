@@ -26,7 +26,7 @@
                 <h5 class="card-title text-white mb-1">Willkommen</h5>
                 <p class="text-white-50 small mb-4">Melde dich mit deinem Spotify-Konto an, um die Musik deiner Kinder zu verwalten.</p>
 
-                <th:block th:if="${param.error != null}">
+                <th:block th:if="${param.error != null and !param.error.isEmpty()}">
                     <div class="alert alert-danger py-2 small" role="alert">
                         <span th:if="${param.error[0] == 'expired'}">Sitzung abgelaufen. Bitte versuche es erneut.</span>
                         <span th:if="${param.error[0] == 'auth_failed'}">Anmeldung fehlgeschlagen. Bitte versuche es erneut.</span>
