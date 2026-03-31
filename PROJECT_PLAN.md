@@ -62,12 +62,28 @@ A self-hosted backend (rather than direct device-to-device sync) provides:
 - **Multi-device support** – multiple kids' devices, multiple parent devices, all in sync
 - **Offline resilience** – kids' app caches allowed content locally, syncs when back online
 
-### 2.2 Spotify API Integration Strategy
+### 2.2 Spotify Account Model
 
-| API | Used By | Purpose |
-|-----|---------|---------|
-| **Spotify Web API** | Backend | Search, metadata, artist catalog, playlist contents, user listening history |
-| **Spotify App Remote SDK** | Kids App | Playback control (play, pause, skip, seek). Requires Spotify app installed on device |
+Each person in a KidsTune household has their **own individual Spotify account**. There is no shared family account.
+
+| Account | Owned By | Stored In | Used For |
+|---------|----------|-----------|----------|
+| Parent Spotify account | Parent(s) | `Family.spotify_refresh_token` | Web dashboard OAuth login; content search and metadata resolution via Spotify Web API |
+| Child Spotify account | Each child | `ChildProfile.spotify_refresh_token` | Playback via Spotify App Remote SDK on the child's device (SDK controls the Spotify app logged in with the child's own account); initial listening history import |
+
+**Key implications:**
+- The Spotify app on a child's device is logged in with the **child's own Spotify account**, not the parent's.
+- `SpotifyTokenService` manages tokens at two levels: per-family (parent) and per-profile (child).
+- The backend import wizard fetches each child's **own** listening history, playlists, and top artists using the child's token.
+- Content search/resolution from the web dashboard uses the parent's token.
+
+### 2.3 Spotify API Integration Strategy
+
+| API | Used By | Token Level | Purpose |
+|-----|---------|-------------|---------|
+| **Spotify Web API** | Backend (parent context) | Family | Dashboard content search, metadata resolution, artist/album/playlist lookup |
+| **Spotify Web API** | Backend (import context) | Per-profile (child) | Fetch child's listening history, playlists, top artists for import wizard |
+| **Spotify App Remote SDK** | Kids App | Child's on-device Spotify session | Playback control (play, pause, skip, seek) |
 
 **Important constraint:** The Spotify App Remote SDK controls the Spotify app running on the same device. The kids' phone must have Spotify installed, but children never open it directly – Samsung Kids only shows KidsTune Kids as an allowed app. Spotify runs as a background process exclusively.
 
@@ -75,21 +91,34 @@ A self-hosted backend (rather than direct device-to-device sync) provides:
 - Register at developer.spotify.com (free)
 - Development mode: up to 25 users (more than sufficient for family use)
 - No formal Spotify review process required at this scale
-- Required scopes: `user-read-playback-state`, `user-modify-playback-state`, `user-library-read`, `user-read-recently-played`, `playlist-read-private`, `streaming`
+- Required scopes for parent account: `user-read-playback-state`, `user-modify-playback-state`, `user-library-read`, `user-read-recently-played`, `playlist-read-private`, `streaming`
+- Required scopes for child accounts (import): `user-library-read`, `user-read-recently-played`, `user-top-read`, `playlist-read-private`
 
-### 2.3 Authentication Flow
+### 2.4 Authentication Flow
+
+Dashboard auth (email/password) is **fully decoupled from Spotify**. The parent logs into the dashboard with their own KidsTune credentials. Spotify tokens are stored separately and used purely for Spotify API calls — not for identity.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    INITIAL SETUP (one-time)                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  1. Parent opens web dashboard (browser)                        │
-│     └─→ Spotify OAuth PKCE login                                │
-│         └─→ Backend stores refresh_token server-side            │
+│  1. Parent opens web dashboard, registers with email + password │
+│     └─→ Family row created (email, password_hash)               │
+│     └─→ Session cookie issued                                   │
+│                                                                 │
+│  1b. Parent connects their Spotify account (in Settings):       │
+│     └─→ "Connect Spotify Account" → Spotify OAuth PKCE          │
+│         └─→ Backend stores family.spotify_refresh_token         │
+│         (Required for content search and metadata resolution)   │
 │                                                                 │
 │  2. Parent creates child profiles via web dashboard             │
 │     └─→ Backend stores profiles with avatars + age groups       │
+│                                                                 │
+│  2b. For each child profile: parent clicks "Link Spotify"       │
+│     └─→ Spotify OAuth PKCE for CHILD's Spotify account          │
+│         └─→ Backend stores child_profile.spotify_refresh_token  │
+│         (Required for listening history import)                 │
 │                                                                 │
 │  3. Parent clicks "Pair New Device" in web dashboard            │
 │     └─→ Backend generates 6-digit pairing code (5 min expiry)  │
@@ -102,19 +131,26 @@ A self-hosted backend (rather than direct device-to-device sync) provides:
 │  5. Parent assigns a child profile to the paired device         │
 │     (via web dashboard → Devices)                               │
 │                                                                 │
+│  Note: The Spotify app on the kids' device must be logged in    │
+│  with the child's own Spotify account (done once outside        │
+│  Samsung Kids as part of device setup). The App Remote SDK      │
+│  controls this already-logged-in Spotify session.               │
+│                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │                    ONGOING OPERATION                             │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Kids App uses device token for all backend calls               │
-│  Backend uses stored Spotify token for API calls on behalf of   │
-│  kids' device – token refresh happens server-side transparently │
+│  Dashboard access: email + password → session cookie            │
+│  Kids App: device token (JWT) for all backend calls             │
+│  Backend uses stored family Spotify token for content API calls │
 │  Spotify App Remote SDK on kids' device handles local playback  │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 This means:
+- Dashboard login is independent of Spotify — a lapsed Spotify subscription doesn't lock parents out
+- Multiple parents can have dashboard access without needing Spotify accounts
 - Children never see Spotify credentials
 - Token refresh happens server-side automatically
 - If Spotify token expires, backend handles re-auth transparently
@@ -173,21 +209,27 @@ This means:
 
 ```
 ┌─────────────────┐       ┌──────────────────────┐
-│ Family           │       │ ChildProfile         │
-├─────────────────┤       ├──────────────────────┤
-│ id (PK)         │──┐    │ id (PK)              │
-│ spotify_user_id │  │    │ family_id (FK)       │
-│ spotify_refresh_ │  │    │ name                 │
-│   token (encr.) │  │    │ avatar_icon          │
-│ notification_   │  │    │ avatar_color         │
-│   emails (TEXT) │  │    │ age_group (ENUM:     │
-│ created_at      │  │    │   TODDLER 0-3,       │
-└─────────────────┘  │    │   TODDLER 0-3,       │
-                     │    │   PRESCHOOL 4-6,      │
-                     │    │   SCHOOL 7-12)        │
-                     │    │ created_at            │
-                     └───>│ updated_at            │
-                          └──────────────────────┘
+│ Family           │       │ ChildProfile              │
+├─────────────────┤       ├───────────────────────────┤
+│ id (PK)         │──┐    │ id (PK)                   │
+│ email (UNIQUE)  │  │    │ family_id (FK)            │
+│ password_hash   │  │    │ name                      │
+│ spotify_user_id │  │    │ avatar_icon               │
+│  (nullable)     │  │    │ avatar_color              │
+│ spotify_refresh_ │  │    │ age_group (ENUM:          │
+│   token (encr., │  │    │   TODDLER 0-3,            │
+│   nullable)     │  │    │   PRESCHOOL 4-6,          │
+│ notification_   │  │    │   SCHOOL 7-12)            │
+│   emails (TEXT) │  │    │ spotify_user_id (nullable)│  ← child's own Spotify account
+│ created_at      │  │    │ spotify_refresh_token     │  ← child's OAuth token (encrypted)
+└─────────────────┘  │    │   (TEXT, nullable)        │
+                     │    │   SCHOOL 7-12)            │
+                     │    │ spotify_user_id (nullable)│  ← child's own Spotify account
+                     │    │ spotify_refresh_token     │  ← child's OAuth token (encrypted)
+                     │    │   (TEXT, nullable)        │
+                     │    │ created_at                │
+                     └───>│ updated_at                │
+                          └───────────────────────────┘
                                │
                      ┌─────────┼──────────────┐
                      ▼         ▼              ▼
@@ -741,17 +783,19 @@ The Discover screen allows children to search the full Spotify catalog, but NOT 
 
 #### 5.2.1 Page Structure
 
-The web dashboard is a responsive Thymeleaf + HTMX + Bootstrap 5 app served at `/web/**` by the Spring Boot backend. It uses session-based auth (Spotify OAuth) and is mobile-friendly.
+The web dashboard is a responsive Thymeleaf + HTMX + Bootstrap 5 app served at `/web/**` by the Spring Boot backend. It uses session-based auth (email + password, with optional "Remember me" persistent cookie) and is mobile-friendly. Spotify OAuth is a separate "Connect Spotify" step in Settings — not the login mechanism.
 
 ```
-/web/login            → Spotify OAuth login page
+/web/login            → Email + password login page (with "Remember me" checkbox)
+/web/register         → First-time registration page (email, password, confirm password)
 /web/dashboard        → Overview: pending count badge, profile cards, recent activity
 /web/profiles         → List, create, edit, delete child profiles
 /web/profiles/{id}/content → Content per profile (list, search/add, remove)
 /web/requests         → Approval queue (PENDING / APPROVED / REJECTED / EXPIRED tabs)
-/web/import           → Import wizard (listening history → age-based suggestions → bulk add)
+/web/import           → Import wizard (per-profile, uses child's own Spotify history)
 /web/devices          → Paired devices list, generate pairing code, reassign profile
 /web/approve/{token}  → One-click approve link from email (public, no login required)
+/web/settings         → Notification emails; connect/disconnect parent Spotify account
 /web/admin/**         → Admin CRUD tables for all entities (operational oversight)
 ```
 
@@ -788,19 +832,23 @@ The approval queue shows pending requests with inline approve/reject buttons (HT
          │
 #### 5.2.2 Initial Import Flow
 
-To ease migration from existing Spotify usage, the web dashboard includes an import wizard:
+To ease migration from existing Spotify usage, the web dashboard includes an import wizard. Since each child has their own Spotify account, the import is **per-profile** — each child's own listening history is fetched using their linked Spotify account.
+
+**Prerequisite:** The child's Spotify account must be linked to their profile (step 2b in §2.4) before import can run. Profiles without a linked Spotify account show a "Link Spotify Account first" prompt.
 
 ```
 1. Parent opens /web/import in browser
-2. Parent selects target profile(s):
+2. Parent selects a profile to import for:
    ┌─────────────────────────────────────┐
-   │  Import for which profile(s)?       │
-   │  ☑ 🐻 Luna (age 4-6)               │
-   │  ☑ 🦊 Max (age 7-12)               │
+   │  Import for which profile?          │
+   │  ○ 🐻 Luna (Spotify linked ✓)      │
+   │  ○ 🦊 Max  (Spotify linked ✓)      │
    │  [Continue →]                       │
    └─────────────────────────────────────┘
 
-3. Backend calls Spotify Web API:
+   (One profile at a time — each child's own history is separate)
+
+3. Backend calls Spotify Web API using CHILD's profile token:
    - GET /v1/me/player/recently-played (last 50 tracks)
    - GET /v1/me/playlists (all user playlists)
    - GET /v1/me/top/artists?time_range=medium_term (top 50 artists)
@@ -808,30 +856,26 @@ To ease migration from existing Spotify usage, the web dashboard includes an imp
 
 4. Backend groups and deduplicates results, applies children's content heuristic
 
-5. App displays results with per-profile assignment:
+5. App displays results for the selected profile (e.g., Luna):
 
    ┌─────────────────────────────────────────────────────────────┐
-   │  Import from Listening History                               │
+   │  Import from 🐻 Luna's Listening History                     │
    │                                                              │
    │  Detected children's content:                      [pre-✓]  │
    │  ┌─────────────────────────────────────────────────────┐    │
    │  │ ☑ Bibi & Tina              (23 plays)               │    │
-   │  │   → Artist (all content)                             │    │
-   │  │   Add to: [🐻 Luna ✓] [🦊 Max ✓]                    │    │
+   │  │   → Artist (all content)   [add to Luna ✓]          │    │
    │  │                                                      │    │
    │  │ ☑ Die drei ??? Kids        (15 plays)               │    │
-   │  │   → Artist (all content)                             │    │
-   │  │   Add to: [🐻 Luna ✗] [🦊 Max ✓]   ← age-based hint│    │
+   │  │   → Artist (all content)   [add to Luna ✓]          │    │
    │  │                                                      │    │
    │  │ ☑ Rolf Zuckowski           (8 plays)                │    │
-   │  │   → Artist (all content)                             │    │
-   │  │   Add to: [🐻 Luna ✓] [🦊 Max ✓]                    │    │
+   │  │   → Artist (all content)   [add to Luna ✓]          │    │
    │  └─────────────────────────────────────────────────────┘    │
    │                                                              │
-   │  Your playlists with kids content:                          │
+   │  Luna's playlists with kids content:                        │
    │  ┌─────────────────────────────────────────────────────┐    │
    │  │ ☑ "Einschlaflieder" (18 tracks)                      │    │
-   │  │   Add to: [🐻 Luna ✓] [🦊 Max ✓]                    │    │
    │  │ ☐ "Road Trip Mix" (52 tracks)                        │    │
    │  └─────────────────────────────────────────────────────┘    │
    │                                                              │
@@ -844,7 +888,9 @@ To ease migration from existing Spotify usage, the web dashboard includes an imp
    - Playlist selections → PLAYLIST scope
 ```
 
-**Smart per-profile pre-selection:** The heuristic not only detects children's content but also suggests age-appropriate assignment. For example, "Die drei ??? Kids" (recommended age 6+) is pre-selected for Max (age 7-12) but not for Luna (age 4-6). This is based on a simple age-range tag in the `known_children_artists` config:
+**Per-profile import:** Since each profile imports from its own Spotify account, the results naturally reflect that child's actual listening taste. The age-based heuristic is still applied as a soft hint — items below the child's age group are pre-deselected but still visible. Parents run the import once per profile.
+
+**Smart age-based pre-selection:** The heuristic applies `known_children_artists` age ranges. Items well above the profile's age group are pre-deselected (but visible). This is based on the `known_children_artists` config:
 ```yaml
 known_children_artists:
   - name: "Bibi & Tina"

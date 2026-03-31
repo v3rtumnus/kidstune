@@ -10,8 +10,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 **Implementation Progress:**
 - ✅ Phase 1 complete (1.1 – 1.4)
 - ✅ Phase 2 backend complete (2.1 – 2.3)
-- ✅ Prompt 2.4 – Web Dashboard Foundation
-- ⬅️ **NEXT: Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue**
+- ✅ Prompt 2.4 – Web Dashboard Foundation (login uses Spotify OAuth — superseded by 2.4b)
+- ⬅️ **NEXT: Prompt 2.4b – Refactor Dashboard Auth to Email/Password**
 
 ---
 
@@ -394,6 +394,9 @@ VERIFICATION:
 ```
 
 ### Prompt 2.4 – Web Dashboard Foundation ✅
+> ⚠️ **NOTE:** This prompt was implemented with Spotify OAuth as the login mechanism.
+> Prompt 2.4b below refactors this to email/password. The layout, dashboard stats,
+> and settings page built here remain valid; only the login/auth mechanism changes.
 
 ```
 CONTEXT: Phase 2 of KidsTune. Backend has content management (2.1-2.3) and Spotify proxy.
@@ -454,22 +457,168 @@ VERIFICATION:
   → curl http://localhost:8080/web/login → HTML returned
 ```
 
-### Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue ⬅️ NEXT
+### Prompt 2.4b – Refactor Dashboard Auth to Email/Password ⬅️ NEXT
+
+```
+CONTEXT: Phase 2 of KidsTune. The web dashboard foundation exists (2.4) but uses Spotify
+OAuth as the login mechanism. We decouple dashboard authentication from Spotify entirely:
+login uses email + password, with "Remember me" support. The parent's Spotify account
+becomes an optional "Connect Spotify" step in Settings (needed for content search/resolution,
+but not for login). Read CLAUDE.md pitfall #8 and PROJECT_PLAN.md §2.4 before starting.
+
+GOAL: When this task is done:
+
+- Family entity updated (Liquibase migration 003-family-auth.yaml):
+  - Add email VARCHAR(255) NOT NULL UNIQUE
+  - Add password_hash VARCHAR(255) NOT NULL  (BCrypt)
+  - spotify_user_id and spotify_refresh_token become nullable
+    (existing NOT NULL constraints relaxed)
+  - For any existing rows in the dev DB: set a placeholder password_hash so migration
+    applies cleanly (use a fixed BCrypt hash that the dev knows)
+
+- FamilyService (new or updated):
+  - register(email, password) → validates unique email, hashes password with BCrypt,
+    creates Family row, returns familyId
+  - authenticate(email, password) → loads Family by email, verifies BCrypt hash,
+    returns familyId or throws InvalidCredentialsException
+  - A FamilyRepository.findByEmail(email) query method
+
+- WebLoginController refactored (replaces Spotify-based login):
+  - GET  /web/login     → renders login form (email + password fields + "Remember me" checkbox)
+  - POST /web/login     → authenticates via FamilyService; on success: creates WebSession
+                          storing familyId; if "Remember me" checked: also sets a persistent
+                          "remember_me" cookie (signed token, 30-day TTL, stored in DB);
+                          redirects to /web/dashboard (or to the originally requested URL
+                          if redirected from a protected page)
+                          on failure: re-renders login form with generic error
+                          ("E-Mail oder Passwort falsch")
+  - GET  /web/register  → renders registration form (email, password, confirm password)
+  - POST /web/register  → validates fields (email format, password min 8 chars,
+                          passwords match, unique email); on success: creates Family,
+                          creates WebSession, redirects to /web/dashboard; on error:
+                          re-renders form with field-level errors
+  - POST /web/logout    → invalidates WebSession + deletes remember_me cookie/token;
+                          redirects to /web/login
+
+- Remember-me mechanism:
+  - New table remember_me_token (Liquibase migration 003-family-auth.yaml):
+    series VARCHAR(64) PK (random base64),
+    token_hash VARCHAR(64) (BCrypt or SHA-256 of random value),
+    family_id VARCHAR(36) FK → family(id) ON DELETE CASCADE,
+    created_at DATETIME(6), expires_at DATETIME(6)
+  - On "Remember me" login: generate random series + token; store hashed token in DB;
+    set cookie "remember_me={series}:{token}" (HttpOnly, Secure, SameSite=Strict, 30 days)
+  - On request with no WebSession but valid remember_me cookie:
+    WebSessionSecurityContextRepository (or a new RememberMeWebFilter) looks up series,
+    verifies token hash, creates new WebSession with familyId, rotates token (new token,
+    same series — standard Spring-style remember-me token rotation to detect theft)
+  - On logout: delete all remember_me_token rows for the family (not just the current series)
+
+- SecurityConfig updated:
+  - Public: /web/login, /web/register, /web/approve/**, /actuator/health
+    (remove /web/auth/callback and /web/auth/spotify-login from public list)
+  - Remove the web redirect to Spotify; unauthenticated /web/** → redirect to /web/login
+
+- SettingsWebController updated:
+  - GET /web/settings → shows notification_emails + Spotify section:
+    "Spotify account: [Connected as {spotifyUserId}] [Disconnect]"  or
+    "Spotify account: Not connected [Connect Spotify Account]"
+  - GET /web/settings/connect-spotify → initiates Spotify OAuth PKCE (same flow as before,
+    reusing existing SpotifyOAuthController internals) using a new redirect URI:
+    {base-url}/web/settings/spotify-callback
+  - GET /web/settings/spotify-callback → stores family.spotify_refresh_token + spotify_user_id;
+    redirects to /web/settings with ?spotify=connected
+  - POST /web/settings/disconnect-spotify → clears spotify_user_id + spotify_refresh_token
+    from Family; redirects to /web/settings
+
+- Old Spotify-based web login routes cleaned up:
+  - Remove /web/auth/spotify-login and /web/auth/callback from WebLoginController
+  - These routes no longer exist (they were only used for login, not for API use)
+  - The /api/v1/auth/spotify/** routes for device clients remain untouched
+
+REFERENCE: PROJECT_PLAN.md §2.4 (updated auth flow), §4.1 (Family entity with email + password_hash),
+§5.2.1 (/web/login and /web/register pages). CLAUDE.md pitfall #8 (two Spotify token levels;
+dashboard auth is independent of Spotify).
+
+CONSTRAINTS:
+- Use BCrypt (Spring Security's BCryptPasswordEncoder) for password hashing
+- Remember-me token uses the "persistent token" approach (series + token) — NOT a JWT or
+  a simple cookie value — to enable theft detection via series collision
+- Do NOT store plaintext passwords anywhere (not even in logs)
+- Registration is open (no invite code) — it's a private homeserver, not a public app
+- Do NOT modify /api/v1/** endpoints or JWT auth
+- Do NOT implement password reset (out of scope for now)
+- Thymeleaf error messages in German to match existing UI language
+
+VERIFICATION:
+- GET /web/register → registration form renders
+- POST /web/register with valid data → Family created (BCrypt hash in DB), session created,
+  redirected to /web/dashboard
+- POST /web/register with duplicate email → form re-rendered with "E-Mail bereits vergeben"
+- GET /web/login → login form renders (no more Spotify button)
+- POST /web/login with correct credentials → session created, redirected to /web/dashboard
+- POST /web/login with wrong password → form re-rendered with generic error
+- POST /web/login with "Remember me" → remember_me cookie set (HttpOnly, 30d) + DB row created
+- New browser (no session), valid remember_me cookie → automatically logged in, cookie rotated
+- POST /web/logout → session gone, remember_me cookie cleared, DB token deleted
+- GET /web/dashboard without session AND without remember_me cookie → 302 to /web/login
+- GET /web/settings → shows Spotify "Not connected" (since no OAuth happened yet)
+- GET /web/settings/connect-spotify → redirects to Spotify OAuth
+- Callback → Family.spotify_refresh_token stored, settings shows "Connected"
+- POST /web/settings/disconnect-spotify → token cleared
+- GET /api/v1/profiles without JWT → 401 (unchanged)
+- GET /api/v1/profiles with valid JWT → 200 (unchanged)
+- Run ./gradlew test → all tests pass
+- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local'
+  → test register + login flow in browser
+```
+
+### Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue
 
 ```
 CONTEXT: Phase 2 of KidsTune. Web dashboard foundation exists (2.4). We add profile
-management, per-profile content pages, and the content request approval queue.
+management (including per-profile Spotify account linking), per-profile content pages,
+and the content request approval queue.
+
+Each child has their own individual Spotify account. These are linked to child profiles
+via a separate OAuth flow (child's own Spotify credentials, not the parent's). The linked
+token is stored at the ChildProfile level and used later for the import wizard (phase 6).
 
 GOAL: When this task is done:
+
+- ChildProfile entity updated (requires Liquibase migration 003-profile-spotify.yaml):
+  - Add spotify_user_id VARCHAR(255) NULL
+  - Add spotify_refresh_token TEXT NULL
+  (Encrypted at rest using the same AES-256-GCM encryption already used for Family tokens)
+
+- SpotifyTokenService extended with profile-level methods (parallel to the existing family methods):
+  - getValidProfileAccessToken(profileId) → decrypts + refreshes child's token; returns current access token
+  - storeProfileTokens(profileId, accessToken, refreshToken, expiresIn)
+  - isProfileSpotifyLinked(profileId) → true if spotify_refresh_token is non-null for profile
+
+- New OAuth endpoints in WebLoginController (or a new ProfileSpotifyLinkController):
+  - GET /web/profiles/{id}/link-spotify → initiates Spotify OAuth PKCE for child's account;
+    stores profileId in session (to know which profile to update on callback);
+    uses a SEPARATE redirect_uri: {base-url}/web/profiles/spotify-callback
+    and the scopes required for import (user-library-read, user-read-recently-played,
+    user-top-read, playlist-read-private) — NOT the parent's scopes
+  - GET /web/profiles/spotify-callback → receives code for child's account,
+    exchanges for tokens, stores in ChildProfile via SpotifyTokenService,
+    redirects to /web/profiles/{id}/edit with ?linked=true
+
 - ProfileWebController with pages:
   - GET /web/profiles → list all profiles: name, avatar (colored CSS circle + emoji),
-    age group, content count, bound device name
+    age group, content count, bound device name, Spotify account linked badge
   - GET /web/profiles/new → create form (name, avatar icon/color dropdowns, age group)
   - POST /web/profiles → create, same validation as REST (max 6, unique name);
     on error: re-render form with field errors; on success: redirect to list
-  - GET /web/profiles/{id}/edit → edit form pre-populated
+  - GET /web/profiles/{id}/edit → edit form pre-populated; shows "Spotify account:
+    [Linked as {spotifyUserId}] [Unlink]" or "Not linked [Link Spotify Account]"
   - POST /web/profiles/{id} → update; redirect to list on success
   - POST /web/profiles/{id}/delete → HTMX confirmation modal; on confirm: delete + redirect
+  - POST /web/profiles/{id}/unlink-spotify → clears spotify_user_id + spotify_refresh_token
+    on the profile; redirect to edit page with ?unlinked=true
+
 - ContentWebController with pages:
   - GET /web/profiles/{profileId}/content → content table: title, artist, scope badge,
     type badge, added date, delete button; query params: ?type=, ?scope=, ?search=
@@ -480,6 +629,7 @@ GOAL: When this task is done:
     checkboxes (for bulk-add to siblings); calls ContentService.addContent() or addContentBulk()
   - POST /web/profiles/{profileId}/content/{id}/delete → HTMX confirmation;
     on confirm: delete + HTMX swap removes the row
+
 - RequestWebController with pages:
   - GET /web/requests → tabbed page: PENDING, APPROVED, REJECTED, EXPIRED
     (tab content loaded via HTMX hx-get on tab click)
@@ -494,8 +644,10 @@ GOAL: When this task is done:
   - GET /web/requests/history → HTMX partial for history tabs (APPROVED/REJECTED/EXPIRED)
 - Shared fragments: web/fragments/confirm-modal.html (HTMX), web/fragments/search-results.html
 
-REFERENCE: PROJECT_PLAN.md §5.2.1 (dashboard layout wireframe, approval queue wireframe),
-§4.1 (ChildProfile entity), §4.2 (content scope). CLAUDE.md pitfall #7 (per-profile, not per-family).
+REFERENCE: PROJECT_PLAN.md §2.2 (Spotify account model — child tokens at profile level),
+§2.4 (auth flow step 2b — child Spotify linking), §4.1 (ChildProfile entity with new Spotify fields),
+§5.2.1 (dashboard layout wireframe, approval queue wireframe),
+§4.2 (content scope). CLAUDE.md pitfall #7 (per-profile, not per-family).
 
 CONSTRAINTS:
 - Do NOT implement email notifications here (prompt 2.6)
@@ -504,11 +656,16 @@ CONSTRAINTS:
 - Reuse ProfileService, ContentService, ContentRequestService directly
 - HTMX for search results and delete confirmations; no full-page reloads for these actions
 - Avatar display: colored CSS circles with animal emoji characters (no image files)
+- The child OAuth callback must use a DIFFERENT redirect_uri than the parent login callback
+  (e.g., /web/profiles/spotify-callback vs /web/auth/callback)
+- Register /web/profiles/spotify-callback as a valid redirect URI in Spotify Developer App settings
 
 VERIFICATION:
-- GET /web/profiles → shows profiles with content count
+- GET /web/profiles → shows profiles with content count and Spotify linked/unlinked badge
 - Create profile via web → appears in list → visible via GET /api/v1/profiles
 - Edit profile → updated values in list
+- "Link Spotify Account" on edit page → triggers child OAuth → redirects back → profile shows linked
+- "Unlink" → clears token, profile shows not linked
 - Delete profile → confirmation modal → cascade-deleted in DB
 - Spotify search HTMX: POST search → partial HTML returned (no full page reload)
 - Add content → visible in content list + in API response
@@ -1188,45 +1345,55 @@ VERIFICATION:
 
 ```
 CONTEXT: Phase 6 of KidsTune. We implement the Spotify listening history import to ease
-onboarding for new families.
+onboarding. Each child has their own Spotify account linked to their ChildProfile (set up
+in prompt 2.5). The import fetches each CHILD's own listening history using the
+child's profile-level Spotify token — NOT the parent's family-level token.
 
 GOAL: When this task is done:
 - SpotifyImportService in spotify/ package:
-  - getImportSuggestions(familyId) → calls Spotify Web API:
+  - getImportSuggestions(profileId) → resolves the child's Spotify token via
+    SpotifyTokenService.getValidProfileAccessToken(profileId) and calls:
     - GET /v1/me/player/recently-played (limit 50)
     - GET /v1/me/top/artists?time_range=medium_term (limit 50)
     - GET /v1/me/top/artists?time_range=long_term (limit 50)
     - GET /v1/me/playlists (limit 50)
+    All calls authenticated with the child's access token (not the family token).
+  - Throws ProfileSpotifyNotLinkedException if the profile has no linked Spotify account
   - Deduplicates artists across all sources
   - Groups results into:
     - detectedChildrenContent: items matching children's heuristic (pre-selected)
     - playlists: user playlists containing likely children's content
     - otherArtists: everything else (not pre-selected)
-  - Per item, per profile: suggests inclusion based on age matching:
+  - Applies age-based pre-selection using the profile's own age_group:
     - Loads known-artists.yml min_age
-    - Compares with each profile's age_group (TODDLER=0-3, PRESCHOOL=4-6, SCHOOL=7-12)
-    - e.g., "Die drei ??? Kids" (min_age 6) pre-selected for SCHOOL, not for TODDLER
-  - Returns ImportSuggestionsDto with per-item per-profile selection flags
+    - Compares with profile's age_group (TODDLER=0-3, PRESCHOOL=4-6, SCHOOL=7-12)
+  - Returns ImportSuggestionsDto (scoped to the single profile, no per-profile flags needed)
 - POST /api/v1/content/import endpoint (already defined) now fully implemented:
   - Accepts { items: [{ spotifyUri, scope, profileIds[] }] }
   - Creates AllowedContent rows per profile
   - Triggers ContentResolver for each new entry
   - Returns { created: int, profiles: [{ id, name, newContentCount }] }
 
-REFERENCE: PROJECT_PLAN.md §5.2.2 (import flow with per-profile age-based pre-selection),
+REFERENCE: PROJECT_PLAN.md §2.2 (Spotify account model — per-profile tokens),
+§5.2.2 (import flow — per-profile, uses child's own Spotify history),
 §5.2.2 (known-artists.yml format with age ranges), §6.1 Content Management import endpoint.
 
 CONSTRAINTS:
 - Do NOT modify Android apps
+- Use SpotifyTokenService.getValidProfileAccessToken(profileId) — NOT getValidAccessToken(familyId)
 - Genre-based heuristic reuses ContentTypeClassifier from phase 2
 - Known-artists.yml reuses KnownChildrenArtists from phase 2
+- If profile's Spotify account is not linked: return 409 with error "SPOTIFY_NOT_LINKED"
 
 VERIFICATION:
-- Unit test: age-based pre-selection logic:
-  - "Bibi & Tina" (min_age 3) → selected for TODDLER, PRESCHOOL, SCHOOL
-  - "Die drei ??? Kids" (min_age 6) → NOT for TODDLER, YES for PRESCHOOL, YES for SCHOOL
-  - "Die drei ???" (min_age 10) → NOT for TODDLER, NOT for PRESCHOOL, YES for SCHOOL
-- Integration test with MockWebServer: mock Spotify responses → verify grouped results
+- Unit test: age-based pre-selection logic for a PRESCHOOL profile:
+  - "Bibi & Tina" (min_age 3) → pre-selected
+  - "Die drei ??? Kids" (min_age 6) → NOT pre-selected (age 4-6 is borderline — deselect to be safe)
+  - "Die drei ???" (min_age 10) → NOT pre-selected
+- Unit test: getImportSuggestions with unlinked profile → throws ProfileSpotifyNotLinkedException
+- Integration test with MockWebServer: mock Spotify responses using CHILD's token →
+  verify grouped results correctly use profile token (not family token)
+- Integration test: unlinked profile → 409 with SPOTIFY_NOT_LINKED
   with correct pre-selection per profile
 - Integration test: POST /api/v1/content/import with 3 items, 2 profiles →
   verify 6 AllowedContent rows created, ContentResolver triggered 6 times

@@ -222,11 +222,13 @@ kidstune/
 
 7. **Content is per-profile, not per-family.** AllowedContent has `profile_id` FK. When adding content for "all children", create one AllowedContent row per profile.
 
-8. **Email-based notifications, not FCM or Android push.** When a content request is created, the backend sends email to all `family.notification_emails` via Spring Mail. Email contains a one-click `/web/approve/{token}` link (public, no login). Daily digest at 19:00. WebSocket browser push updates the dashboard badge in real time. No Android parent app, no Firebase.
+8. **Dashboard auth is email/password — completely independent of Spotify.** The web dashboard login (`/web/login`) uses `Family.email` + `Family.password_hash` (BCrypt). Spotify tokens are stored separately and used only for Spotify API calls. Two Spotify token levels exist: `Family.spotify_refresh_token` (parent's account, nullable — connected via Settings, used for content search/resolution) and `ChildProfile.spotify_refresh_token` (each child's own account, nullable — connected per-profile, used for import). `SpotifyTokenService` has parallel methods: `getValidAccessToken(familyId)` for parent context, `getValidProfileAccessToken(profileId)` for child import context. The Spotify App Remote SDK on a child's device controls the Spotify app already logged in with the child's own account — no backend token exchange for playback. Never use the family Spotify token for per-child import operations. Never gate dashboard login on Spotify connectivity.
 
-9. **Jetpack Compose uses Material 3.** Do not import Material 2 (`androidx.compose.material`). Use `androidx.compose.material3` throughout.
+9. **Email-based notifications, not FCM or Android push.** When a content request is created, the backend sends email to all `family.notification_emails` via Spring Mail. Email contains a one-click `/web/approve/{token}` link (public, no login). Daily digest at 19:00. WebSocket browser push updates the dashboard badge in real time. No Android parent app, no Firebase.
 
-10. **Coil 3, not Coil 2.** Import path is `coil3.*`, not `coil.*`. Compose integration is `coil3.compose.AsyncImage`.
+10. **Jetpack Compose uses Material 3.** Do not import Material 2 (`androidx.compose.material`). Use `androidx.compose.material3` throughout.
+
+11. **Coil 3, not Coil 2.** Import path is `coil3.*`, not `coil.*`. Compose integration is `coil3.compose.AsyncImage`.
 
 ## Build & Run
 
