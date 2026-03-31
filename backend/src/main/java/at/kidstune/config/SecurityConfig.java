@@ -84,7 +84,7 @@ public class SecurityConfig {
                         // ── Public ───────────────────────────────────────────
                         .pathMatchers("/actuator/health").permitAll()
                         .pathMatchers("/webjars/**").permitAll()
-                        .pathMatchers("/favicon.ico", "/robots.txt").permitAll()
+                        .pathMatchers("/", "/favicon.ico", "/robots.txt").permitAll()
                         .pathMatchers(
                                 "/api/v1/auth/spotify/**",
                                 "/api/v1/auth/pair/confirm",
