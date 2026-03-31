@@ -84,6 +84,7 @@ public class SecurityConfig {
                         // ── Public ───────────────────────────────────────────
                         .pathMatchers("/actuator/health").permitAll()
                         .pathMatchers("/webjars/**").permitAll()
+                        .pathMatchers("/favicon.ico", "/robots.txt").permitAll()
                         .pathMatchers(
                                 "/api/v1/auth/spotify/**",
                                 "/api/v1/auth/pair/confirm",
@@ -105,6 +106,16 @@ public class SecurityConfig {
 
                         // ── Anything else requires authentication ─────────────
                         .anyExchange().authenticated()
+                )
+                .exceptionHandling(eh -> eh
+                        .authenticationEntryPoint((exchange, ex) -> {
+                            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                            return exchange.getResponse().setComplete();
+                        })
+                        .accessDeniedHandler((exchange, ex) -> {
+                            exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+                            return exchange.getResponse().setComplete();
+                        })
                 )
                 .build();
     }
