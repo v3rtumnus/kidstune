@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrieren - KidsTune</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+    <style>
+        body { background: #1a1a2e; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .register-card { max-width: 420px; width: 100%; }
+        .brand-title { font-size: 2rem; font-weight: 700; color: #1db954; }
+        .brand-sub { color: rgba(255,255,255,.6); }
+    </style>
+</head>
+<body>
+    <div class="register-card p-3">
+        <div class="text-center mb-4">
+            <div class="brand-title">KidsTune</div>
+            <div class="brand-sub">Konto erstellen</div>
+        </div>
+
+        <div class="card bg-dark border-0 shadow">
+            <div class="card-body p-4">
+                <h5 class="card-title text-white mb-4">Neues Konto</h5>
+
+                <form th:action="@{/web/register}" method="post">
+                    <div class="mb-3">
+                        <label for="email" class="form-label text-white-50 small">E-Mail-Adresse</label>
+                        <input type="email"
+                               class="form-control bg-secondary border-0 text-white"
+                               th:classappend="${emailError != null} ? 'is-invalid' : ''"
+                               id="email" name="email"
+                               th:value="${email}"
+                               autocomplete="email" required autofocus>
+                        <div th:if="${emailError}" class="invalid-feedback" th:text="${emailError}"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label text-white-50 small">Passwort</label>
+                        <input type="password"
+                               class="form-control bg-secondary border-0 text-white"
+                               th:classappend="${passwordError != null} ? 'is-invalid' : ''"
+                               id="password" name="password"
+                               autocomplete="new-password" required>
+                        <div class="form-text text-white-50" th:if="${passwordError == null}">Mindestens 8 Zeichen</div>
+                        <div th:if="${passwordError}" class="invalid-feedback" th:text="${passwordError}"></div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="confirmPassword" class="form-label text-white-50 small">Passwort best&auml;tigen</label>
+                        <input type="password"
+                               class="form-control bg-secondary border-0 text-white"
+                               th:classappend="${passwordError != null} ? 'is-invalid' : ''"
+                               id="confirmPassword" name="confirmPassword"
+                               autocomplete="new-password" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 fw-semibold">Konto erstellen</button>
+                </form>
+
+                <hr class="border-secondary my-3">
+                <p class="text-center text-white-50 small mb-0">
+                    Bereits ein Konto?
+                    <a th:href="@{/web/login}" class="text-success">Anmelden</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

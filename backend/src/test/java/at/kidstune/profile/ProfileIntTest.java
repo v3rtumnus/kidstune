@@ -65,6 +65,8 @@ class ProfileIntTest {
         if (!familyRepository.existsById(FAMILY_ID)) {
             Family family = new Family();
             family.setId(FAMILY_ID);
+            family.setEmail("test-" + FAMILY_ID + "@kidstune.test");
+            family.setPasswordHash("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
             family.setSpotifyUserId("test-spotify-user-" + FAMILY_ID);
             familyRepository.save(family);
         }

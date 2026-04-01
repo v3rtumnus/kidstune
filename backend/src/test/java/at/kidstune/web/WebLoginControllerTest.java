@@ -1,7 +1,7 @@
 package at.kidstune.web;
 
-import at.kidstune.auth.SpotifyConfig;
-import at.kidstune.auth.SpotifyTokenService;
+import at.kidstune.family.FamilyService;
+import at.kidstune.family.InvalidCredentialsException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,8 +19,9 @@ import static org.springframework.http.HttpStatus.FOUND;
 @ExtendWith(MockitoExtension.class)
 class WebLoginControllerTest {
 
-    @Mock SpotifyTokenService tokenService;
-    @Mock SpotifyConfig       spotifyConfig;
+    @Mock FamilyService             familyService;
+    @Mock RememberMeTokenRepository rememberMeTokenRepository;
+    @Mock RememberMeWebFilter       rememberMeWebFilter;
 
     @InjectMocks
     WebLoginController controller;
@@ -28,85 +29,136 @@ class WebLoginControllerTest {
     // ── loginPage ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("loginPage returns web-login view name")
-    void loginPageReturnsWebLoginViewName() {
-        StepVerifier.create(controller.loginPage())
+    @DisplayName("loginPage returns web/login view name")
+    void loginPageReturnsViewName() {
+        org.springframework.ui.Model model =
+                new org.springframework.ui.ExtendedModelMap();
+        StepVerifier.create(controller.loginPage(null, model))
                 .expectNext("web/login")
                 .verifyComplete();
     }
 
-    // ── spotifyLogin ─────────────────────────────────────────────────────────
-
     @Test
-    @DisplayName("spotifyLogin stores pkce verifier in session and redirects to Spotify")
-    void spotifyLoginStoresPkceVerifierAndRedirects() {
-        when(spotifyConfig.getAccountsBaseUrl()).thenReturn("https://accounts.spotify.com");
-        when(spotifyConfig.getClientId()).thenReturn("test-client-id");
-        when(spotifyConfig.getWebRedirectUri()).thenReturn("https://example.com/web/auth/callback");
-
-        MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/web/auth/spotify-login").build());
-
-        StepVerifier.create(controller.spotifyLogin(exchange))
+    @DisplayName("loginPage with error param adds errorMessage attribute")
+    void loginPageWithErrorParamAddsErrorMessage() {
+        org.springframework.ui.Model model =
+                new org.springframework.ui.ExtendedModelMap();
+        StepVerifier.create(controller.loginPage("credentials", model))
+                .expectNext("web/login")
                 .verifyComplete();
-
-        // Response must be a redirect to Spotify
-        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
-        String location = exchange.getResponse().getHeaders().getFirst("Location");
-        assertThat(location).startsWith("https://accounts.spotify.com/authorize");
-        assertThat(location).contains("client_id=test-client-id");
-        assertThat(location).contains("code_challenge_method=S256");
-        assertThat(location).contains("redirect_uri=");
-
-        // PKCE verifier must be stored in the session
-        exchange.getSession().subscribe(session -> {
-            boolean hasPkceEntry = session.getAttributes().keySet().stream()
-                    .anyMatch(k -> k.startsWith("pkce_"));
-            assertThat(hasPkceEntry).isTrue();
-        });
+        assertThat(model.asMap()).containsKey("errorMessage");
     }
 
-    // ── callback ─────────────────────────────────────────────────────────────
+    // ── processLogin ─────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("callback with missing PKCE state redirects to login with error")
-    void callbackWithMissingPkceStateRedirectsToLoginWithError() {
-        MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/web/auth/callback?code=abc&state=unknown").build());
+    @DisplayName("processLogin with valid credentials sets familyId in session and redirects to dashboard")
+    void processLoginValidCredentialsSetsSessionAndRedirects() {
+        when(familyService.authenticate("user@example.com", "secret123"))
+                .thenReturn("family-001");
 
-        // No PKCE verifier stored in session → should redirect to /web/login?error=expired
-        StepVerifier.create(controller.callback("abc", "unknown", exchange))
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/login").build());
+
+        StepVerifier.create(controller.processLogin(
+                        "user@example.com", "secret123", false, exchange))
                 .verifyComplete();
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
-        String location = exchange.getResponse().getHeaders().getFirst("Location");
-        assertThat(location).isEqualTo("/web/login?error=expired");
-    }
-
-    @Test
-    @DisplayName("callback with valid PKCE state stores familyId in session and redirects to dashboard")
-    void callbackWithValidPkceStateStoresFamilyIdAndRedirects() {
-        when(spotifyConfig.getWebRedirectUri()).thenReturn("https://example.com/web/auth/callback");
-        when(tokenService.exchangeCodeAndPersist("code123", "verifier", "https://example.com/web/auth/callback"))
-                .thenReturn(reactor.core.publisher.Mono.just("family-id-001"));
-
-        MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/web/auth/callback?code=code123&state=state-xyz").build());
-
-        // Pre-populate PKCE verifier in session
-        exchange.getSession().subscribe(session ->
-                session.getAttributes().put("pkce_state-xyz", "verifier"));
-
-        StepVerifier.create(controller.callback("code123", "state-xyz", exchange))
-                .verifyComplete();
-
-        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
-        assertThat(exchange.getResponse().getHeaders().getFirst("Location")).isEqualTo("/web/dashboard");
+        assertThat(exchange.getResponse().getHeaders().getFirst("Location"))
+                .isEqualTo("/web/dashboard");
 
         exchange.getSession().subscribe(session -> {
             String familyId = session.getAttribute(WebSessionSecurityContextRepository.SESSION_FAMILY_ID);
-            assertThat(familyId).isEqualTo("family-id-001");
+            assertThat(familyId).isEqualTo("family-001");
         });
+    }
+
+    @Test
+    @DisplayName("processLogin with invalid credentials redirects to login with error param")
+    void processLoginInvalidCredentialsRedirectsWithError() {
+        when(familyService.authenticate("bad@example.com", "wrong"))
+                .thenThrow(new InvalidCredentialsException());
+
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/login").build());
+
+        StepVerifier.create(controller.processLogin(
+                        "bad@example.com", "wrong", false, exchange))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
+        String location = exchange.getResponse().getHeaders().getFirst("Location");
+        assertThat(location).startsWith("/web/login");
+        assertThat(location).contains("error");
+    }
+
+    @Test
+    @DisplayName("processLogin redirects to originally requested URL saved in session")
+    void processLoginRedirectsToSavedUrl() {
+        when(familyService.authenticate("user@example.com", "pass1234"))
+                .thenReturn("family-002");
+
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/login").build());
+
+        // Simulate entry point having saved the original URL
+        exchange.getSession().subscribe(session ->
+                session.getAttributes().put(WebLoginController.SESSION_LOGIN_REDIRECT, "/web/settings"));
+
+        StepVerifier.create(controller.processLogin(
+                        "user@example.com", "pass1234", false, exchange))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
+        assertThat(exchange.getResponse().getHeaders().getFirst("Location"))
+                .isEqualTo("/web/settings");
+    }
+
+    // ── registerPage ─────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("registerPage returns web/register view name")
+    void registerPageReturnsViewName() {
+        org.springframework.ui.Model model =
+                new org.springframework.ui.ExtendedModelMap();
+        StepVerifier.create(controller.registerPage(model))
+                .expectNext("web/register")
+                .verifyComplete();
+    }
+
+    // ── processRegister ───────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("processRegister with mismatched passwords re-renders form with error")
+    void processRegisterMismatchedPasswordsReRendersForm() {
+        org.springframework.ui.Model model =
+                new org.springframework.ui.ExtendedModelMap();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/register").build());
+
+        StepVerifier.create(controller.processRegister(
+                        "a@b.de", "password1", "password2", model, exchange))
+                .expectNext("web/register")
+                .verifyComplete();
+
+        assertThat(model.asMap()).containsKey("passwordError");
+    }
+
+    @Test
+    @DisplayName("processRegister with short password re-renders form with error")
+    void processRegisterShortPasswordReRendersForm() {
+        org.springframework.ui.Model model =
+                new org.springframework.ui.ExtendedModelMap();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/register").build());
+
+        StepVerifier.create(controller.processRegister(
+                        "a@b.de", "short", "short", model, exchange))
+                .expectNext("web/register")
+                .verifyComplete();
+
+        assertThat(model.asMap()).containsKey("passwordError");
     }
 
     // ── logout ───────────────────────────────────────────────────────────────
@@ -117,14 +169,15 @@ class WebLoginControllerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.post("/web/logout").build());
 
-        // Populate session so there's something to invalidate
         exchange.getSession().subscribe(session ->
-                session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, "some-family"));
+                session.getAttributes().put(
+                        WebSessionSecurityContextRepository.SESSION_FAMILY_ID, "family-abc"));
 
         StepVerifier.create(controller.logout(exchange))
                 .verifyComplete();
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
-        assertThat(exchange.getResponse().getHeaders().getFirst("Location")).isEqualTo("/web/login");
+        assertThat(exchange.getResponse().getHeaders().getFirst("Location"))
+                .isEqualTo("/web/login");
     }
 }

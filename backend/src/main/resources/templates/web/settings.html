@@ -13,7 +13,9 @@
         <h1 class="h3 mb-0">Einstellungen</h1>
     </div>
 
-    <div class="row">
+    <div class="row g-4">
+
+        <!-- Notification e-mails -->
         <div class="col-12 col-md-8 col-lg-6">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white">
@@ -51,6 +53,53 @@
                 </div>
             </div>
         </div>
+
+        <!-- Spotify account -->
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Spotify-Konto</h5>
+                </div>
+                <div class="card-body">
+
+                    <div class="alert alert-success small" role="alert" th:if="${spotifyJustConnected}">
+                        Spotify-Konto erfolgreich verbunden.
+                    </div>
+                    <div class="alert alert-danger small" role="alert"
+                         th:if="${#request.getParameter('spotify') == 'error'}">
+                        Verbindung mit Spotify fehlgeschlagen. Bitte versuche es erneut.
+                    </div>
+
+                    <!-- Connected state -->
+                    <th:block th:if="${spotifyConnected}">
+                        <p class="text-muted small mb-3">
+                            Dein Spotify-Konto ist verbunden. Es wird f&uuml;r die Inhaltssuche
+                            und Metadaten-Aufl&ouml;sung im Dashboard verwendet.
+                        </p>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="badge bg-success fs-6 px-3 py-2">
+                                &#x2713; Verbunden als <span th:text="${spotifyUserId}"></span>
+                            </span>
+                            <form th:action="@{/web/settings/disconnect-spotify}" method="post" class="mb-0">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Trennen</button>
+                            </form>
+                        </div>
+                    </th:block>
+
+                    <!-- Not connected state -->
+                    <th:block th:unless="${spotifyConnected}">
+                        <p class="text-muted small mb-3">
+                            Verbinde dein Spotify-Konto, um Inhalte f&uuml;r deine Kinder
+                            suchen und hinzuf&uuml;gen zu k&ouml;nnen.
+                        </p>
+                        <a th:href="@{/web/settings/connect-spotify}" class="btn btn-success">
+                            Spotify-Konto verbinden
+                        </a>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
     </div>
 
 </th:block>

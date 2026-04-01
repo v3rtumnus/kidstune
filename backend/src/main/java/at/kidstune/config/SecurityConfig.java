@@ -1,6 +1,8 @@
 package at.kidstune.config;
 
 import at.kidstune.auth.JwtAuthenticationFilter;
+import at.kidstune.web.RememberMeWebFilter;
+import at.kidstune.web.WebLoginController;
 import at.kidstune.web.WebSessionSecurityContextRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.util.matcher.PathPatternParserServerWebExchangeMatcher;
 import reactor.core.publisher.Mono;
@@ -23,21 +27,27 @@ public class SecurityConfig {
     public static final String KIDS_ROLE   = "KIDS";
     public static final String PARENT_ROLE = "PARENT";
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final WebSessionSecurityContextRepository webSessionSecurityContextRepository;
+    private final JwtAuthenticationFilter              jwtAuthenticationFilter;
+    private final WebSessionSecurityContextRepository  webSessionSecurityContextRepository;
+    private final RememberMeWebFilter                  rememberMeWebFilter;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
-                          WebSessionSecurityContextRepository webSessionSecurityContextRepository) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+                          WebSessionSecurityContextRepository webSessionSecurityContextRepository,
+                          RememberMeWebFilter rememberMeWebFilter) {
+        this.jwtAuthenticationFilter             = jwtAuthenticationFilter;
         this.webSessionSecurityContextRepository = webSessionSecurityContextRepository;
+        this.rememberMeWebFilter                 = rememberMeWebFilter;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 
     // ── Web dashboard security (session-based) ───────────────────────────────
     // Order(1): evaluated first; only matches /web/** requests.
-    // Authentication is loaded by WebSessionSecurityContextRepository, which reads
-    // the familyId WebSession attribute written by WebLoginController after OAuth.
-    // SecurityContextServerWebExchangeWebFilter populates the Reactor context with
-    // that authentication before AuthorizationWebFilter runs.
+    // The RememberMeWebFilter runs before SECURITY_CONTEXT_SERVER_WEB_EXCHANGE
+    // so it can populate the session before the security context is loaded.
 
     @Bean
     @Order(1)
@@ -45,25 +55,31 @@ public class SecurityConfig {
         return http
                 .securityMatcher(new PathPatternParserServerWebExchangeMatcher("/web/**"))
                 .securityContextRepository(webSessionSecurityContextRepository)
+                .addFilterBefore(rememberMeWebFilter, SecurityWebFiltersOrder.SECURITY_CONTEXT_SERVER_WEB_EXCHANGE)
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        // Login / callback / approve links are public
                         .pathMatchers(
                                 "/web/login",
-                                "/web/auth/spotify-login",
-                                "/web/auth/callback",
+                                "/web/register",
                                 "/web/approve/**"
                         ).permitAll()
                         .anyExchange().authenticated()
                 )
                 .exceptionHandling(eh -> eh
-                        .authenticationEntryPoint((exchange, ex) -> {
-                            exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-                            exchange.getResponse().getHeaders().setLocation(URI.create("/web/login"));
-                            return Mono.empty();
-                        })
+                        .authenticationEntryPoint((exchange, ex) ->
+                                exchange.getSession().flatMap(session -> {
+                                    // Save the originally requested URL so login can redirect back.
+                                    String path  = exchange.getRequest().getURI().getPath();
+                                    String query = exchange.getRequest().getURI().getQuery();
+                                    String full  = query != null ? path + "?" + query : path;
+                                    session.getAttributes().put(WebLoginController.SESSION_LOGIN_REDIRECT, full);
+                                    exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+                                    exchange.getResponse().getHeaders().setLocation(URI.create("/web/login"));
+                                    return Mono.empty();
+                                })
+                        )
                 )
                 .build();
     }

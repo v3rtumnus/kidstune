@@ -18,10 +18,19 @@ public class Family {
     @Column(name = "id", length = 36, nullable = false)
     private String id;
 
-    @Column(name = "spotify_user_id", nullable = false, unique = true, length = 255)
+    /** KidsTune dashboard login e-mail (unique). */
+    @Column(name = "email", nullable = false, unique = true, length = 255)
+    private String email;
+
+    /** BCrypt hash of the dashboard password. */
+    @Column(name = "password_hash", nullable = false, length = 255)
+    private String passwordHash;
+
+    /** Spotify user ID – nullable; set once the parent connects their Spotify account. */
+    @Column(name = "spotify_user_id", unique = true, length = 255)
     private String spotifyUserId;
 
-    /** AES-256-GCM encrypted Spotify refresh token. */
+    /** AES-256-GCM encrypted Spotify refresh token – nullable. */
     @Column(name = "spotify_refresh_token")
     private String spotifyRefreshToken;
 
@@ -54,6 +63,12 @@ public class Family {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 
     public String getSpotifyUserId() { return spotifyUserId; }
     public void setSpotifyUserId(String spotifyUserId) { this.spotifyUserId = spotifyUserId; }

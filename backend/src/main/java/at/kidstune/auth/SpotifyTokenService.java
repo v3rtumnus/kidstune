@@ -51,6 +51,10 @@ public class SpotifyTokenService {
     private static final int GCM_IV_LENGTH  = 12;   // bytes
     private static final int GCM_TAG_LENGTH = 128;  // bits
 
+    /** BCrypt hash of "changeme" (cost 10) – used as placeholder for device-created families. */
+    private static final String PLACEHOLDER_PASSWORD_HASH =
+            "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     private final SpotifyConfig spotifyConfig;
     private final FamilyRepository familyRepository;
     private final WebClient spotifyAccountsClient;
@@ -176,7 +180,14 @@ public class SpotifyTokenService {
     private Mono<String> persistFamily(String spotifyUserId, TokenExchangeResponse tokenResponse) {
         return Mono.fromCallable(() -> {
             Family family = familyRepository.findBySpotifyUserId(spotifyUserId)
-                    .orElseGet(Family::new);
+                    .orElseGet(() -> {
+                        // Device-initiated Spotify login: set placeholder credentials.
+                        // The parent can later complete their account via the web dashboard.
+                        Family f = new Family();
+                        f.setEmail("spotify." + spotifyUserId + "@kidstune.placeholder");
+                        f.setPasswordHash(PLACEHOLDER_PASSWORD_HASH);
+                        return f;
+                    });
 
             family.setSpotifyUserId(spotifyUserId);
             family.setSpotifyRefreshToken(encrypt(tokenResponse.refreshToken()));
@@ -188,6 +199,54 @@ public class SpotifyTokenService {
 
             return family.getId();
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    // ── Settings: connect Spotify to an existing family ───────────────────────
+
+    /**
+     * Called from the web-dashboard settings page after the parent completes Spotify OAuth.
+     * Exchanges the code, fetches the Spotify user ID, and stores both on the given family.
+     *
+     * @param familyId    the already-authenticated family's ID
+     * @param code        the authorization code from Spotify's callback
+     * @param codeVerifier the PKCE verifier stored in the session during the OAuth flow
+     * @param redirectUri  the redirect_uri that was registered with Spotify for this flow
+     */
+    public Mono<Void> connectSpotifyToFamily(String familyId, String code,
+                                             String codeVerifier, String redirectUri) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type",    "authorization_code");
+        form.add("code",          code);
+        form.add("redirect_uri",  redirectUri);
+        form.add("client_id",     spotifyConfig.getClientId());
+        form.add("code_verifier", codeVerifier);
+
+        return spotifyAccountsClient.post()
+                .uri("/api/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .bodyToMono(TokenExchangeResponse.class)
+                .flatMap(tokenResponse ->
+                        spotifyApiClient.get()
+                                .uri("/v1/me")
+                                .header("Authorization", "Bearer " + tokenResponse.accessToken())
+                                .retrieve()
+                                .bodyToMono(at.kidstune.auth.dto.SpotifyUserProfile.class)
+                                .flatMap(profile -> Mono.fromCallable(() -> {
+                                    Family family = familyRepository.findById(familyId)
+                                            .orElseThrow(() -> new IllegalArgumentException(
+                                                    "Family not found: " + familyId));
+                                    family.setSpotifyUserId(profile.id());
+                                    family.setSpotifyRefreshToken(encrypt(tokenResponse.refreshToken()));
+                                    familyRepository.save(family);
+
+                                    Instant expiresAt = Instant.now().plusSeconds(tokenResponse.expiresIn());
+                                    accessTokenCache.put(familyId,
+                                            new AccessTokenEntry(tokenResponse.accessToken(), expiresAt));
+                                    return (Void) null;
+                                }).subscribeOn(Schedulers.boundedElastic()))
+                );
     }
 
     // ── Token access & refresh ────────────────────────────────────────────────

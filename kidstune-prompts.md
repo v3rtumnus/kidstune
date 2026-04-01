@@ -11,7 +11,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Phase 1 complete (1.1 – 1.4)
 - ✅ Phase 2 backend complete (2.1 – 2.3)
 - ✅ Prompt 2.4 – Web Dashboard Foundation (login uses Spotify OAuth — superseded by 2.4b)
-- ⬅️ **NEXT: Prompt 2.4b – Refactor Dashboard Auth to Email/Password**
+- ✅ Prompt 2.4b – Refactor Dashboard Auth to Email/Password
+- ⬅️ **NEXT: Prompt 2.5 – (next prompt)**
 
 ---
 
@@ -1024,11 +1025,15 @@ GOAL: When this task is done:
   - sync(profileId): calls GET /api/v1/sync/{profileId} → returns SyncPayloadDto
   - Uses device token from EncryptedSharedPreferences for Authorization header
   - Base URL configurable in BuildConfig (default: https://kidstune.altenburger.io)
-- ContentDao, AlbumDao, TrackDao, FavoriteDao in kids-app/data/local/:
+- ContentDao, AlbumDao, TrackDao, FavoriteDao, PlaybackPositionDao in kids-app/data/local/:
   - ContentDao: insert/replace all, deleteAll, getByType(contentType), getAll, getById
   - AlbumDao: insert/replace all, deleteByContentEntryId, getByContentEntryId (ordered by release_date desc)
-  - TrackDao: insert/replace all, deleteByAlbumId, getByAlbumId (ordered by disc, track number)
+  - TrackDao: insert/replace all, deleteByAlbumId, getByAlbumId (ordered by disc, track number),
+    getIndexByUri(albumId, trackUri): returns the 0-based index of a track within its album
+    (used to resume playback at the right chapter via skipToIndex)
   - FavoriteDao: insert, delete, getAll, existsByTrackUri
+  - PlaybackPositionDao: upsert(LocalPlaybackPosition), getByProfileId(profileId)
+    LocalPlaybackPosition entity: profile_id (PK), context_uri, track_uri, track_index, position_ms, updated_at
 - SyncRepository in kids-app/data/repository/:
   - fullSync(profileId): calls API → maps DTOs to Room entities → stores in single Room transaction
     (delete old data, insert new data, all in @Transaction)
@@ -1077,37 +1082,77 @@ GOAL: When this task is done:
   - isConnected: StateFlow<Boolean>
   - connectionError: StateFlow<SpotifyConnectionError?> (NOT_INSTALLED, NOT_LOGGED_IN, PREMIUM_REQUIRED, OTHER)
 - PlaybackController in kids-app/playback/:
-  - play(trackUri: String): plays a specific track by spotify:track:... URI from Room DB
-  - playAlbum(albumUri: String, startTrackIndex: Int): plays album starting at track
+  - IMPORTANT: Never call play(trackUri) alone — always play as a context so Spotify
+    auto-advances through chapters. Use album URI as the context.
+  - playFromChapter(albumUri: String, trackIndex: Int): calls PlayerApi.play(albumUri) then
+    PlayerApi.skipToIndex(albumUri, trackIndex) so playback starts at the chosen chapter
+    and auto-advances through subsequent chapters
+  - playAlbumFromStart(albumUri: String): shortcut for playFromChapter(albumUri, 0)
   - pause(), resume(), skipNext(), skipPrevious()
   - seekTo(positionMs: Long)
-  - nowPlaying: StateFlow<NowPlayingState> (trackUri, title, artist, imageUrl, durationMs, positionMs, isPlaying)
-  - Listens to Spotify's PlayerState updates and maps to NowPlayingState
+  - nowPlaying: StateFlow<NowPlayingState>:
+    { trackUri, title, artist, imageUrl, durationMs, positionMs, isPlaying,
+      chapterIndex: Int?, totalChapters: Int? }
+    chapterIndex/totalChapters are populated by looking up the currently playing trackUri
+    in LocalTrack Room table to get track_number and parent album's total_tracks
+    (only non-null when content_type == AUDIOBOOK)
+  - Observes Spotify's PlayerState updates (via subscribeToPlayerState) and maps to NowPlayingState
+  - Persists playback position to LocalPlaybackPosition via PlaybackPositionDao:
+    throttled write every 5 seconds + on pause + on app background
+    (stores: context_uri = albumUri, track_uri, track_index, position_ms, updated_at)
 - PlayerViewModel updated to use PlaybackController:
+  - On init: reads LocalPlaybackPosition for the profile → pre-populates NowPlayingState
+    so mini-player bar is populated even before the user taps play
   - NowPlayingScreen shows real track info from nowPlaying StateFlow
+  - For AUDIOBOOK: shows "Kapitel N von M" subtitle using chapterIndex + totalChapters
   - Play/pause button toggles real playback
-  - Skip forward/back works
+  - Skip forward/back works (Spotify handles context-aware skipping natively)
   - Progress bar updates in real-time (poll every 500ms or use Spotify's callback)
 - MiniPlayerBar updated to show real nowPlaying data, tappable to expand to NowPlayingScreen
-- BrowseScreen: tapping a tile → starts playing the first track of that album via PlaybackController
-  using the trackUri from LocalTrack in Room (NO network call to resolve)
+- BrowseScreen:
+  - MUSIC albums: tapping tile → playAlbumFromStart(albumUri)
+  - AUDIOBOOK albums: tapping tile → navigates to chapter list screen (ChapterListScreen)
+    instead of immediately playing (see below)
+- ChapterListScreen (new screen, only for AUDIOBOOK albums):
+  - Displays vertical list of LocalTrack ordered by disc_number ASC, track_number ASC
+  - Shows album art, album title, chapter count and total duration at top
+  - Each chapter row: title, duration, small progress bar if this is the last-played chapter
+  - ▶ resume indicator on the chapter that matches LocalPlaybackPosition.track_uri
+  - Tapping any chapter: playFromChapter(albumUri, trackIndex)
+  - Tapping the resume chapter: playFromChapter(albumUri, trackIndex) then seekTo(position_ms)
 
 REFERENCE: PROJECT_PLAN.md §2.2 (Spotify App Remote SDK), §5.1.5 (offline playback flow –
-track URIs come from Room, not network). Spotify App Remote SDK docs:
+track URIs come from Room, not network), §5.1.7 (sequential & continuous playback, chapter list UX,
+playback position persistence schema). Spotify App Remote SDK docs:
 https://developer.spotify.com/documentation/android/
 
 CONSTRAINTS:
 - Track URIs MUST come from LocalTrack in Room DB, NOT from any network call
 - Do NOT call Spotify Web API from the kids app – all data is in Room
+- NEVER call play(trackUri) alone for albums — always use playFromChapter(albumUri, index)
+  so Spotify maintains the album as a context and auto-advances chapters
 - Do NOT implement queueing or playlist management beyond basic skip
 - Handle connection errors gracefully: show friendly error screen (detailed error screens come in phase 8)
 - The Spotify AAR must be manually downloaded – document the path in a comment
 
 VERIFICATION:
 - Integration test: SpotifyRemoteManager connection lifecycle (mock or stub the SDK for unit tests)
+- Unit test: PlaybackController.playFromChapter calls PlayerApi.play(albumUri) then
+  PlayerApi.skipToIndex(albumUri, trackIndex) in that order
 - Unit test: PlaybackController state transitions (play → isPlaying=true, pause → isPlaying=false)
-- Manual test on real device: tap a tile → music plays from Spotify → pause works → skip works
+- Unit test: position persistence – playback state update → PlaybackPositionDao.upsert called
+  with correct context_uri, track_uri, track_index, position_ms
+- Unit test: NowPlayingState.chapterIndex and totalChapters populated correctly from Room lookup
+  for AUDIOBOOK content_type; null for MUSIC content_type
+- Unit test: TrackDao.getIndexByUri returns correct 0-based index within album
+- UI test: AUDIOBOOK album tile → ChapterListScreen shows chapters in order with correct titles
+- UI test: last-played chapter has ▶ resume indicator; tapping it calls seekTo with saved position_ms
+- Manual test on real device: tap music tile → music plays → pause → skip works
   → MiniPlayerBar updates → progress bar moves
+- Manual test on real device: tap audiobook tile → chapter list → tap chapter 3 → chapter 3 plays
+  → chapter 4 starts automatically when chapter 3 ends → skip works
+- Manual test: play chapter 3 partway through → close app → reopen → mini-player shows
+  saved position, tapping resume plays chapter 3 from saved position
 - Run ./gradlew test → all tests pass (unit tests that don't depend on real Spotify SDK)
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```

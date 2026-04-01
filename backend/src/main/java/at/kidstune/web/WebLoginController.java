@@ -1,26 +1,23 @@
 package at.kidstune.web;
 
-import at.kidstune.auth.SpotifyConfig;
-import at.kidstune.auth.SpotifyTokenService;
+import at.kidstune.family.DuplicateEmailException;
+import at.kidstune.family.FamilyService;
+import at.kidstune.family.InvalidCredentialsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Base64;
-import java.util.UUID;
+import java.time.Instant;
 
 @Controller
 @RequestMapping("/web")
@@ -28,96 +25,100 @@ public class WebLoginController {
 
     private static final Logger log = LoggerFactory.getLogger(WebLoginController.class);
 
-    private static final String[] SCOPES = {
-            "user-read-playback-state",
-            "user-modify-playback-state",
-            "user-library-read",
-            "user-read-recently-played",
-            "playlist-read-private",
-            "streaming",
-            "user-read-private"
-    };
+    /** Session attribute that stores the URL the user originally requested before being redirected to login. */
+    public static final String SESSION_LOGIN_REDIRECT = "loginRedirect";
 
-    private static final String PKCE_PREFIX = "pkce_";
+    private final FamilyService             familyService;
+    private final RememberMeTokenRepository rememberMeTokenRepository;
+    private final RememberMeWebFilter       rememberMeWebFilter;
 
-    private final SpotifyTokenService tokenService;
-    private final SpotifyConfig       spotifyConfig;
-
-    public WebLoginController(SpotifyTokenService tokenService, SpotifyConfig spotifyConfig) {
-        this.tokenService  = tokenService;
-        this.spotifyConfig = spotifyConfig;
+    public WebLoginController(FamilyService familyService,
+                              RememberMeTokenRepository rememberMeTokenRepository,
+                              RememberMeWebFilter rememberMeWebFilter) {
+        this.familyService             = familyService;
+        this.rememberMeTokenRepository = rememberMeTokenRepository;
+        this.rememberMeWebFilter       = rememberMeWebFilter;
     }
 
     // ── GET /web/login ───────────────────────────────────────────────────────
 
     @GetMapping("/login")
-    public Mono<String> loginPage() {
+    public Mono<String> loginPage(
+            @RequestParam(value = "error", required = false) String error,
+            Model model) {
+        if (error != null) {
+            model.addAttribute("errorMessage", "E-Mail oder Passwort falsch");
+        }
         return Mono.just("web/login");
     }
 
-    // ── GET /web/auth/spotify-login ──────────────────────────────────────────
-    // Generates a PKCE challenge, stores the verifier in the session, and
-    // redirects the browser to Spotify's authorization page.
+    // ── POST /web/login ──────────────────────────────────────────────────────
 
-    @GetMapping("/auth/spotify-login")
-    public Mono<Void> spotifyLogin(ServerWebExchange exchange) {
-        String codeVerifier  = generateCodeVerifier();
-        String codeChallenge = generateCodeChallenge(codeVerifier);
-        String state         = UUID.randomUUID().toString();
-
-        return exchange.getSession().flatMap(session -> {
-            session.getAttributes().put(PKCE_PREFIX + state, codeVerifier);
-
-            String authUrl = spotifyConfig.getAccountsBaseUrl() + "/authorize?" +
-                    "client_id="             + encode(spotifyConfig.getClientId()) +
-                    "&response_type=code" +
-                    "&redirect_uri="         + encode(spotifyConfig.getWebRedirectUri()) +
-                    "&scope="                + encode(String.join(" ", SCOPES)) +
-                    "&state="                + encode(state) +
-                    "&code_challenge_method=S256" +
-                    "&code_challenge="       + encode(codeChallenge);
-
-            exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-            exchange.getResponse().getHeaders().setLocation(URI.create(authUrl));
-            return exchange.getResponse().setComplete();
-        });
-    }
-
-    // ── GET /web/auth/callback ───────────────────────────────────────────────
-    // Spotify redirects here after the user grants access.
-    // Exchanges the authorization code for tokens, stores familyId in the
-    // WebSession, and redirects to the dashboard.
-
-    @GetMapping("/auth/callback")
-    public Mono<Void> callback(
-            @RequestParam("code")  String code,
-            @RequestParam("state") String state,
+    @PostMapping("/login")
+    public Mono<Void> processLogin(
+            @RequestParam("email")      String  email,
+            @RequestParam("password")   String  password,
+            @RequestParam(value = "rememberMe", defaultValue = "false") boolean rememberMe,
             ServerWebExchange exchange) {
 
-        return exchange.getSession().flatMap(session -> {
-            String verifier = session.getAttribute(PKCE_PREFIX + state);
-            if (verifier == null) {
-                log.warn("Web OAuth callback: missing or expired PKCE state '{}'", state);
-                exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-                exchange.getResponse().getHeaders().setLocation(URI.create("/web/login?error=expired"));
-                return exchange.getResponse().setComplete();
-            }
-            session.getAttributes().remove(PKCE_PREFIX + state);
+        return Mono.fromCallable(() -> familyService.authenticate(email, password))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(familyId -> exchange.getSession().flatMap(session -> {
+                    session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
 
-            return tokenService.exchangeCodeAndPersist(code, verifier, spotifyConfig.getWebRedirectUri())
-                    .flatMap(familyId -> exchange.getSession().flatMap(s -> {
-                        s.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
-                        exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-                        exchange.getResponse().getHeaders().setLocation(URI.create("/web/dashboard"));
-                        return exchange.getResponse().setComplete();
-                    }))
-                    .onErrorResume(e -> {
-                        log.error("Web OAuth callback failed: {}", e.getMessage());
-                        exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-                        exchange.getResponse().getHeaders().setLocation(URI.create("/web/login?error=auth_failed"));
-                        return exchange.getResponse().setComplete();
-                    });
-        });
+                    if (rememberMe) {
+                        return issueRememberMeCookie(exchange, familyId);
+                    }
+                    return Mono.empty();
+                }))
+                .then(redirectAfterLogin(exchange))
+                .onErrorResume(InvalidCredentialsException.class, e ->
+                        renderLoginError(exchange, "E-Mail oder Passwort falsch"));
+    }
+
+    // ── GET /web/register ────────────────────────────────────────────────────
+
+    @GetMapping("/register")
+    public Mono<String> registerPage(Model model) {
+        model.addAttribute("registerForm", new RegisterForm());
+        return Mono.just("web/register");
+    }
+
+    // ── POST /web/register ───────────────────────────────────────────────────
+
+    @PostMapping("/register")
+    public Mono<Object> processRegister(
+            @RequestParam("email")           String email,
+            @RequestParam("password")        String password,
+            @RequestParam("confirmPassword") String confirmPassword,
+            Model model,
+            ServerWebExchange exchange) {
+
+        // ── Validate input ────────────────────────────────────────────────────
+        String emailError    = validateEmail(email);
+        String passwordError = validatePassword(password, confirmPassword);
+
+        if (emailError != null || passwordError != null) {
+            model.addAttribute("email", email);
+            model.addAttribute("emailError", emailError);
+            model.addAttribute("passwordError", passwordError);
+            return Mono.just("web/register");
+        }
+
+        return Mono.fromCallable(() -> familyService.register(email, password))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(familyId -> exchange.getSession().flatMap(session -> {
+                    session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
+                    exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+                    exchange.getResponse().getHeaders().setLocation(URI.create("/web/dashboard"));
+                    return exchange.getResponse().setComplete();
+                }))
+                .cast(Object.class)
+                .onErrorResume(DuplicateEmailException.class, e -> {
+                    model.addAttribute("email", email);
+                    model.addAttribute("emailError", "E-Mail bereits vergeben");
+                    return Mono.just("web/register");
+                });
     }
 
     // ── POST /web/logout ─────────────────────────────────────────────────────
@@ -125,32 +126,93 @@ public class WebLoginController {
     @PostMapping("/logout")
     public Mono<Void> logout(ServerWebExchange exchange) {
         return exchange.getSession().flatMap(session -> {
-            session.invalidate();
+            String familyId = session.getAttribute(WebSessionSecurityContextRepository.SESSION_FAMILY_ID);
+
+            Mono<Void> deleteTokens = Mono.empty();
+            if (familyId != null) {
+                deleteTokens = Mono.fromRunnable(() -> rememberMeTokenRepository.deleteByFamilyId(familyId))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .then();
+            }
+
+            // Expire the remember_me cookie
+            exchange.getResponse().addCookie(
+                    org.springframework.http.ResponseCookie.from(RememberMeWebFilter.COOKIE_NAME, "")
+                            .httpOnly(true)
+                            .path("/")
+                            .maxAge(java.time.Duration.ZERO)
+                            .sameSite("Strict")
+                            .build()
+            );
+
+            return deleteTokens
+                    .then(session.invalidate())
+                    .then(Mono.fromRunnable(() -> {
+                        exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+                        exchange.getResponse().getHeaders().setLocation(URI.create("/web/login"));
+                    }))
+                    .then(exchange.getResponse().setComplete());
+        });
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private Mono<Void> issueRememberMeCookie(ServerWebExchange exchange, String familyId) {
+        String series   = RememberMeWebFilter.generateToken();
+        String rawToken = RememberMeWebFilter.generateToken();
+        String hash     = RememberMeWebFilter.sha256Hex(rawToken);
+        Instant now     = Instant.now();
+
+        RememberMeToken token = new RememberMeToken();
+        token.setSeries(series);
+        token.setTokenHash(hash);
+        token.setFamilyId(familyId);
+        token.setCreatedAt(now);
+        token.setExpiresAt(now.plus(RememberMeWebFilter.COOKIE_TTL));
+
+        return Mono.fromRunnable(() -> rememberMeTokenRepository.save(token))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then(Mono.fromRunnable(() -> rememberMeWebFilter.setCookie(exchange, series, rawToken)));
+    }
+
+    private Mono<Void> redirectAfterLogin(ServerWebExchange exchange) {
+        return exchange.getSession().flatMap(session -> {
+            String redirect = session.getAttribute(SESSION_LOGIN_REDIRECT);
+            if (redirect != null) {
+                session.getAttributes().remove(SESSION_LOGIN_REDIRECT);
+            }
+            String target = (redirect != null && !redirect.startsWith("/web/login")) ? redirect : "/web/dashboard";
             exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-            exchange.getResponse().getHeaders().setLocation(URI.create("/web/login"));
+            exchange.getResponse().getHeaders().setLocation(URI.create(target));
             return exchange.getResponse().setComplete();
         });
     }
 
-    // ── PKCE helpers ─────────────────────────────────────────────────────────
-
-    private String generateCodeVerifier() {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    private Mono<Void> renderLoginError(ServerWebExchange exchange, String errorMessage) {
+        // Render the login page with an error by forwarding to Thymeleaf.
+        // Since we're in a void-returning handler (no Model injection), we redirect
+        // with a query param that the template reads.
+        exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+        exchange.getResponse().getHeaders().setLocation(URI.create("/web/login?error=credentials"));
+        return exchange.getResponse().setComplete();
     }
 
-    private String generateCodeChallenge(String verifier) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(verifier.getBytes(StandardCharsets.US_ASCII));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
+    // ── Validation helpers ────────────────────────────────────────────────────
+
+    private String validateEmail(String email) {
+        if (email == null || email.isBlank()) return "E-Mail-Adresse ist erforderlich";
+        if (!email.contains("@") || !email.contains(".")) return "Keine gültige E-Mail-Adresse";
+        return null;
     }
 
-    private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    private String validatePassword(String password, String confirmPassword) {
+        if (password == null || password.length() < 8) return "Passwort muss mindestens 8 Zeichen lang sein";
+        if (!password.equals(confirmPassword))          return "Passwörter stimmen nicht überein";
+        return null;
     }
+
+    // ── Inner form beans (used as model attributes) ───────────────────────────
+
+    public static class LoginForm {}
+    public static class RegisterForm {}
 }

@@ -7,39 +7,47 @@
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
     <style>
         body { background: #1a1a2e; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .login-card { max-width: 400px; width: 100%; }
+        .login-card { max-width: 420px; width: 100%; }
         .brand-title { font-size: 2rem; font-weight: 700; color: #1db954; }
         .brand-sub { color: rgba(255,255,255,.6); }
-        .btn-spotify { background: #1db954; color: #fff; border: none; font-weight: 600; padding: .75rem 2rem; font-size: 1rem; }
-        .btn-spotify:hover { background: #1aa34a; color: #fff; }
     </style>
 </head>
 <body>
-    <div class="login-card text-center p-4">
-        <div class="mb-4">
+    <div class="login-card p-3">
+        <div class="text-center mb-4">
             <div class="brand-title">KidsTune</div>
             <div class="brand-sub">Eltern-Dashboard</div>
         </div>
 
         <div class="card bg-dark border-0 shadow">
             <div class="card-body p-4">
-                <h5 class="card-title text-white mb-1">Willkommen</h5>
-                <p class="text-white-50 small mb-4">Melde dich mit deinem Spotify-Konto an, um die Musik deiner Kinder zu verwalten.</p>
+                <h5 class="card-title text-white mb-4">Anmelden</h5>
 
-                <th:block th:if="${param.error != null and !param.error.isEmpty()}">
-                    <div class="alert alert-danger py-2 small" role="alert">
-                        <span th:if="${param.error[0] == 'expired'}">Sitzung abgelaufen. Bitte versuche es erneut.</span>
-                        <span th:if="${param.error[0] == 'auth_failed'}">Anmeldung fehlgeschlagen. Bitte versuche es erneut.</span>
-                        <span th:unless="${param.error[0] == 'expired' or param.error[0] == 'auth_failed'}">Ein Fehler ist aufgetreten. Bitte versuche es erneut.</span>
+                <div th:if="${errorMessage}" class="alert alert-danger py-2 small" role="alert"
+                     th:text="${errorMessage}"></div>
+
+                <form th:action="@{/web/login}" method="post">
+                    <div class="mb-3">
+                        <label for="email" class="form-label text-white-50 small">E-Mail-Adresse</label>
+                        <input type="email" class="form-control bg-secondary border-0 text-white"
+                               id="email" name="email" autocomplete="email" required autofocus>
                     </div>
-                </th:block>
+                    <div class="mb-3">
+                        <label for="password" class="form-label text-white-50 small">Passwort</label>
+                        <input type="password" class="form-control bg-secondary border-0 text-white"
+                               id="password" name="password" autocomplete="current-password" required>
+                    </div>
+                    <div class="mb-4 form-check">
+                        <input type="checkbox" class="form-check-input" id="rememberMe" name="rememberMe" value="true">
+                        <label class="form-check-label text-white-50 small" for="rememberMe">Angemeldet bleiben (30 Tage)</label>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 fw-semibold">Anmelden</button>
+                </form>
 
-                <a th:href="@{/web/auth/spotify-login}" class="btn btn-spotify w-100 rounded-pill">
-                    Mit Spotify anmelden
-                </a>
-
-                <p class="text-white-50 small mt-3 mb-0">
-                    Ein Spotify-Premium-Konto ist f&uuml;r die Wiedergabe auf den Kinderger&auml;ten erforderlich.
+                <hr class="border-secondary my-3">
+                <p class="text-center text-white-50 small mb-0">
+                    Noch kein Konto?
+                    <a th:href="@{/web/register}" class="text-success">Jetzt registrieren</a>
                 </p>
             </div>
         </div>

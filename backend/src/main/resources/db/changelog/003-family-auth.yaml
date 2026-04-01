@@ -1,0 +1,130 @@
+databaseChangeLog:
+
+  # ── Step 1: relax spotify_user_id NOT NULL so Spotify becomes optional ───────
+  - changeSet:
+      id: "003-family-spotify-user-id-nullable"
+      author: "kidstune"
+      changes:
+        - dropNotNullConstraint:
+            tableName: family
+            columnName: spotify_user_id
+            columnDataType: VARCHAR(255)
+
+  # ── Step 2: add email (nullable initially so migration applies to existing rows)
+  - changeSet:
+      id: "003-family-add-email"
+      author: "kidstune"
+      changes:
+        - addColumn:
+            tableName: family
+            columns:
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+
+  # ── Step 3: add password_hash (nullable initially) ───────────────────────────
+  - changeSet:
+      id: "003-family-add-password-hash"
+      author: "kidstune"
+      changes:
+        - addColumn:
+            tableName: family
+            columns:
+              - column:
+                  name: password_hash
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+
+  # ── Step 4: backfill placeholder values for any existing dev rows ─────────────
+  # placeholder email: migrated.<first-8-of-id>@kidstune.local
+  # placeholder password hash: BCrypt of "changeme" (cost 10)
+  # To log in with a migrated account: reset password after registering a new account,
+  # or use the placeholder password "changeme".
+  - changeSet:
+      id: "003-family-backfill-auth"
+      author: "kidstune"
+      changes:
+        - sql:
+            sql: >-
+              UPDATE family
+              SET
+                email         = CONCAT('migrated.', LEFT(id, 8), '@kidstune.local'),
+                password_hash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'
+              WHERE email IS NULL
+
+  # ── Step 5: enforce NOT NULL + UNIQUE on email ────────────────────────────────
+  - changeSet:
+      id: "003-family-email-not-null"
+      author: "kidstune"
+      changes:
+        - addNotNullConstraint:
+            tableName: family
+            columnName: email
+            columnDataType: VARCHAR(255)
+
+  - changeSet:
+      id: "003-family-email-unique"
+      author: "kidstune"
+      changes:
+        - addUniqueConstraint:
+            tableName: family
+            columnNames: email
+            constraintName: uq_family_email
+
+  # ── Step 6: enforce NOT NULL on password_hash ────────────────────────────────
+  - changeSet:
+      id: "003-family-password-hash-not-null"
+      author: "kidstune"
+      changes:
+        - addNotNullConstraint:
+            tableName: family
+            columnName: password_hash
+            columnDataType: VARCHAR(255)
+
+  # ── Step 7: remember_me_token table ──────────────────────────────────────────
+  - changeSet:
+      id: "003-create-remember-me-token"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: remember_me_token
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: series
+                  type: VARCHAR(64)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: token_hash
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: family_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_remember_me_token_family
+                    references: family(id)
+                    deleteCascade: true
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expires_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: remember_me_token
+            indexName: idx_remember_me_token_family_id
+            columns:
+              - column:
+                  name: family_id
