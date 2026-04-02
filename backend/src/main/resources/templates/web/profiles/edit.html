@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Profil bearbeiten</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <a th:href="@{/web/profiles}" class="btn btn-sm btn-outline-secondary me-3">&larr;</a>
+        <h1 class="h3 mb-0">Profil bearbeiten</h1>
+    </div>
+
+    <div th:if="${justLinked}" class="alert alert-success alert-dismissible fade show" role="alert">
+        Spotify-Konto erfolgreich verkn&uuml;pft.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${justUnlinked}" class="alert alert-info alert-dismissible fade show" role="alert">
+        Spotify-Konto wurde entfernt.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- Profile form -->
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <form th:action="@{/web/profiles/{id}(id=${profileId})}" method="post">
+
+                        <!-- Name -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="name">Name</label>
+                            <input type="text" id="name" name="name"
+                                   class="form-control"
+                                   th:classappend="${nameError != null} ? ' is-invalid'"
+                                   th:value="${profile.name}"
+                                   maxlength="100" required>
+                            <div class="invalid-feedback" th:if="${nameError != null}" th:text="${nameError}"></div>
+                        </div>
+
+                        <!-- Avatar Icon -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Tier</label>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <th:block th:each="icon : ${avatarIcons}">
+                                    <input type="radio" class="btn-check" name="avatarIcon"
+                                           th:id="'icon-' + ${icon.name()}"
+                                           th:value="${icon.name()}"
+                                           th:checked="${profile.avatarIcon == icon}">
+                                    <label class="btn btn-outline-secondary"
+                                           th:for="'icon-' + ${icon.name()}"
+                                           th:text="${avatarHelper.emoji(icon) + ' ' + avatarHelper.iconLabel(icon)}">
+                                    </label>
+                                </th:block>
+                            </div>
+                        </div>
+
+                        <!-- Avatar Color -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Farbe</label>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <th:block th:each="color : ${avatarColors}">
+                                    <input type="radio" class="btn-check" name="avatarColor"
+                                           th:id="'color-' + ${color.name()}"
+                                           th:value="${color.name()}"
+                                           th:checked="${profile.avatarColor == color}">
+                                    <label class="btn btn-outline-secondary d-flex align-items-center gap-1"
+                                           th:for="'color-' + ${color.name()}">
+                                        <span class="rounded-circle d-inline-block"
+                                              th:style="'width:14px;height:14px;background-color:' + ${avatarHelper.cssColor(color)}">
+                                        </span>
+                                        <span th:text="${avatarHelper.colorLabel(color)}"></span>
+                                    </label>
+                                </th:block>
+                            </div>
+                        </div>
+
+                        <!-- Age Group -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold" for="ageGroup">Altersgruppe</label>
+                            <select id="ageGroup" name="ageGroup" class="form-select">
+                                <option th:each="ag : ${ageGroups}"
+                                        th:value="${ag.name()}"
+                                        th:text="${ag.name()}"
+                                        th:selected="${profile.ageGroup == ag}">
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Speichern</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spotify section -->
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Spotify-Konto des Kindes</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div th:if="${spotifyLinked}">
+                        <p class="text-success mb-1">
+                            Verkn&uuml;pft als <strong th:text="${spotifyUserId}"></strong>
+                        </p>
+                        <p class="text-muted small mb-3">
+                            Dieses Konto wird f&uuml;r den Import verwendet (Phase 6).
+                        </p>
+                        <form th:action="@{/web/profiles/{id}/unlink-spotify(id=${profileId})}" method="post">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Spotify-Konto wirklich entfernen?')">
+                                Verbindung trennen
+                            </button>
+                        </form>
+                    </div>
+                    <div th:unless="${spotifyLinked}">
+                        <p class="text-muted mb-3">
+                            Noch kein Spotify-Konto verkn&uuml;pft.
+                            Das Konto des Kindes wird sp&auml;ter f&uuml;r den Import der H&ouml;rgewohnheiten genutzt.
+                        </p>
+                        <a th:href="@{/web/profiles/{id}/link-spotify(id=${profileId})}"
+                           class="btn btn-outline-success">
+                            Spotify-Konto verkn&uuml;pfen
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Danger zone -->
+            <div class="card border-danger mt-3">
+                <div class="card-header bg-white text-danger">Gefahrenzone</div>
+                <div class="card-body p-4">
+                    <p class="text-muted small mb-3">
+                        Das Profil und alle zugeh&ouml;rigen Inhalte werden unwiderruflich gel&ouml;scht.
+                    </p>
+                    <form th:action="@{/web/profiles/{id}/delete(id=${profileId})}" method="post"
+                          onsubmit="return confirm('Profil wirklich l\u00F6schen? Diese Aktion kann nicht r\u00FCckg\u00E4ngig gemacht werden.')">
+                        <button type="submit" class="btn btn-danger btn-sm">Profil l&ouml;schen</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</th:block>
+</body>
+</html>

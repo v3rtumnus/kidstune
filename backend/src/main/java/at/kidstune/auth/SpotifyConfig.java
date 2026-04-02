@@ -9,6 +9,7 @@ public class SpotifyConfig {
     private String clientSecret;
     private String redirectUri;
     private String webRedirectUri;
+    private String profileRedirectUri;
     private String accountsBaseUrl = "https://accounts.spotify.com";
     private String apiBaseUrl = "https://api.spotify.com";
 
@@ -23,6 +24,9 @@ public class SpotifyConfig {
 
     public String getWebRedirectUri() { return webRedirectUri; }
     public void setWebRedirectUri(String webRedirectUri) { this.webRedirectUri = webRedirectUri; }
+
+    public String getProfileRedirectUri() { return profileRedirectUri; }
+    public void setProfileRedirectUri(String profileRedirectUri) { this.profileRedirectUri = profileRedirectUri; }
 
     public String getAccountsBaseUrl() { return accountsBaseUrl; }
     public void setAccountsBaseUrl(String accountsBaseUrl) { this.accountsBaseUrl = accountsBaseUrl; }

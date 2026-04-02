@@ -1,0 +1,20 @@
+databaseChangeLog:
+
+  # ── child_profile: add per-profile Spotify account fields ───────────────────
+  - changeSet:
+      id: "004-child-profile-spotify"
+      author: "kidstune"
+      changes:
+        - addColumn:
+            tableName: child_profile
+            columns:
+              - column:
+                  name: spotify_user_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: spotify_refresh_token
+                  type: TEXT
+                  constraints:
+                    nullable: true

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Neues Profil</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <a th:href="@{/web/profiles}" class="btn btn-sm btn-outline-secondary me-3">&larr;</a>
+        <h1 class="h3 mb-0">Neues Profil</h1>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="max-width:500px">
+        <div class="card-body p-4">
+            <form th:action="@{/web/profiles}" method="post">
+
+                <!-- Name -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="name">Name</label>
+                    <input type="text" id="name" name="name"
+                           class="form-control"
+                           th:classappend="${nameError != null} ? ' is-invalid'"
+                           th:value="${profile.name}"
+                           maxlength="100" required autofocus>
+                    <div class="invalid-feedback" th:if="${nameError != null}" th:text="${nameError}"></div>
+                </div>
+
+                <!-- Avatar Icon -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Tier</label>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <th:block th:each="icon : ${avatarIcons}">
+                            <input type="radio" class="btn-check" name="avatarIcon"
+                                   th:id="'icon-' + ${icon.name()}"
+                                   th:value="${icon.name()}"
+                                   th:checked="${profile.avatarIcon == icon}">
+                            <label class="btn btn-outline-secondary"
+                                   th:for="'icon-' + ${icon.name()}"
+                                   th:text="${avatarHelper.emoji(icon) + ' ' + avatarHelper.iconLabel(icon)}">
+                            </label>
+                        </th:block>
+                    </div>
+                </div>
+
+                <!-- Avatar Color -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Farbe</label>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <th:block th:each="color : ${avatarColors}">
+                            <input type="radio" class="btn-check" name="avatarColor"
+                                   th:id="'color-' + ${color.name()}"
+                                   th:value="${color.name()}"
+                                   th:checked="${profile.avatarColor == color}">
+                            <label class="btn btn-outline-secondary d-flex align-items-center gap-1"
+                                   th:for="'color-' + ${color.name()}">
+                                <span class="rounded-circle d-inline-block"
+                                      th:style="'width:14px;height:14px;background-color:' + ${avatarHelper.cssColor(color)}">
+                                </span>
+                                <span th:text="${avatarHelper.colorLabel(color)}"></span>
+                            </label>
+                        </th:block>
+                    </div>
+                </div>
+
+                <!-- Age Group -->
+                <div class="mb-4">
+                    <label class="form-label fw-semibold" for="ageGroup">Altersgruppe</label>
+                    <select id="ageGroup" name="ageGroup" class="form-select">
+                        <option th:each="ag : ${ageGroups}"
+                                th:value="${ag.name()}"
+                                th:text="${ag.name()}"
+                                th:selected="${profile.ageGroup == ag}">
+                        </option>
+                    </select>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Profil erstellen</button>
+                    <a th:href="@{/web/profiles}" class="btn btn-outline-secondary">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>

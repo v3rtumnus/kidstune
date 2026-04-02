@@ -38,6 +38,12 @@ public class ChildProfile {
     @Column(name = "age_group", nullable = false)
     private AgeGroup ageGroup;
 
+    @Column(name = "spotify_user_id", length = 255)
+    private String spotifyUserId;
+
+    @Column(name = "spotify_refresh_token", columnDefinition = "TEXT")
+    private String spotifyRefreshToken;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -74,6 +80,12 @@ public class ChildProfile {
 
     public AgeGroup getAgeGroup() { return ageGroup; }
     public void setAgeGroup(AgeGroup ageGroup) { this.ageGroup = ageGroup; }
+
+    public String getSpotifyUserId() { return spotifyUserId; }
+    public void setSpotifyUserId(String spotifyUserId) { this.spotifyUserId = spotifyUserId; }
+
+    public String getSpotifyRefreshToken() { return spotifyRefreshToken; }
+    public void setSpotifyRefreshToken(String spotifyRefreshToken) { this.spotifyRefreshToken = spotifyRefreshToken; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

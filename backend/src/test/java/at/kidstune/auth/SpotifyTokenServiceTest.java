@@ -1,6 +1,7 @@
 package at.kidstune.auth;
 
 import at.kidstune.family.FamilyRepository;
+import at.kidstune.profile.ProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -31,6 +32,7 @@ class SpotifyTokenServiceTest {
         service = new SpotifyTokenService(
                 config,
                 mock(FamilyRepository.class),
+                mock(ProfileRepository.class),
                 WebClient.builder(),
                 "test-secret-minimum-32-chars-ok!!"
         );
@@ -83,6 +85,7 @@ class SpotifyTokenServiceTest {
         SpotifyTokenService otherService = new SpotifyTokenService(
                 config2,
                 mock(FamilyRepository.class),
+                mock(ProfileRepository.class),
                 WebClient.builder(),
                 "completely-different-key-32chars!"
         );

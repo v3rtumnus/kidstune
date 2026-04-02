@@ -23,6 +23,9 @@ public interface ContentRepository extends JpaRepository<AllowedContent, String>
     @Query("SELECT COUNT(c) FROM AllowedContent c WHERE c.profileId IN :profileIds")
     long countByProfileIdIn(@Param("profileIds") List<String> profileIds);
 
+    @Query("SELECT c.profileId, COUNT(c) FROM AllowedContent c WHERE c.profileId IN :profileIds GROUP BY c.profileId")
+    List<Object[]> countGroupedByProfileId(@Param("profileIds") List<String> profileIds);
+
     @Query("SELECT c FROM AllowedContent c WHERE c.profileId IN :profileIds ORDER BY c.createdAt DESC")
     List<AllowedContent> findRecentByProfileIds(@Param("profileIds") List<String> profileIds, Pageable pageable);
 }

@@ -9,7 +9,8 @@
       "Bash(./gradlew dependencies:*)",
       "Bash(./gradlew test:*)",
       "Bash(docker info:*)",
-      "Bash(find ./build -name TEST-*.xml)"
+      "Bash(find ./build -name TEST-*.xml)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

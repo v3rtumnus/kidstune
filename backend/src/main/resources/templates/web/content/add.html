@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Inhalt hinzuf&uuml;gen</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <a th:href="@{/web/profiles/{pid}/content(pid=${profileId})}"
+           class="btn btn-sm btn-outline-secondary me-3">&larr;</a>
+        <h1 class="h3 mb-0" th:text="${profile.name + ' – Inhalt hinzuf\u00FCgen'}">Inhalt hinzuf&uuml;gen</h1>
+    </div>
+
+    <!-- Search form -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form hx-post="/web/profiles/__${profileId}__/content/search"
+                  hx-target="#search-results"
+                  hx-swap="innerHTML"
+                  hx-indicator="#search-spinner">
+                <div class="input-group">
+                    <input type="text" name="query" class="form-control"
+                           placeholder="K&uuml;nstler, Album oder Playlist suchen..."
+                           autofocus>
+                    <button type="submit" class="btn btn-primary">
+                        Suchen
+                        <span id="search-spinner" class="spinner-border spinner-border-sm htmx-indicator ms-1" role="status"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Search results (filled by HTMX) -->
+    <div id="search-results"></div>
+
+    <!-- Sibling profiles for bulk-add (shown when adding content) -->
+    <div th:if="${!siblings.isEmpty()}" id="siblings-panel" class="d-none">
+        <div class="card border-0 shadow-sm mt-3">
+            <div class="card-body">
+                <p class="fw-semibold mb-2">Auch f&uuml;r weitere Kinder hinzuf&uuml;gen:</p>
+                <div class="d-flex flex-wrap gap-2" id="sibling-checkboxes">
+                    <div th:each="sibling : ${siblings}" class="form-check form-check-inline">
+                        <input class="form-check-input sibling-check" type="checkbox"
+                               name="siblingId"
+                               th:id="'sib-' + ${sibling.id}"
+                               th:value="${sibling.id}">
+                        <label class="form-check-label"
+                               th:for="'sib-' + ${sibling.id}"
+                               th:text="${sibling.name}"></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</th:block>
+<th:block layout:fragment="scripts">
+<script>
+// When a result card "Add" button is clicked, inject selected sibling IDs into the form
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('btn-add-content')) {
+        const form = e.target.closest('form');
+        if (!form) return;
+        // Remove old sibling inputs
+        form.querySelectorAll('.injected-sibling').forEach(el => el.remove());
+        // Add checked siblings
+        document.querySelectorAll('.sibling-check:checked').forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'siblingIds';
+            input.value = cb.value;
+            input.className = 'injected-sibling';
+            form.appendChild(input);
+        });
+    }
+});
+// Show siblings panel after first search
+document.body.addEventListener('htmx:afterSwap', function(e) {
+    const panel = document.getElementById('siblings-panel');
+    if (panel) panel.classList.remove('d-none');
+});
+</script>
+</th:block>
+</body>
+</html>

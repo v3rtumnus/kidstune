@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Profile</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Profile</h1>
+        <a th:href="@{/web/profiles/new}" class="btn btn-primary">
+            + Neues Profil
+        </a>
+    </div>
+
+    <div th:if="${profiles.isEmpty()}" class="text-muted text-center py-5">
+        Noch keine Profile angelegt.
+        <a th:href="@{/web/profiles/new}">Erstes Profil erstellen</a>
+    </div>
+
+    <div class="row g-3" th:unless="${profiles.isEmpty()}">
+        <div class="col-12 col-md-6 col-lg-4" th:each="item : ${profiles}">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <!-- Avatar circle -->
+                        <div class="rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0"
+                             th:style="'width:52px;height:52px;font-size:1.6rem;background-color:' + ${item.cssColor} + ';'"
+                             th:text="${item.emoji}">
+                        </div>
+                        <div class="min-width-0">
+                            <h5 class="mb-0 text-truncate" th:text="${item.profile.name}"></h5>
+                            <small class="text-muted" th:text="${item.profile.ageGroup}"></small>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap mb-3">
+                        <span class="badge bg-secondary" th:text="${item.contentCount + ' Inhalte'}"></span>
+                        <span class="badge bg-success" th:if="${item.spotifyLinked}">Spotify verkn&uuml;pft</span>
+                        <span class="badge bg-light text-muted" th:unless="${item.spotifyLinked}">Spotify nicht verkn&uuml;pft</span>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <a th:href="@{/web/profiles/{id}/content(id=${item.profile.id})}"
+                           class="btn btn-sm btn-outline-primary">Inhalte</a>
+                        <a th:href="@{/web/profiles/{id}/edit(id=${item.profile.id})}"
+                           class="btn btn-sm btn-outline-secondary">Bearbeiten</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>

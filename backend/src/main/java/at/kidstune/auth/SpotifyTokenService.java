@@ -3,6 +3,8 @@ package at.kidstune.auth;
 import at.kidstune.auth.dto.TokenExchangeResponse;
 import at.kidstune.family.Family;
 import at.kidstune.family.FamilyRepository;
+import at.kidstune.profile.ChildProfile;
+import at.kidstune.profile.ProfileRepository;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
@@ -57,6 +59,7 @@ public class SpotifyTokenService {
 
     private final SpotifyConfig spotifyConfig;
     private final FamilyRepository familyRepository;
+    private final ProfileRepository profileRepository;
     private final WebClient spotifyAccountsClient;
     private final WebClient spotifyApiClient;
     private final SecretKey encryptionKey;
@@ -66,14 +69,21 @@ public class SpotifyTokenService {
             .maximumSize(500)
             .build();
 
+    /** profileId → live access token + expiry (per-child Spotify accounts). */
+    final Cache<String, AccessTokenEntry> profileAccessTokenCache = Caffeine.newBuilder()
+            .maximumSize(500)
+            .build();
+
     public SpotifyTokenService(
             SpotifyConfig spotifyConfig,
             FamilyRepository familyRepository,
+            ProfileRepository profileRepository,
             WebClient.Builder webClientBuilder,
             @Value("${kidstune.jwt-secret}") String jwtSecret) {
 
         this.spotifyConfig = spotifyConfig;
         this.familyRepository = familyRepository;
+        this.profileRepository = profileRepository;
         this.spotifyAccountsClient = webClientBuilder
                 .baseUrl(spotifyConfig.getAccountsBaseUrl())
                 .build();
@@ -247,6 +257,109 @@ public class SpotifyTokenService {
                                     return (Void) null;
                                 }).subscribeOn(Schedulers.boundedElastic()))
                 );
+    }
+
+    // ── Per-profile Spotify (child accounts) ─────────────────────────────────
+
+    /**
+     * Links a child profile to a Spotify account after the OAuth callback.
+     * Exchanges the code, fetches the Spotify user ID, and stores both on the profile.
+     */
+    public Mono<Void> connectSpotifyToProfile(String profileId, String code,
+                                              String codeVerifier, String redirectUri) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type",    "authorization_code");
+        form.add("code",          code);
+        form.add("redirect_uri",  redirectUri);
+        form.add("client_id",     spotifyConfig.getClientId());
+        form.add("code_verifier", codeVerifier);
+
+        return spotifyAccountsClient.post()
+                .uri("/api/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .bodyToMono(TokenExchangeResponse.class)
+                .flatMap(tokenResponse ->
+                        spotifyApiClient.get()
+                                .uri("/v1/me")
+                                .header("Authorization", "Bearer " + tokenResponse.accessToken())
+                                .retrieve()
+                                .bodyToMono(at.kidstune.auth.dto.SpotifyUserProfile.class)
+                                .flatMap(profile -> Mono.fromCallable(() -> {
+                                    ChildProfile childProfile = profileRepository.findById(profileId)
+                                            .orElseThrow(() -> new IllegalArgumentException(
+                                                    "Profile not found: " + profileId));
+                                    childProfile.setSpotifyUserId(profile.id());
+                                    childProfile.setSpotifyRefreshToken(encrypt(tokenResponse.refreshToken()));
+                                    profileRepository.save(childProfile);
+
+                                    Instant expiresAt = Instant.now().plusSeconds(tokenResponse.expiresIn());
+                                    profileAccessTokenCache.put(profileId,
+                                            new AccessTokenEntry(tokenResponse.accessToken(), expiresAt));
+                                    return (Void) null;
+                                }).subscribeOn(Schedulers.boundedElastic()))
+                );
+    }
+
+    /**
+     * Returns a current access token for a child profile, refreshing if needed.
+     */
+    public Mono<String> getValidProfileAccessToken(String profileId) {
+        AccessTokenEntry cached = profileAccessTokenCache.getIfPresent(profileId);
+        if (cached != null && !cached.isExpiredOrExpiringSoon()) {
+            return Mono.just(cached.accessToken());
+        }
+        return refreshProfileAccessToken(profileId);
+    }
+
+    /**
+     * Returns true if the given profile has a linked Spotify account with stored tokens.
+     */
+    public boolean isProfileSpotifyLinked(String profileId) {
+        return profileRepository.findById(profileId)
+                .map(p -> p.getSpotifyUserId() != null && p.getSpotifyRefreshToken() != null)
+                .orElse(false);
+    }
+
+    Mono<String> refreshProfileAccessToken(String profileId) {
+        return Mono.fromCallable(() ->
+                profileRepository.findById(profileId)
+                        .orElseThrow(() -> new IllegalArgumentException("Profile not found: " + profileId))
+                        .getSpotifyRefreshToken()
+        )
+        .subscribeOn(Schedulers.boundedElastic())
+        .flatMap(encryptedRefreshToken -> {
+            String refreshToken = decrypt(encryptedRefreshToken);
+
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("grant_type",    "refresh_token");
+            form.add("refresh_token", refreshToken);
+            form.add("client_id",     spotifyConfig.getClientId());
+
+            return spotifyAccountsClient.post()
+                    .uri("/api/token")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(BodyInserters.fromFormData(form))
+                    .retrieve()
+                    .bodyToMono(TokenExchangeResponse.class);
+        })
+        .flatMap(tokenResponse -> {
+            Instant expiresAt = Instant.now().plusSeconds(tokenResponse.expiresIn());
+            profileAccessTokenCache.put(profileId,
+                    new AccessTokenEntry(tokenResponse.accessToken(), expiresAt));
+
+            if (tokenResponse.refreshToken() != null) {
+                return Mono.fromCallable(() -> {
+                    profileRepository.findById(profileId).ifPresent(p -> {
+                        p.setSpotifyRefreshToken(encrypt(tokenResponse.refreshToken()));
+                        profileRepository.save(p);
+                    });
+                    return tokenResponse.accessToken();
+                }).subscribeOn(Schedulers.boundedElastic());
+            }
+            return Mono.just(tokenResponse.accessToken());
+        });
     }
 
     // ── Token access & refresh ────────────────────────────────────────────────

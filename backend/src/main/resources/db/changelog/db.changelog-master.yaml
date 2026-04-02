@@ -8,3 +8,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/003-family-auth.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/004-profile-spotify.yaml
+      relativeToChangelogFile: false

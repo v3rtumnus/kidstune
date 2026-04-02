@@ -605,6 +605,17 @@ This is low-priority but keeps the door open for running on non-Samsung devices.
 │ added_at             │
 │ synced (BOOLEAN)     │  ← false = queued for upload on next sync
 └──────────────────────┘
+
+┌──────────────────────┐
+│ LocalPlaybackPosition│  ← one row per profile; resume where you left off
+├──────────────────────┤
+│ profile_id (PK)      │  ← single row per profile (upsert on every update)
+│ context_uri          │  ← spotify:album:xxx or spotify:artist:xxx (playback context)
+│ track_uri            │  ← spotify:track:xxx of the currently/last playing chapter
+│ track_index          │  ← 0-based index within the context (for SDK skipToIndex)
+│ position_ms          │  ← playback position within that chapter
+│ updated_at           │
+└──────────────────────┘
 ```
 
 **What this means in practice:**
@@ -776,6 +787,71 @@ The Discover screen allows children to search the full Spotify catalog, but NOT 
 - Expired requests disappear from the kids' UI silently (no sad message – it just goes away)
 - Parents see expired requests in their history with an "Expired – not reviewed" tag
 - The child can re-request the same content (it creates a new request)
+
+#### 5.1.7 Sequential & Continuous Playback (Audiobooks)
+
+Audiobooks on Spotify are structured as albums with many tracks – one per chapter (e.g., "Bibi & Tina – Folge 1" has 12 chapters, each a separate `spotify:track:...` URI). Children expect the same experience they get in Spotify: finish chapter 1, chapter 2 starts automatically.
+
+**The core rule:** Never play a bare `spotify:track:...` URI. Always play the **album as a context**. The Spotify App Remote SDK plays the whole album in order and handles auto-advance natively.
+
+```
+// WRONG – plays only this one chapter, stops after
+PlayerApi.play("spotify:track:abc123")
+
+// CORRECT – plays the album from chapter N, auto-advances through all chapters
+PlayerApi.play("spotify:album:xyz456")         // starts from chapter 1
+PlayerApi.skipToIndex("spotify:album:xyz456", trackIndex)  // resume at chapter N
+```
+
+When a child taps a chapter tile, the `PlaybackController` calls `skipToIndex(albumUri, trackIndex)` – this positions playback at the selected chapter within the album context, so skip-forward/back and auto-advance all work correctly.
+
+**Chapter list UI:**
+
+For AUDIOBOOK albums, the browse screen shows a vertical chapter list instead of a 2×2 tile grid:
+
+```
+┌──────────────────────────────────────────────────┐
+│  [cover art]  Bibi & Tina – Folge 1               │
+│               12 Kapitel  •  ca. 58 min            │
+├──────────────────────────────────────────────────┤
+│  ▶  Kapitel 1 – Bibi trifft Tina       5:12      │  ← resume indicator (▶) on last-played chapter
+│     Kapitel 2 – Das Pferd              4:55      │
+│     Kapitel 3 – Die Wette              6:01      │
+│     ...                                          │
+└──────────────────────────────────────────────────┘
+```
+
+- Chapters are ordered by `disc_number ASC, track_number ASC`
+- The last-played chapter (from `LocalPlaybackPosition`) is highlighted with a ▶ resume indicator and the saved `position_ms` shown as a small progress bar under the title
+- Tapping any chapter calls `PlaybackController.playFromChapter(albumUri, trackIndex)` which calls `skipToIndex`
+- Tapping the ▶ resume chapter restores exactly to the saved position via `seekTo(position_ms)`
+- MUSIC albums continue to show the 2×2 tile grid (no chapter list)
+
+**Playback position persistence:**
+
+`PlaybackController` observes Spotify's `PlayerState` updates and writes to `LocalPlaybackPosition` at most once every 5 seconds (throttled), plus on pause and app background. This allows resuming within a chapter.
+
+On app start, `PlayerViewModel` reads `LocalPlaybackPosition` for the current profile and:
+- Shows the mini-player bar populated with the last-played content (even if Spotify is no longer playing it)
+- Offers a "Resume" tap target on the content tile and in the chapter list
+
+**NowPlaying screen for chapters:**
+
+When `content_type == AUDIOBOOK`, the NowPlaying screen shows the chapter context instead of generic track info:
+
+```
+┌──────────────────────────────────────┐
+│  [large cover art]                   │
+│                                      │
+│  Bibi & Tina – Folge 1               │  ← album title
+│  Kapitel 3 von 12                    │  ← chapter N of total (from LocalAlbum.total_tracks)
+│  Kapitel 3 – Die Wette               │  ← track title
+│  ───────────────────────────────     │
+│  [◀◀]  [⏸]  [▶▶]                    │  ← skip goes to prev/next chapter
+└──────────────────────────────────────┘
+```
+
+The `NowPlayingState` is extended with `chapterIndex: Int?` and `totalChapters: Int?`, populated by looking up the currently playing track URI in the `LocalTrack` Room table to retrieve `track_number` and the parent album's `total_tracks`.
 
 ---
 

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/*
+  Fragment: web/fragments/search-results :: results
+  Returned by POST /web/profiles/{profileId}/content/search via HTMX.
+  Renders grouped search results (artists, albums, playlists).
+*/-->
+<th:block th:fragment="results">
+
+    <div th:if="${searchError}" class="alert alert-warning" th:text="${searchError}"></div>
+
+    <th:block th:if="${results != null}">
+
+        <!-- Artists -->
+        <div th:if="${!results.artists().isEmpty()}" class="mb-4">
+            <h6 class="text-muted text-uppercase small fw-semibold mb-2">K&uuml;nstler</h6>
+            <div class="row g-2">
+                <div class="col-6 col-md-4 col-lg-3"
+                     th:each="item : ${results.artists()}">
+                    <div class="card border-0 shadow-sm h-100">
+                        <img th:if="${item.imageUrl() != null}"
+                             th:src="${item.imageUrl()}"
+                             class="card-img-top" alt="" style="height:120px;object-fit:cover">
+                        <div class="card-body p-2">
+                            <div class="fw-semibold small text-truncate" th:text="${item.title()}"></div>
+                            <form th:action="@{/web/profiles/{pid}/content(pid=${profileId})}" method="post" class="mt-2">
+                                <input type="hidden" name="spotifyUri"  th:value="${item.spotifyUri()}">
+                                <input type="hidden" name="scope"       value="ARTIST">
+                                <input type="hidden" name="title"       th:value="${item.title()}">
+                                <input type="hidden" name="imageUrl"    th:value="${item.imageUrl()}">
+                                <input type="hidden" name="artistName"  th:value="${item.title()}">
+                                <button type="submit" class="btn btn-sm btn-primary w-100 btn-add-content">
+                                    + Hinzuf&uuml;gen
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Albums -->
+        <div th:if="${!results.albums().isEmpty()}" class="mb-4">
+            <h6 class="text-muted text-uppercase small fw-semibold mb-2">Alben</h6>
+            <div class="row g-2">
+                <div class="col-6 col-md-4 col-lg-3"
+                     th:each="item : ${results.albums()}">
+                    <div class="card border-0 shadow-sm h-100">
+                        <img th:if="${item.imageUrl() != null}"
+                             th:src="${item.imageUrl()}"
+                             class="card-img-top" alt="" style="height:120px;object-fit:cover">
+                        <div class="card-body p-2">
+                            <div class="fw-semibold small text-truncate" th:text="${item.title()}"></div>
+                            <div class="text-muted small text-truncate" th:text="${item.artistName()}"></div>
+                            <form th:action="@{/web/profiles/{pid}/content(pid=${profileId})}" method="post" class="mt-2">
+                                <input type="hidden" name="spotifyUri"  th:value="${item.spotifyUri()}">
+                                <input type="hidden" name="scope"       value="ALBUM">
+                                <input type="hidden" name="title"       th:value="${item.title()}">
+                                <input type="hidden" name="imageUrl"    th:value="${item.imageUrl()}">
+                                <input type="hidden" name="artistName"  th:value="${item.artistName()}">
+                                <button type="submit" class="btn btn-sm btn-primary w-100 btn-add-content">
+                                    + Hinzuf&uuml;gen
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Playlists -->
+        <div th:if="${!results.playlists().isEmpty()}" class="mb-4">
+            <h6 class="text-muted text-uppercase small fw-semibold mb-2">Playlists</h6>
+            <div class="row g-2">
+                <div class="col-6 col-md-4 col-lg-3"
+                     th:each="item : ${results.playlists()}">
+                    <div class="card border-0 shadow-sm h-100">
+                        <img th:if="${item.imageUrl() != null}"
+                             th:src="${item.imageUrl()}"
+                             class="card-img-top" alt="" style="height:120px;object-fit:cover">
+                        <div class="card-body p-2">
+                            <div class="fw-semibold small text-truncate" th:text="${item.title()}"></div>
+                            <form th:action="@{/web/profiles/{pid}/content(pid=${profileId})}" method="post" class="mt-2">
+                                <input type="hidden" name="spotifyUri"  th:value="${item.spotifyUri()}">
+                                <input type="hidden" name="scope"       value="PLAYLIST">
+                                <input type="hidden" name="title"       th:value="${item.title()}">
+                                <input type="hidden" name="imageUrl"    th:value="${item.imageUrl()}">
+                                <input type="hidden" name="artistName"  th:value="${item.artistName()}">
+                                <button type="submit" class="btn btn-sm btn-primary w-100 btn-add-content">
+                                    + Hinzuf&uuml;gen
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div th:if="${results.artists().isEmpty() and results.albums().isEmpty() and results.playlists().isEmpty()}"
+             class="text-muted text-center py-4">
+            Keine Ergebnisse f&uuml;r &bdquo;<span th:text="${query}"></span>&ldquo;.
+        </div>
+
+    </th:block>
+
+</th:block>
+
+</body>
+</html>
