@@ -3,9 +3,13 @@ package at.kidstune.requests;
 import at.kidstune.content.AllowedContent;
 import at.kidstune.content.ContentRepository;
 import at.kidstune.content.ContentScope;
+import at.kidstune.content.ContentType;
+import at.kidstune.notification.EmailNotificationService;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -18,13 +22,54 @@ public class ContentRequestService {
     private final ContentRequestRepository requestRepository;
     private final ContentRepository        contentRepository;
     private final ProfileRepository        profileRepository;
+    private final EmailNotificationService emailNotificationService;
 
     public ContentRequestService(ContentRequestRepository requestRepository,
                                   ContentRepository contentRepository,
-                                  ProfileRepository profileRepository) {
-        this.requestRepository = requestRepository;
-        this.contentRepository = contentRepository;
-        this.profileRepository = profileRepository;
+                                  ProfileRepository profileRepository,
+                                  EmailNotificationService emailNotificationService) {
+        this.requestRepository          = requestRepository;
+        this.contentRepository          = contentRepository;
+        this.profileRepository          = profileRepository;
+        this.emailNotificationService   = emailNotificationService;
+    }
+
+    /** Creates a new PENDING request. Enforces max-3 pending per profile. Fires email async. */
+    public Mono<ContentRequest> createRequest(String profileId, String spotifyUri,
+                                              String title, ContentType contentType,
+                                              String imageUrl, String artistName) {
+        return db(() -> {
+            long pending = requestRepository.countByProfileIdAndStatus(profileId, ContentRequestStatus.PENDING);
+            if (pending >= 3) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Maximal 3 offene Anfragen pro Profil erlaubt.");
+            }
+            ContentRequest request = new ContentRequest();
+            request.setProfileId(profileId);
+            request.setSpotifyUri(spotifyUri);
+            request.setTitle(title);
+            request.setContentType(contentType);
+            request.setImageUrl(imageUrl);
+            request.setArtistName(artistName);
+            return requestRepository.save(request);
+        }).doOnNext(emailNotificationService::sendRequestNotification);
+    }
+
+    /** Approves a request by its approve_token (public one-click flow – no auth required). */
+    public Mono<ContentRequest> approveByToken(String approveToken) {
+        return db(() -> {
+            ContentRequest request = requestRepository.findByApproveToken(approveToken)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Ungültiger oder bereits verwendeter Token."));
+            if (request.getStatus() != ContentRequestStatus.PENDING) {
+                return request; // already handled – caller checks status
+            }
+            addContentIfMissing(request.getProfileId(), request);
+            request.setStatus(ContentRequestStatus.APPROVED);
+            request.setResolvedAt(Instant.now());
+            request.setApproveToken(null); // single-use: clear after use
+            return requestRepository.save(request);
+        });
     }
 
     /** Approve a single request: creates AllowedContent for the requesting profile. */

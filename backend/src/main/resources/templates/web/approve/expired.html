@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Link abgelaufen – KidsTune</title>
+  <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center" style="min-height:100vh;">
+<div class="card border-0 shadow-sm text-center p-5" style="max-width:440px;width:100%;">
+  <div class="mb-4" style="font-size:4rem;">&#8987;</div>
+  <h1 class="h3 mb-3">Link abgelaufen</h1>
+  <p class="text-muted">
+    Dieser Genehmigungslink ist nicht mehr g&uuml;ltig. Der Wunsch wurde automatisch abgelaufen.
+  </p>
+  <a th:href="@{/web/requests}" class="btn btn-outline-secondary mt-3">Zum Dashboard</a>
+</div>
+</body>
+</html>

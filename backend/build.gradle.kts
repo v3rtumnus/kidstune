@@ -43,6 +43,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-cache")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
+    // Email
+    implementation("org.springframework.boot:spring-boot-starter-mail")
+
     // Observability
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 

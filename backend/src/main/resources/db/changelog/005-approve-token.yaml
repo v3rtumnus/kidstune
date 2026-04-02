@@ -1,0 +1,19 @@
+databaseChangeLog:
+
+  # ── content_request: add approve_token for one-click email approval ───────────
+  - changeSet:
+      id: "005-content-request-approve-token"
+      author: "kidstune"
+      changes:
+        - addColumn:
+            tableName: content_request
+            columns:
+              - column:
+                  name: approve_token
+                  type: VARCHAR(36)
+                  constraints:
+                    nullable: true
+        - addUniqueConstraint:
+            tableName: content_request
+            columnNames: approve_token
+            constraintName: uq_content_request_approve_token

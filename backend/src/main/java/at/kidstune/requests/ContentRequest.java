@@ -61,10 +61,15 @@ public class ContentRequest {
     @Column(name = "digest_sent_at")
     private Instant digestSentAt;
 
+    /** Single-use token for one-click email approval. Generated on creation, nulled after use. */
+    @Column(name = "approve_token", unique = true, length = 36)
+    private String approveToken;
+
     @PrePersist
     void prePersist() {
-        if (id == null)          id = UUID.randomUUID().toString();
-        if (requestedAt == null) requestedAt = Instant.now();
-        if (status == null)      status = ContentRequestStatus.PENDING;
+        if (id == null)            id = UUID.randomUUID().toString();
+        if (requestedAt == null)   requestedAt = Instant.now();
+        if (status == null)        status = ContentRequestStatus.PENDING;
+        if (approveToken == null)  approveToken = UUID.randomUUID().toString();
     }
 }

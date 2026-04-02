@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface ContentRequestRepository extends JpaRepository<ContentRequest, String> {
 
@@ -21,6 +22,12 @@ public interface ContentRequestRepository extends JpaRepository<ContentRequest, 
     List<ContentRequest> findByProfileIdIn(List<String> profileIds);
 
     long countByProfileIdAndStatus(String profileId, ContentRequestStatus status);
+
+    Optional<ContentRequest> findByApproveToken(String approveToken);
+
+    @Query("SELECT r FROM ContentRequest r WHERE r.status = 'PENDING' " +
+           "AND r.requestedAt < :cutoff AND r.digestSentAt IS NULL")
+    List<ContentRequest> findPendingOlderThanWithoutDigest(@Param("cutoff") Instant cutoff);
 
     @Modifying
     @Query("UPDATE ContentRequest r SET r.status = 'EXPIRED', r.resolvedAt = :now " +

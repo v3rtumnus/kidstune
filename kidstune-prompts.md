@@ -13,7 +13,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Prompt 2.4 – Web Dashboard Foundation (login uses Spotify OAuth — superseded by 2.4b)
 - ✅ Prompt 2.4b – Refactor Dashboard Auth to Email/Password
 - ✅ Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue
-- ⬅️ **NEXT: Prompt 2.6 – Email Notifications with Approve Token**
+- ✅ Prompt 2.6 – Email Notifications with Approve Token
+- ⬅️ **NEXT: Prompt 3.1 – Kids App Project Setup + Theme**
 
 ---
 
@@ -681,7 +682,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 2.6 – Email Notifications with Approve Token ⬅️ NEXT
+### Prompt 2.6 – Email Notifications with Approve Token ✅
 
 ```
 CONTEXT: Phase 2 of KidsTune. Web dashboard is live (2.4, 2.5). We add email notifications
@@ -757,7 +758,7 @@ VERIFICATION:
 
 ## Phase 3 – Kids App UI Shell with Mock Data (Week 4)
 
-### Prompt 3.1 – Kids App Project Setup + Theme
+### Prompt 3.1 – Kids App Project Setup + Theme ⬅️ NEXT
 
 ```
 CONTEXT: Phase 3 of KidsTune. Backend exists (phases 1-2). We now create the Kids App
