@@ -92,7 +92,9 @@ Each person in a KidsTune household has their **own individual Spotify account**
 - Development mode: up to 25 users (more than sufficient for family use)
 - No formal Spotify review process required at this scale
 - Required scopes for parent account: `user-read-playback-state`, `user-modify-playback-state`, `user-library-read`, `user-read-recently-played`, `playlist-read-private`, `streaming`
-- Required scopes for child accounts (import): `user-library-read`, `user-read-recently-played`, `user-top-read`, `playlist-read-private`
+- Required scopes for child accounts (import + favorites sync): `user-library-read`, `user-library-modify`, `user-read-recently-played`, `user-top-read`, `playlist-read-private`
+  - `user-library-read`: read child's Liked Songs for import pre-population
+  - `user-library-modify`: mirror KidsTune heart taps back to Spotify Liked Songs ("Lieblingssongs")
 
 ### 2.4 Authentication Flow
 
@@ -1340,7 +1342,7 @@ Phase 8 ─→ Production-hardened, admin data tables, documented, ready for dai
 | **Kids App: Sync Client** | Ktor client calls `/api/v1/sync/{profileId}`, parses response, stores complete tree in Room transactionally. For MVP: sync on app launch only (WorkManager comes in Phase 5). | Integration: mock backend response → verify Room populated correctly |
 | **Kids App: Replace Mock Data** | Content grid, album view, and track list now read from Room instead of hardcoded mocks. All navigation works with real data. Cover art loads from Coil (with disk cache for offline). | UI test: tiles show real Spotify artwork, drill-down to albums/tracks works |
 | **Kids App: Spotify Playback** | Spotify App Remote SDK integration: connection lifecycle management, play/pause/skip/seek using `spotify:track:...` URIs from local Room DB, track change listener, now-playing state updates, progress bar | Integration: SDK connects, plays a track from local URI, state updates in UI |
-| **Kids App: Favorites (Real)** | Heart button persists to `LocalFavorite` in Room (synced=false), favorites tab reads from Room, upload to backend on next sync | Unit: FavoriteRepository add/remove/list. Integration: favorite persists across app restart |
+| **Kids App: Favorites (Real)** | Heart button persists to `LocalFavorite` in Room (synced=false), favorites tab reads from Room, upload to backend on next sync. **Backend mirrors each favorite add/remove to Spotify Liked Songs ("Lieblingssongs") via `PUT/DELETE /v1/me/tracks` using the child's profile-level token — fire-and-forget, never blocks the KidsTune operation. Gracefully no-ops if child Spotify account is not linked.** | Unit: FavoriteRepository add/remove/list. Unit: SpotifyFavoriteSyncService mirrors add/remove, no-ops on unlinked profile, swallows Spotify errors. Integration: favorite persists across app restart |
 | **Kids App: Mini-Player** | Persistent bottom bar showing current cover art thumbnail + play/pause + track title, tappable to expand to full Now Playing screen | UI test: mini-player reflects playback state |
 
 **Milestone deliverable:** ← **THIS IS THE MVP.** You can:
@@ -1383,8 +1385,8 @@ Phase 8 ─→ Production-hardened, admin data tables, documented, ready for dai
 
 | Module | Scope | Tests |
 |--------|-------|-------|
-| **Backend: Listening History Import** | Fetch recently played + top artists + playlists from Spotify, apply children's content heuristic with age-based pre-selection, return grouped results | Unit: heuristic detection accuracy, age-range matching. Integration: mock Spotify history responses |
-| **Web Dashboard: Import Wizard** | Import wizard page: select profiles → HTMX-loaded suggestion cards with per-profile checkboxes (age-based pre-selection) → bulk add with progress | Integration: full import flow via web → AllowedContent rows created |
+| **Backend: Listening History Import** | Fetch recently played + top artists + playlists from Spotify, apply children's content heuristic with age-based pre-selection, return grouped results. **Also fetches child's Liked Songs (`GET /v1/me/tracks`) and pre-populates KidsTune favorites for any liked track that is already in the child's resolved content — safety filter ensures only parent-approved content becomes a favorite.** | Unit: heuristic detection accuracy, age-range matching, liked-songs-to-favorites cross-reference logic. Integration: mock Spotify history responses |
+| **Web Dashboard: Import Wizard** | Import wizard page: select profiles → HTMX-loaded suggestion cards with per-profile checkboxes (age-based pre-selection) → bulk add. **After content import, automatically calls importLikedSongsAsFavorites() per profile and shows imported favorites count on success page ("+ Y Lieblingssongs als Favoriten übernommen").** | Integration: full import flow via web → AllowedContent rows created + Favorite rows pre-populated |
 | **Kids App: Offline Hardening** | Stress-test offline behavior: airplane mode from cold start (should show all cached content), Wi-Fi loss mid-playback (should continue), favorites added offline queued correctly, content request queued offline. Visual offline indicator (subtle cloud icon). | Unit: offline queue persistence. Integration: simulate network loss mid-sync → recovery. Manual: airplane mode end-to-end walkthrough |
 | **Kids App: Samsung Kids Testing** | Verify: Activity lifecycle inside Samsung Kids, audio focus handling when Samsung Kids pauses/resumes, Spotify background process survives Samsung Kids transitions, correct behavior on Samsung Kids time limit reached | Manual test: documented procedure + verification checklist with screenshots |
 | **Documentation: Samsung Kids Setup** | Step-by-step guide with screenshots: install apps, configure Samsung Kids, add KidsTune Kids as allowed app, verify Spotify runs in background | Published as README section |

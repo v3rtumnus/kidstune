@@ -1158,13 +1158,19 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 4.5 – Kids App Real Favorites
+### Prompt 4.5 – Kids App Real Favorites + Spotify Liked Songs Sync
 
 ```
 CONTEXT: Phase 4 of KidsTune. Playback works (4.4). We now implement real favorites that
-persist to Room and sync to the backend.
+persist to Room and sync to the backend. KidsTune favorites are also mirrored to Spotify
+"Lieblingssongs" (Liked Songs) bidirectionally: a heart tap in KidsTune adds the track to
+Spotify Liked Songs, and removal mirrors back. This uses the child's profile-level Spotify
+token already stored on the backend (set up in 2.5). If no child Spotify account is linked,
+favorites silently work as standalone (no errors, no Spotify calls).
 
 GOAL: When this task is done:
+
+Kids App:
 - FavoriteRepository in kids-app/data/repository/:
   - toggleFavorite(track: LocalTrack): if already favorite → remove, else → add
   - Inserts into LocalFavorite table with synced=false
@@ -1184,11 +1190,33 @@ GOAL: When this task is done:
   - Delete locally removed favorites from backend: DELETE /api/v1/profiles/{id}/favorites/{uri}
 - FavoriteDao updated: getUnsynced() returns LocalFavorites where synced=false
 
-REFERENCE: PROJECT_PLAN.md §5.1.5 (LocalFavorite schema with synced flag, offline data flow),
-§6.1 Favorites endpoints. CLAUDE.md: "No confirmation dialogs – adding is instant, removing needs long-press."
+Backend (new, in favorites/ package):
+- SpotifyFavoriteSyncService:
+  - mirrorAdd(profileId, trackUri): if SpotifyTokenService.isProfileSpotifyLinked(profileId),
+    calls PUT https://api.spotify.com/v1/me/tracks?ids={trackId} using
+    SpotifyTokenService.getValidProfileAccessToken(profileId).
+    trackId is extracted from the Spotify URI (spotify:track:{id} → {id}).
+    Silently no-ops (log.debug) if profile has no linked Spotify account.
+  - mirrorRemove(profileId, trackUri): same guard, calls DELETE /v1/me/tracks?ids={trackId}
+  - Both methods swallow non-fatal Spotify API errors (log.warn) so a Spotify failure
+    never breaks the KidsTune favorite operation
+- FavoritesController (POST /api/v1/profiles/{profileId}/favorites):
+  - Creates Favorite row in DB (existing behaviour)
+  - Calls SpotifyFavoriteSyncService.mirrorAdd() asynchronously (Mono.fromRunnable on
+    Schedulers.boundedElastic, subscribeOn, no await — fire and forget)
+- FavoritesController (DELETE /api/v1/profiles/{profileId}/favorites/{uri}):
+  - Deletes Favorite row (existing behaviour)
+  - Calls SpotifyFavoriteSyncService.mirrorRemove() asynchronously
+
+REFERENCE: PROJECT_PLAN.md §2.2 (per-profile Spotify tokens), §4.5 (Spotify Liked Songs sync
+design), §5.1.5 (LocalFavorite schema with synced flag, offline data flow),
+§6.1 Favorites endpoints. CLAUDE.md pitfall #8 (never use family token for per-child operations).
 
 CONSTRAINTS:
 - Favorites persist locally even when offline (synced=false, uploaded later)
+- Spotify mirror is fire-and-forget: a Spotify API error must never fail the KidsTune favorite
+- Use SpotifyTokenService.getValidProfileAccessToken(profileId) — NOT the family token
+- extracting trackId from URI: only spotify:track:* URIs should be mirrored (skip albums/playlists/artists)
 - Do NOT implement the Discover screen
 - Do NOT implement content requests
 - Do NOT add WorkManager sync yet (still manual sync on app launch for now)
@@ -1199,6 +1227,10 @@ VERIFICATION:
 - Unit test: getUnsynced() returns only favorites with synced=false
 - UI test: NowPlayingScreen → tap heart → Favorites tab shows the track → tap heart again → removed
 - Integration test: add favorite (synced=false) → run sync → verify POST called → synced=true
+- Unit test: SpotifyFavoriteSyncService.mirrorAdd with unlinked profile → no Spotify call, no exception
+- Unit test: SpotifyFavoriteSyncService.mirrorAdd with linked profile → PUT /v1/me/tracks called with correct trackId
+- Unit test: mirrorAdd for a non-track URI (spotify:album:*) → no Spotify call
+- Unit test: Spotify API returns 500 → mirrorAdd swallows error, does not rethrow
 - Run ./gradlew test → all tests pass
 ```
 
@@ -1387,13 +1419,18 @@ VERIFICATION:
 
 ## Phase 6 – Import, Offline & Samsung Kids (Week 8)
 
-### Prompt 6.1 – Backend Import Service
+### Prompt 6.1 – Backend Import Service + Liked Songs Pre-population
 
 ```
 CONTEXT: Phase 6 of KidsTune. We implement the Spotify listening history import to ease
 onboarding. Each child has their own Spotify account linked to their ChildProfile (set up
 in prompt 2.5). The import fetches each CHILD's own listening history using the
 child's profile-level Spotify token — NOT the parent's family-level token.
+
+As part of import, we also pre-populate KidsTune favorites from the child's existing Spotify
+Liked Songs ("Lieblingssongs"). Only tracks that are part of the child's allowed content are
+imported as favorites — this preserves the safety model. Tracks in Liked Songs that are not
+in the allowed content list are silently skipped (they may not be children's content).
 
 GOAL: When this task is done:
 - SpotifyImportService in spotify/ package:
@@ -1414,14 +1451,26 @@ GOAL: When this task is done:
     - Loads known-artists.yml min_age
     - Compares with profile's age_group (TODDLER=0-3, PRESCHOOL=4-6, SCHOOL=7-12)
   - Returns ImportSuggestionsDto (scoped to the single profile, no per-profile flags needed)
+- importLikedSongsAsFavorites(profileId): new method on SpotifyImportService:
+  - Calls GET /v1/me/tracks (paginated, up to 200 tracks) with child's token
+  - For each liked track URI, checks if a ResolvedTrack with that URI exists for this profile
+    (via ResolvedTrackRepository or a JOIN query)
+  - For matching tracks: creates a Favorite row if one doesn't already exist
+  - Returns count of favorites created
+  - Silently no-ops if profile Spotify is not linked (no exception)
 - POST /api/v1/content/import endpoint (already defined) now fully implemented:
   - Accepts { items: [{ spotifyUri, scope, profileIds[] }] }
   - Creates AllowedContent rows per profile
   - Triggers ContentResolver for each new entry
   - Returns { created: int, profiles: [{ id, name, newContentCount }] }
+- POST /api/v1/profiles/{profileId}/import-liked-songs (new, web-dashboard-only endpoint,
+  requires session auth — NOT JWT):
+  - Calls importLikedSongsAsFavorites(profileId)
+  - Returns { imported: int }
+  - Called by the import wizard (6.2) after content import completes
 
-REFERENCE: PROJECT_PLAN.md §2.2 (Spotify account model — per-profile tokens),
-§5.2.2 (import flow — per-profile, uses child's own Spotify history),
+REFERENCE: PROJECT_PLAN.md §2.2 (Spotify account model — per-profile tokens), §4.5 (Spotify
+Liked Songs sync design), §5.2.2 (import flow — per-profile, uses child's own Spotify history),
 §5.2.2 (known-artists.yml format with age ranges), §6.1 Content Management import endpoint.
 
 CONSTRAINTS:
@@ -1430,6 +1479,9 @@ CONSTRAINTS:
 - Genre-based heuristic reuses ContentTypeClassifier from phase 2
 - Known-artists.yml reuses KnownChildrenArtists from phase 2
 - If profile's Spotify account is not linked: return 409 with error "SPOTIFY_NOT_LINKED"
+  for getImportSuggestions; importLikedSongsAsFavorites silently no-ops (no error)
+- Safety: only import as favorites tracks that are already in resolved content for this profile —
+  never create Favorite rows for content the parent hasn't approved
 
 VERIFICATION:
 - Unit test: age-based pre-selection logic for a PRESCHOOL profile:
@@ -1437,21 +1489,29 @@ VERIFICATION:
   - "Die drei ??? Kids" (min_age 6) → NOT pre-selected (age 4-6 is borderline — deselect to be safe)
   - "Die drei ???" (min_age 10) → NOT pre-selected
 - Unit test: getImportSuggestions with unlinked profile → throws ProfileSpotifyNotLinkedException
+- Unit test: importLikedSongsAsFavorites with unlinked profile → returns 0, no exception
+- Unit test: importLikedSongsAsFavorites — liked track URI matches a resolved track for profile → Favorite created
+- Unit test: importLikedSongsAsFavorites — liked track URI NOT in resolved content → skipped, no Favorite
+- Unit test: importLikedSongsAsFavorites — favorite already exists → not duplicated
 - Integration test with MockWebServer: mock Spotify responses using CHILD's token →
   verify grouped results correctly use profile token (not family token)
 - Integration test: unlinked profile → 409 with SPOTIFY_NOT_LINKED
-  with correct pre-selection per profile
 - Integration test: POST /api/v1/content/import with 3 items, 2 profiles →
   verify 6 AllowedContent rows created, ContentResolver triggered 6 times
+- Integration test: importLikedSongsAsFavorites with 5 liked tracks, 3 in resolved content →
+  3 Favorite rows created, 2 skipped
 - Run ./gradlew test → all tests pass
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 6.2 – Web Dashboard Import Wizard
+### Prompt 6.2 – Web Dashboard Import Wizard + Liked Songs Import
 
 ```
-CONTEXT: Phase 6 of KidsTune. Backend import service exists (6.1). The web dashboard
-foundation exists (2.4). We build the import wizard as a web dashboard page.
+CONTEXT: Phase 6 of KidsTune. Backend import service exists (6.1), including
+importLikedSongsAsFavorites(). The web dashboard foundation exists (2.4). We build the
+import wizard as a web dashboard page. After content import completes, the wizard also
+offers a "Import Lieblingssongs" step that pre-populates the child's KidsTune favorites
+from their Spotify Liked Songs.
 
 GOAL: When this task is done:
 - ImportWebController (com.kidstune.web) with pages:
@@ -1464,20 +1524,21 @@ GOAL: When this task is done:
     - "Other artists" section (unchecked by default)
     Returns web/fragments/import-suggestions.html partial
   - POST /web/import → bulk-add all checked items: calls ContentService.addContentBulk()
-    per selected item; redirect to success page showing
-    "Added X items for Luna, Y items for Max"
+    per selected item; after content import, for each profile that has a linked Spotify account:
+    calls SpotifyImportService.importLikedSongsAsFavorites(profileId) and records the count;
+    redirect to success page showing:
+    "Added X items for Luna (+ Y Lieblingssongs imported as favorites), ..."
 - Thymeleaf templates:
   - web/import/step1.html: profile checkboxes, "Fetch Suggestions" HTMX trigger
   - web/import/step2.html: HTMX target div that receives suggestion fragments, Import button,
     step summary ("X items selected for Y profiles")
-  - web/import/success.html: confirmation with added counts per profile
+  - web/import/success.html: confirmation with added counts per profile + favorites imported count
+    (only shown if > 0 favorites were imported; if 0, just show content count)
   - web/fragments/import-suggestions.html: HTMX partial for suggestion groups
-- Navigation: sidebar link "Import from History" → /web/import
-- GET /api/v1/content/import/suggestions endpoint added to backend if not already present
-  (called by ImportWebController via SpotifyImportService, not HTTP-looped)
+- Navigation: sidebar link "Importieren" → /web/import already exists in layout
 
-REFERENCE: PROJECT_PLAN.md §5.2.2 (import flow with per-profile age-based pre-selection),
-§6.1 (SpotifyImportService already implemented in 6.1).
+REFERENCE: PROJECT_PLAN.md §4.5 (Spotify Liked Songs sync design), §5.2.2 (import flow with
+per-profile age-based pre-selection), §6.1 (SpotifyImportService already implemented in 6.1).
 
 CONSTRAINTS:
 - Do NOT modify kids-app
@@ -1485,14 +1546,21 @@ CONSTRAINTS:
 - Web controller calls SpotifyImportService directly, never HTTP-loops to own REST API
 - Import wizard does NOT need WebSocket live progress — HTMX form submission is sufficient
 - Reuse ContentService.addContentBulk() from the backend service layer
+- Liked Songs import is best-effort: if it fails or profile has no Spotify linked, silently show 0;
+  never fail the whole import because of it
 
 VERIFICATION:
 - GET /web/import → profile checkboxes shown
 - POST /web/import/suggestions (HTMX) → suggestion groups returned as partial HTML
 - Pre-selected items match age heuristic (verify with a SCHOOL profile vs TODDLER profile)
 - Submit import → redirect to success page with correct added-item counts per profile
+- Success page shows favorites imported count for profiles with Spotify linked
+- Success page does not mention favorites for profiles without Spotify linked
 - Integration test: ImportWebController mock Spotify suggestions → verify HTMX partial rendered
   with correct pre-selections
+- Integration test: import with profile that has Spotify linked → importLikedSongsAsFavorites called
+- Integration test: import with profile that has NO Spotify linked → importLikedSongsAsFavorites
+  not called (or silently returns 0), success page shows only content count
 - Run ./gradlew test → all tests pass
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
@@ -1875,8 +1943,13 @@ GOAL: When this task is done:
       returns success flash message; resolver runs in background as usual
   Favorite:
     - GET /web/admin/favorites → paginated table: profile name, track title, artist, added_at,
-      synced status; filter by profile via dropdown
+      synced status, Spotify-mirrored badge (shown if profile has linked Spotify);
+      filter by profile via dropdown
     - POST /web/admin/favorites/{id}/delete → HTMX confirmation → delete
+    Note: the per-profile favorites tab on the profile content page
+    (GET /web/profiles/{id}/content?tab=favorites) is also implemented here as a tab
+    alongside the existing content list, showing the child's current favorites with
+    added_at and a delete button (same HTMX pattern as content delete)
   ContentRequest:
     - GET /web/admin/requests → paginated table: profile, title, status badge, requested_at,
       resolved_at, parent_note; filter by status dropdown
