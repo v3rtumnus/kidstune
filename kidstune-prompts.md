@@ -787,6 +787,17 @@ GOAL: When this task is done:
   - MiniPlayerBar: bottom bar with thumbnail, title, play/pause button
 - Mock data provider: MockContentProvider with ~20 hardcoded content entries
   (mix of MUSIC and AUDIOBOOK), ~5 mock albums with tracks, 2 mock profiles
+- Compose Preview Screenshot Testing configured from the start:
+  - Apply plugin `com.android.tools.compose:compose-preview-screenshot-testing` in
+    kids-app/build.gradle.kts (check AGP + plugin compatibility for target version)
+  - Configure screenshot output directory to docs/screenshots/ (via plugin DSL or default
+    src/debug/screenshotTest/reference/) — whichever the installed plugin version supports
+  - Every reusable component (ContentTile, FavoriteButton, PageIndicator, MiniPlayerBar) gets
+    at least one @Preview function covering the normal state; the plugin renders all @Preview
+    composables to PNG on the host JVM without a device or emulator
+  - Run ./gradlew updateDebugScreenshotTest → PNG reference images generated
+  - Commit the generated PNG files to the repo under docs/screenshots/ (or reference dir)
+    so screenshots are persisted and tracked alongside code
 
 REFERENCE: PROJECT_PLAN.md §5.1.2 (UI design principles), §5.1.5 (Local Room DB schema),
 §3.1 (Android tech stack). CLAUDE.md Kids App specifics (72dp targets, color scheme).
@@ -803,6 +814,9 @@ VERIFICATION:
 - Room schema test: in-memory DB creates all 4 tables, basic insert/query works
 - Visual inspection: install on target device, verify colors and touch target sizes
 - Run ./gradlew test → all tests pass
+- Run ./gradlew updateDebugScreenshotTest → PNG files generated for ContentTile,
+  FavoriteButton, PageIndicator, MiniPlayerBar (one PNG per @Preview function)
+- Confirm generated PNGs look correct, then commit them to the repo
 ```
 
 ### Prompt 3.2 – Kids App All Screens (Mock Data)
@@ -860,6 +874,9 @@ VERIFICATION:
 - UI test: BrowseScreen pagination → swipe right → page 2 → dots update
 - Install on target Samsung phone → hand to child → observe usability
 - Run ./gradlew test → all tests pass
+- Run ./gradlew updateDebugScreenshotTest → new PNGs generated for all screen @Preview functions
+  (ProfileSelectionScreen, HomeScreen, BrowseScreen, NowPlayingScreen, FavoritesEmptyState)
+- Confirm PNGs look correct (colors, touch targets, layout), then commit them to the repo
 ```
 
 ### Prompt 3.3 – Kids App UI Tests
@@ -1156,6 +1173,9 @@ VERIFICATION:
 - Manual test: play chapter 3 partway through → close app → reopen → mini-player shows
   saved position, tapping resume plays chapter 3 from saved position
 - Run ./gradlew test → all tests pass (unit tests that don't depend on real Spotify SDK)
+- Run ./gradlew updateDebugScreenshotTest → new PNG generated for ChapterListScreen @Preview
+- Confirm ChapterListScreen PNG looks correct (album art header, chapter list, resume indicator),
+  then commit it to the repo
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
@@ -1365,6 +1385,9 @@ VERIFICATION:
 - Unit test: PairingViewModel state transitions (EnteringCode → Confirming → Success)
 - Integration test: full pairing flow with mock backend → token stored → profile selection shown
 - Run ./gradlew test → all tests pass
+- Run ./gradlew updateDebugScreenshotTest → new PNG generated for PairingScreen @Preview
+  (number pad, digit input fields, Connect button)
+- Confirm PNG looks correct, then commit it to the repo
 ```
 
 ### Prompt 5.4 – Kids App Sync Manager (WorkManager)
@@ -1906,6 +1929,9 @@ VERIFICATION:
 - Unit test: search rate limiting (2 queries within 5s → second blocked)
 - Unit test: DiscoverViewModel processes WebSocket approval → triggers sync
 - Run ./gradlew test → all tests pass
+- Run ./gradlew updateDebugScreenshotTest → new PNGs generated for DiscoverScreen @Preview
+  functions (search idle, search results, pending requests, approval celebration)
+- Confirm PNGs look correct, then commit them to the repo
 ```
 
 ---
@@ -2027,6 +2053,9 @@ VERIFICATION:
 - Manual test: each animation runs smoothly on target device
 - UI test: verify animations don't crash or cause layout issues
 - Run ./gradlew test → all existing tests still pass
+- Run ./gradlew updateDebugScreenshotTest → update existing reference PNGs to capture polished
+  animations states (e.g., FavoriteButton filled state, confetti frame, transition states)
+- Review diffs against previous reference PNGs, confirm intentional changes, commit updated PNGs
 ```
 
 ### Prompt 8.3 – Kids App Edge Cases
@@ -2065,6 +2094,9 @@ VERIFICATION:
 - UI test: each error screen renders with correct illustration and text
 - UI test: storage full error shown when Room write throws IOException
 - Run ./gradlew test → all tests pass
+- Run ./gradlew updateDebugScreenshotTest → new PNGs generated for each error screen
+  (SpotifyNotInstalled, SpotifyNotLoggedIn, NoNetwork, StorageFull)
+- Confirm PNGs look correct (friendly illustrations, correct text), then commit them to the repo
 ```
 
 ### Prompt 8.4 – Kids App Accessibility Audit
