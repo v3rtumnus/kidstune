@@ -45,6 +45,12 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     // Screenshot Testing – reference images are stored in src/debug/screenshotTest/reference/
     // Run: ./gradlew updateDebugScreenshotTest   → generate/update PNGs
     // Run: ./gradlew validateDebugScreenshotTest → fail if visuals changed

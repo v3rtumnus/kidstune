@@ -57,6 +57,7 @@ fun MiniPlayerBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .kidsTouchTarget()
                 .clickable(onClick = onExpand)
                 .semantics { contentDescription = "Jetzt läuft: $title" }
                 .padding(horizontal = 12.dp, vertical = 8.dp),

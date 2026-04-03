@@ -17,14 +17,12 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -66,7 +64,6 @@ fun NowPlayingScreen(
 
 // ── Stateless composable (used in Previews and tests) ─────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
     modifier: Modifier = Modifier,
@@ -77,17 +74,23 @@ fun NowPlayingScreen(
     Scaffold(
         modifier = modifier,
         topBar   = {
-            TopAppBar(
-                title          = { /* intentionally empty – cover art is the focus */ },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
-                        Icon(
-                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurück"
-                        )
-                    }
+            Row(
+                modifier          = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick  = onNavigateUp,
+                    modifier = Modifier.size(72.dp)
+                ) {
+                    Icon(
+                        imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Zurück"
+                    )
                 }
-            )
+            }
         }
     ) { innerPadding ->
         Column(
