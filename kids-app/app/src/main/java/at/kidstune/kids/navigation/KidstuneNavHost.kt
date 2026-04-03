@@ -7,24 +7,25 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import at.kidstune.kids.domain.model.ContentType
+import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.ui.screens.BrowseScreen
 import at.kidstune.kids.ui.screens.DiscoverScreen
 import at.kidstune.kids.ui.screens.HomeScreen
 import at.kidstune.kids.ui.screens.NowPlayingScreen
-import at.kidstune.kids.ui.screens.SetupScreen
+import at.kidstune.kids.ui.screens.ProfileSelectionScreen
 import kotlinx.serialization.Serializable
 
 // ── Route definitions (type-safe Compose Navigation) ──────────────────────
 
 @Serializable
-object SetupRoute
+object ProfileSelectionRoute
 
 @Serializable
 object HomeRoute
 
+/** [category] is a [BrowseCategory] name, e.g. "MUSIC", "AUDIOBOOK", "FAVORITES". */
 @Serializable
-data class BrowseRoute(val category: String) // category = ContentType name
+data class BrowseRoute(val category: String)
 
 @Serializable
 object NowPlayingRoute
@@ -45,28 +46,30 @@ fun KidstuneNavHost(
         startDestination = startDestination,
         modifier         = modifier
     ) {
-        composable<SetupRoute> {
-            SetupScreen(
-                onSetupComplete = { navController.navigate(HomeRoute) {
-                    popUpTo<SetupRoute> { inclusive = true }
-                }}
+        composable<ProfileSelectionRoute> {
+            ProfileSelectionScreen(
+                onProfileBound = {
+                    navController.navigate(HomeRoute) {
+                        popUpTo<ProfileSelectionRoute> { inclusive = true }
+                    }
+                }
             )
         }
 
         composable<HomeRoute> {
             HomeScreen(
-                onNavigateToBrowse    = { type -> navController.navigate(BrowseRoute(type.name)) },
-                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) },
-                onNavigateToDiscover  = { navController.navigate(DiscoverRoute) }
+                onNavigateToBrowse     = { category ->
+                    navController.navigate(BrowseRoute(category.name))
+                },
+                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
             )
         }
 
         composable<BrowseRoute> { backStackEntry ->
-            val route = backStackEntry.toRoute<BrowseRoute>()
-            val contentType = ContentType.entries.firstOrNull { it.name == route.category }
-                ?: ContentType.MUSIC
+            val route    = backStackEntry.toRoute<BrowseRoute>()
+            val category = BrowseCategory.fromString(route.category)
             BrowseScreen(
-                contentType            = contentType,
+                category               = category,
                 onNavigateUp           = { navController.navigateUp() },
                 onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
             )

@@ -15,7 +15,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue
 - ✅ Prompt 2.6 – Email Notifications with Approve Token
 - ✅ Prompt 3.1 – Kids App Project Setup + Theme
-- ⬅️ **NEXT: Prompt 3.2 – Kids App All Screens (Mock Data)**
+- ✅ Prompt 3.2 – Kids App All Screens (Mock Data)
+- ⬅️ **NEXT: Prompt 3.3 – Kids App UI Tests**
 
 ---
 
@@ -820,7 +821,7 @@ VERIFICATION:
 - Confirm generated PNGs look correct, then commit them to the repo
 ```
 
-### Prompt 3.2 – Kids App All Screens (Mock Data) ⬅️ NEXT
+### Prompt 3.2 – Kids App All Screens (Mock Data) ✅
 
 ```
 CONTEXT: Phase 3 of KidsTune. Kids App scaffold with theme exists (3.1).

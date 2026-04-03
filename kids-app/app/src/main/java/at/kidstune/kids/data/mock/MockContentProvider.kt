@@ -4,6 +4,7 @@ import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.data.local.entities.LocalFavorite
 import at.kidstune.kids.data.local.entities.LocalTrack
+import at.kidstune.kids.domain.model.BrowseTile
 import at.kidstune.kids.domain.model.ContentScope
 import at.kidstune.kids.domain.model.ContentType
 import java.time.Instant
@@ -245,6 +246,98 @@ object MockContentProvider {
             trackNumber      = 1,
             discNumber       = 1,
             imageUrl         = null
+        ),
+    )
+
+    // ── Browse tiles (UI mock, not Room entities) ──────────────────────────
+
+    val mockMusicTiles: List<BrowseTile> = listOf(
+        BrowseTile(
+            id = "tile-bibi1",
+            title = "Bibi & Tina – Folge 1",
+            artistName = "Bibi & Tina",
+            imageUrl = "https://picsum.photos/seed/bibitina1/400/400",
+            spotifyTrackUri = "spotify:track:bibi01t1"
+        ),
+        BrowseTile(
+            id = "tile-bibi2",
+            title = "Bibi & Tina – Folge 2",
+            artistName = "Bibi & Tina",
+            imageUrl = "https://picsum.photos/seed/bibitina2/400/400",
+            spotifyTrackUri = "spotify:track:bibi02t1"
+        ),
+        BrowseTile(
+            id = "tile-bibi3",
+            title = "Bibi & Tina – Folge 3",
+            artistName = "Bibi & Tina",
+            imageUrl = "https://picsum.photos/seed/bibitina3/400/400",
+            spotifyTrackUri = "spotify:track:bibi03t1"
+        ),
+        BrowseTile(
+            id = "tile-bibi-blocksberg",
+            title = "Bibi Blocksberg – Folge 1",
+            artistName = "Bibi Blocksberg",
+            imageUrl = "https://picsum.photos/seed/bibiblocks/400/400",
+            spotifyTrackUri = "spotify:track:blocks01t1"
+        ),
+        BrowseTile(
+            id = "tile-filly",
+            title = "Filly Witchy – Das Lied",
+            artistName = "Filly",
+            imageUrl = "https://picsum.photos/seed/fillyw/400/400",
+            spotifyTrackUri = "spotify:track:filly01t1"
+        ),
+        BrowseTile(
+            id = "tile-kinderlieder",
+            title = "Kinderlieder Medley",
+            artistName = "Various",
+            imageUrl = "https://picsum.photos/seed/kinderlied/400/400",
+            spotifyTrackUri = "spotify:track:kinderlied01"
+        ),
+    )
+
+    val mockAudiobookTiles: List<BrowseTile> = listOf(
+        BrowseTile(
+            id = "tile-tkkg200",
+            title = "TKKG – Folge 200",
+            artistName = "TKKG",
+            imageUrl = "https://picsum.photos/seed/tkkg200/400/400",
+            spotifyTrackUri = "spotify:track:tkkg200t1"
+        ),
+        BrowseTile(
+            id = "tile-yakari1",
+            title = "Yakari – Folge 1",
+            artistName = "Yakari",
+            imageUrl = "https://picsum.photos/seed/yakari1/400/400",
+            spotifyTrackUri = "spotify:track:yakari1t1"
+        ),
+        BrowseTile(
+            id = "tile-drei1",
+            title = "Die drei ??? – Folge 1",
+            artistName = "Die drei ???",
+            imageUrl = "https://picsum.photos/seed/dreifrage1/400/400",
+            spotifyTrackUri = "spotify:track:drei01t1"
+        ),
+        BrowseTile(
+            id = "tile-benjamin",
+            title = "Benjamin Blümchen",
+            artistName = "Benjamin Blümchen",
+            imageUrl = "https://picsum.photos/seed/benjamin1/400/400",
+            spotifyTrackUri = "spotify:track:benjamin01"
+        ),
+        BrowseTile(
+            id = "tile-pumuckl",
+            title = "Pumuckl – Klassiker",
+            artistName = "Pumuckl",
+            imageUrl = "https://picsum.photos/seed/pumuckl1/400/400",
+            spotifyTrackUri = "spotify:track:pumuckl01"
+        ),
+        BrowseTile(
+            id = "tile-bienemaja",
+            title = "Biene Maja – Folge 1",
+            artistName = "Biene Maja",
+            imageUrl = "https://picsum.photos/seed/bienemaja1/400/400",
+            spotifyTrackUri = "spotify:track:biene01t1"
         ),
     )
 

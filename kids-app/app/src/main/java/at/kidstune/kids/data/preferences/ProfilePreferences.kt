@@ -1,0 +1,36 @@
+package at.kidstune.kids.data.preferences
+
+import android.content.Context
+import androidx.core.content.edit
+
+class ProfilePreferences(context: Context) {
+
+    private val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+
+    var boundProfileId: String?
+        get() = prefs.getString(KEY_PROFILE_ID, null)
+        set(value) = prefs.edit { putString(KEY_PROFILE_ID, value) }
+
+    var boundProfileName: String?
+        get() = prefs.getString(KEY_PROFILE_NAME, null)
+        set(value) = prefs.edit { putString(KEY_PROFILE_NAME, value) }
+
+    var boundProfileEmoji: String?
+        get() = prefs.getString(KEY_PROFILE_EMOJI, null)
+        set(value) = prefs.edit { putString(KEY_PROFILE_EMOJI, value) }
+
+    val isBound: Boolean get() = boundProfileId != null
+
+    fun clearBinding() = prefs.edit {
+        remove(KEY_PROFILE_ID)
+        remove(KEY_PROFILE_NAME)
+        remove(KEY_PROFILE_EMOJI)
+    }
+
+    companion object {
+        private const val PREF_NAME         = "kidstune_profile"
+        private const val KEY_PROFILE_ID    = "bound_profile_id"
+        private const val KEY_PROFILE_NAME  = "bound_profile_name"
+        private const val KEY_PROFILE_EMOJI = "bound_profile_emoji"
+    }
+}

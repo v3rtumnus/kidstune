@@ -93,6 +93,8 @@ dependencies {
     testImplementation(libs.room.testing)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.androidx.test.core)
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
     implementation(libs.serialization.json)
 
     // ── Screenshot tests ─────────────────────────────────────────────────────
