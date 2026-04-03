@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher icon foreground: a pair of musical eighth notes (♫) with a small star accent.
+  White with a soft yellow star highlight – cheerful and recognizable for kids.
+  The safe zone for adaptive icons is the central 72dp × 72dp area.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ── Left note head (filled oval) ─────────────────────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M37,70 a7,5 -20 1,0 14,-5.1 a7,5 -20 1,0 -14,5.1 Z" />
+
+    <!-- ── Left note stem ───────────────────────────────────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,65 L50,40 L52,40 L52,65 Z" />
+
+    <!-- ── Right note head ──────────────────────────────────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M57,63 a7,5 -20 1,0 14,-5.1 a7,5 -20 1,0 -14,5.1 Z" />
+
+    <!-- ── Right note stem ──────────────────────────────────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M70,58 L70,33 L72,33 L72,58 Z" />
+
+    <!-- ── Beam connecting both stems ───────────────────────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,40 L72,33 L72,37 L50,44 Z" />
+
+    <!-- ── Second beam (eighth notes have two beams) ────────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,44 L72,37 L72,41 L50,48 Z" />
+
+    <!-- ── Yellow star accent (top-right of notes) ──────────────────────── -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M76,28 L77.8,33.5 L83.5,33.5 L79,37 L80.8,42.5 L76,39 L71.2,42.5 L73,37 L68.5,33.5 L74.2,33.5 Z" />
+
+    <!-- ── Small pink heart (bottom-left, favorites hint) ───────────────── -->
+    <path
+        android:fillColor="#FF6B8A"
+        android:fillAlpha="0.9"
+        android:pathData="M35,82 C35,79.5 31.5,77 29,79.5 C26.5,77 23,79.5 23,82 C23,85 29,89 29,89 C29,89 35,85 35,82 Z" />
+
+</vector>
