@@ -14,7 +14,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Prompt 2.4b – Refactor Dashboard Auth to Email/Password
 - ✅ Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue
 - ✅ Prompt 2.6 – Email Notifications with Approve Token
-- ⬅️ **NEXT: Prompt 3.1 – Kids App Project Setup + Theme**
+- ✅ Prompt 3.1 – Kids App Project Setup + Theme
+- ⬅️ **NEXT: Prompt 3.2 – Kids App All Screens (Mock Data)**
 
 ---
 
@@ -758,7 +759,7 @@ VERIFICATION:
 
 ## Phase 3 – Kids App UI Shell with Mock Data (Week 4)
 
-### Prompt 3.1 – Kids App Project Setup + Theme ⬅️ NEXT
+### Prompt 3.1 – Kids App Project Setup + Theme ✅
 
 ```
 CONTEXT: Phase 3 of KidsTune. Backend exists (phases 1-2). We now create the Kids App
@@ -819,7 +820,7 @@ VERIFICATION:
 - Confirm generated PNGs look correct, then commit them to the repo
 ```
 
-### Prompt 3.2 – Kids App All Screens (Mock Data)
+### Prompt 3.2 – Kids App All Screens (Mock Data) ⬅️ NEXT
 
 ```
 CONTEXT: Phase 3 of KidsTune. Kids App scaffold with theme exists (3.1).
