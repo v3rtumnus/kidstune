@@ -17,7 +17,7 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Prompt 3.1 – Kids App Project Setup + Theme
 - ✅ Prompt 3.2 – Kids App All Screens (Mock Data)
 - ✅ Prompt 3.3 – Kids App UI Tests
-- ⬅️ **NEXT: Prompt 4.1 – Backend Content Resolver**
+- ⬅️ **NEXT: Prompt 3.4 – Kids App Discover Screen (Mock Data)**
 
 ---
 
@@ -933,6 +933,101 @@ VERIFICATION:
 - cd kids-app && ./gradlew test → all UI tests pass
 - Test report shows 15+ test cases across 5 test classes
 - No test depends on network or external services
+```
+
+### Prompt 3.4 – Kids App Discover Screen (Mock Data)
+
+```
+CONTEXT: Phase 3 of KidsTune. All core screens exist and are tested (3.2/3.3). The DiscoverScreen
+is currently a bare placeholder. We now implement it fully with hardcoded mock data so the complete
+UX can be validated before any backend wiring.
+
+KEY DESIGN PRINCIPLE: Children can search and find ANY Spotify content. There is NO play button on
+this screen. The only action is "Request". Playing becomes possible only after parent approval +
+sync. The safety constraint is on playback, not discovery.
+
+GOAL: When this task is done:
+- DiscoverScreen fully implemented with mock data:
+  - Back button (72dp, same custom Row pattern as BrowseScreen / NowPlayingScreen)
+  - Search box: large text (sp 20+), 72dp height, microphone icon button on the right
+    (mic button triggers Android SpeechRecognizer for voice input; for now just show the button)
+  - IDLE STATE (query is empty): shows hardcoded curated suggestions (mock list of 6–8 items
+    representing known-artists.yml content: Bibi & Tina, Pumuckl, Die Drei ???, Pippi Långstrump,
+    TKKG, Benjamin Blümchen, Lillifee). Large tiles (same ContentTile component), each with a
+    "🙏 Ich will das!" Request button instead of being tappable to play.
+  - ACTIVE SEARCH STATE (query non-empty): curated list replaced by mock search results
+    (another hardcoded list of 6 items e.g. "Frozen OST", "Frozen 2 OST", "Encanto OST", etc.)
+    Each tile has a Request button.
+  - "Meine Wünsche" (My wishes) section always visible below the tile list — shows pending
+    requests. The section is hidden (not shown at all) when there are no pending requests.
+    - Pending tile: clock icon 🕐, title, time-context label computed from requestedAt:
+        < 1 h  → "Mama/Papa schauen sich das an"
+        1–24 h → "Gestern gewünscht"
+        > 24 h → "Vor ein paar Tagen gewünscht"
+    - Rejected tile: ❌ icon, title, parent note (if any). Dismissed after 24 h (mock: always shown)
+  - Tapping Request on an idle/search result tile:
+    - Adds item to "Meine Wünsche" as PENDING
+    - The tile's Request button changes to "Angefragt" (disabled) immediately
+    - If 3 pending requests already exist: button is disabled with tooltip/text
+      "Du hast schon 3 Wünsche offen – warte bis Mama/Papa geantwortet hat!"
+  - HomeScreen: add a fourth button "Entdecken" (🔍, accent color purple/indigo) that navigates
+    to DiscoverRoute. Place it below the three existing category buttons.
+
+- MVI state:
+  - DiscoverState(
+      query: String = "",
+      suggestions: List<DiscoverTile> = mockSuggestions,   // idle tiles
+      searchResults: List<DiscoverTile> = emptyList(),      // active search tiles
+      pendingRequests: List<PendingRequest> = emptyList(),
+      requestedUris: Set<String> = emptySet()               // tracks already-requested URIs
+    )
+  - DiscoverIntent: UpdateQuery(q), SubmitSearch, RequestContent(tile), DismissRejected(id)
+  - DiscoverViewModel (no Hilt injection needed for mock phase – use default constructor)
+  - DiscoverTile(spotifyUri, title, artistName, imageUrl?, type: ContentType)
+  - PendingRequest(id, tile, status: PENDING|REJECTED, requestedAt, parentNote?)
+
+- MockDiscoverData object (src/main/java/.../data/mock/MockDiscoverData.kt):
+  - mockSuggestions: List<DiscoverTile> (8 items, German kids content)
+  - mockSearchResults: List<DiscoverTile> (6 items, movie soundtracks)
+  - mockPendingRequests: List<PendingRequest> (2 items: one PENDING < 1h, one REJECTED with note)
+
+- @Preview functions (src/main/java/.../ui/screens/DiscoverScreen.kt):
+  - DiscoverIdlePreview – idle state with suggestions
+  - DiscoverSearchPreview – active search with results
+  - DiscoverWithPendingPreview – idle + "Meine Wünsche" section showing 2 items
+  - DiscoverLimitReachedPreview – all Request buttons disabled (3 pending requests)
+
+- Screenshot tests (src/screenshotTest/java/.../ui/screens/DiscoverScreenshots.kt):
+  - 4 reference PNGs matching the 4 @Preview functions above
+  - Run ./gradlew updateDebugScreenshotTest → commit PNGs
+
+- UI tests (src/test/java/.../ui/screen/DiscoverScreenTest.kt, ~10 test cases):
+  - Idle state: suggestion tiles are shown
+  - Active search: typing query replaces suggestions with search results
+  - Tapping Request adds item to "Meine Wünsche" and disables its button
+  - 3 pending requests: 4th Request button is disabled with limit message
+  - Back button (72dp touch target)
+  - Pending time-context string function: unit tests for all 3 thresholds (< 1h, 1–24h, > 24h)
+
+CONSTRAINTS:
+- No networking – all data is hardcoded mock
+- No Spotify SDK calls
+- Search debounce / voice recognition: add the mic button but it can be a no-op for now
+- Follow the exact same patterns as BrowseScreen / NowPlayingScreen:
+  - Custom 72dp Row for the top bar (NOT TopAppBar)
+  - kidsTouchTarget() / Modifier.size(72.dp) for interactive elements
+  - Stateless composable overload for testability
+- DiscoverViewModel does NOT need @HiltViewModel in this phase (no injected deps)
+
+REFERENCE: PROJECT_PLAN.md §5.1.6 (full Discover screen design, wireframe, request limits,
+pending UX, time-context strings, auto-expiry, celebration animation — the celebration animation
+and WebSocket wiring come in Prompt 7.4, not here).
+
+VERIFICATION:
+- ./gradlew testDebugUnitTest → all tests pass (including new DiscoverScreenTest)
+- ./gradlew updateDebugScreenshotTest → 4 new PNGs generated and look correct
+- Commit PNGs to repo
+- HomeScreen shows the Discover button and navigates correctly (manual check)
 ```
 
 ---
@@ -1888,9 +1983,9 @@ VERIFICATION:
 ### Prompt 7.4 – Kids App Discover Screen
 
 ```
-CONTEXT: Phase 7 of KidsTune. Backend content requests work (7.2). We now build the Discover
-screen in the Kids App where children can freely search the full Spotify catalog and request
-content they want.
+CONTEXT: Phase 7 of KidsTune. Backend content requests work (7.2). The Discover screen already
+exists with full mock UX from Prompt 3.4. We now wire it to real backend endpoints: replace mock
+data with live Spotify search, real content request POSTs, and WebSocket approval events.
 
 KEY DESIGN PRINCIPLE: Children can search and find ANY Spotify content (tracks, albums, artists,
 playlists). There is NO play button — only a Request button. Playing becomes possible only after
