@@ -722,14 +722,22 @@ App Launch (or WorkManager periodic trigger every 15 min)
 
 #### 5.1.6 Discover & Request Feature (Bonus)
 
-The Discover screen allows children to search the full Spotify catalog, but NOT play anything directly. Instead, they request content and wait for parental approval.
+The Discover screen allows children to **search the full Spotify catalog** and request content they want to listen to. Crucially:
+- **Playing is not possible** until the parent approves the request — there is no play button, only a Request button.
+- **Any Spotify content is findable** (tracks, albums, artists, playlists), not just a curated list. The safety constraint is on *playback*, not on *discovery*.
+- The backend proxies all search calls to the Spotify Web API using the family's token — the kids app never holds Spotify credentials directly.
+
+**Idle state (no query typed yet):** The backend returns a curated list of age-appropriate suggestions from `known-artists.yml`. These render as large tiles identical to search results — each with a Request button. This gives pre-readers something to tap immediately without needing to type.
+
+**Active search:** As soon as the child types (or speaks), the curated list is replaced with live Spotify search results (max 10, explicit content filtered).
 
 ```
 ┌────────────────────────────────────┐
 │  🔍 [Search box with               │
 │      voice input button]           │
 │                                    │
-│  Search results:                   │
+│  Search results (or curated        │
+│  suggestions when idle):                              │
 │  ┌──────────────────────────┐      │
 │  │ [img] Frozen OST         │      │
 │  │     [🙏 Request]         │      │

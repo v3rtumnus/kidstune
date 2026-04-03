@@ -1889,14 +1889,25 @@ VERIFICATION:
 
 ```
 CONTEXT: Phase 7 of KidsTune. Backend content requests work (7.2). We now build the Discover
-screen in the Kids App where children can search and request new content.
+screen in the Kids App where children can freely search the full Spotify catalog and request
+content they want.
+
+KEY DESIGN PRINCIPLE: Children can search and find ANY Spotify content (tracks, albums, artists,
+playlists). There is NO play button — only a Request button. Playing becomes possible only after
+the parent approves the request and the device syncs. The safety constraint is on playback, not
+discovery.
 
 GOAL: When this task is done:
 - DiscoverScreen in kids-app/ui/discover/:
   - Search box with 72dp height, large text, microphone button for voice input
     (Android SpeechRecognizer for speech-to-text)
-  - Search results: max 10 items in large tiles, explicit content filtered by backend
-  - Each result has a "🙏 Request" button → POST /api/v1/content-requests (or queue if offline)
+  - IDLE STATE (no query typed): GET /api/v1/spotify/suggestions → returns curated age-appropriate
+    content from known-artists.yml on the backend; shown as large tiles with Request buttons.
+    This gives pre-readers something to tap without needing to type.
+  - ACTIVE SEARCH: GET /api/v1/spotify/search?q=... replaces idle tiles with live Spotify results
+    (max 10 items, explicit content filtered by backend). Results are large tiles, each with a
+    Request button — NO play button anywhere on this screen.
+  - Each result has a "🙏 Ich will das!" button → POST /api/v1/content-requests (or queue offline)
   - Request button DISABLED when 3 pending requests exist, with friendly message:
     "Du hast schon 3 Wünsche offen – warte bis Mama/Papa geantwortet hat!"
   - "My wishes" section below search:
@@ -1915,14 +1926,17 @@ GOAL: When this task is done:
 - WebSocket listener in kids-app: listens for REQUEST_APPROVED, REQUEST_REJECTED, REQUEST_EXPIRED
   and updates local state accordingly
 
-REFERENCE: PROJECT_PLAN.md §5.1.6 (Discover screen wireframe, request limits, pending UX,
-time context strings, auto-expiry behavior).
+REFERENCE: PROJECT_PLAN.md §5.1.6 (Discover screen wireframe, free search design, request
+limits, pending UX, time context strings, auto-expiry behavior).
 
 CONSTRAINTS:
-- Search calls GET /api/v1/spotify/search via backend (requires internet)
-- Content requests POST to backend (or queue offline)
+- Idle suggestions: GET /api/v1/spotify/suggestions (new backend endpoint, returns curated list
+  from known-artists.yml – implement alongside this prompt if not already done)
+- Search: GET /api/v1/spotify/search?q=...&limit=10 via backend proxy (requires internet)
+- Content requests: POST /api/v1/profiles/{profileId}/content-requests (or queue offline)
 - Do NOT implement parent notification (that's the backend email service's job)
-- Do NOT play requested content – it's only playable after parent approval + sync
+- Do NOT play requested content – there is NO play button on this screen; content is only
+  playable after parent approval + sync pushes it into the local Room DB
 
 VERIFICATION:
 - UI test: search "Frozen" → results shown → tap Request → "My wishes" section shows pending item
