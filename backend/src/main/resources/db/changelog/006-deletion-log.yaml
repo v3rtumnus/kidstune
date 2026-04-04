@@ -1,0 +1,44 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: "006-create-deletion-log"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: deletion_log
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: type
+                  type: ENUM('CONTENT','FAVORITE')
+                  constraints:
+                    nullable: false
+              - column:
+                  name: spotify_uri
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: deletion_log
+            indexName: idx_deletion_log_profile_deleted
+            columns:
+              - column:
+                  name: profile_id
+              - column:
+                  name: deleted_at

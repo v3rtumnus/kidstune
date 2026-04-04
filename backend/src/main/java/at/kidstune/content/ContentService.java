@@ -5,6 +5,8 @@ import at.kidstune.content.dto.BulkAddContentRequest;
 import at.kidstune.content.dto.ContentCheckResponse;
 import at.kidstune.content.dto.ContentResponse;
 import at.kidstune.resolver.ContentResolver;
+import at.kidstune.sync.DeletionLog;
+import at.kidstune.sync.DeletionLogRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -21,15 +23,18 @@ public class ContentService {
     private final ScopeResolver         scopeResolver;
     private final ContentTypeClassifier classifier;
     private final ContentResolver       resolver;
+    private final DeletionLogRepository deletionLogRepository;
 
     public ContentService(ContentRepository contentRepository,
                           ScopeResolver scopeResolver,
                           ContentTypeClassifier classifier,
-                          ContentResolver resolver) {
-        this.contentRepository = contentRepository;
-        this.scopeResolver     = scopeResolver;
-        this.classifier        = classifier;
-        this.resolver          = resolver;
+                          ContentResolver resolver,
+                          DeletionLogRepository deletionLogRepository) {
+        this.contentRepository    = contentRepository;
+        this.scopeResolver        = scopeResolver;
+        this.classifier           = classifier;
+        this.resolver             = resolver;
+        this.deletionLogRepository = deletionLogRepository;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -107,8 +112,17 @@ public class ContentService {
                         "Content not found", "CONTENT_NOT_FOUND", HttpStatus.NOT_FOUND);
             }
             contentRepository.delete(content);
+            logDeletion(profileId, content.getSpotifyUri());
             return null;
         });
+    }
+
+    private void logDeletion(String profileId, String spotifyUri) {
+        DeletionLog entry = new DeletionLog();
+        entry.setProfileId(profileId);
+        entry.setType(DeletionLog.DeletionType.CONTENT);
+        entry.setSpotifyUri(spotifyUri);
+        deletionLogRepository.save(entry);
     }
 
     // ── Check ─────────────────────────────────────────────────────────────────

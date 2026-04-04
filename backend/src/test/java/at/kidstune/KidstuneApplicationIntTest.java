@@ -66,6 +66,7 @@ class KidstuneApplicationIntTest {
                 "content_request",
                 "DATABASECHANGELOG",       // Liquibase tracking table
                 "DATABASECHANGELOGLOCK",   // Liquibase lock table
+                "deletion_log",
                 "family",
                 "favorite",
                 "paired_device",
