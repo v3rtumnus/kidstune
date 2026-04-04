@@ -270,12 +270,13 @@ public class ContentResolver {
         if (tracks == null) tracks = List.of();
 
         long avgDurationMs = avgDuration(tracks);
-        ContentType contentType = classifier.classify(new SpotifyItemInfo(
-                "album",
-                album.genres(),
-                album.title(),
-                tracks.size(),
-                avgDurationMs));
+        // Classify with Spotify genre data if available (ALBUM scope returns full album objects
+        // with genres); fall back to the type already set on AllowedContent when genres are absent
+        // (e.g. ARTIST scope returns SimplifiedAlbumObjects which have no genres field).
+        ContentType contentType = album.genres().isEmpty()
+                ? content.getContentType()
+                : classifier.classify(new SpotifyItemInfo(
+                        "album", album.genres(), album.title(), tracks.size(), avgDurationMs));
 
         ResolvedAlbum resolvedAlbum = buildAndSaveAlbum(
                 content, album.uri(), album.title(), album.imageUrl(),
@@ -299,8 +300,8 @@ public class ContentResolver {
             long avgDurationMs = avgDuration(albumTracks);
             String albumTitle = first.albumTitle() != null ? first.albumTitle() : "Unknown Album";
 
-            ContentType contentType = classifier.classify(new SpotifyItemInfo(
-                    "album", List.of(), albumTitle, albumTracks.size(), avgDurationMs));
+            // Playlist tracks carry no genre data – inherit from the AllowedContent type
+            ContentType contentType = content.getContentType();
 
             ResolvedAlbum resolvedAlbum = buildAndSaveAlbum(
                     content, entry.getKey(), albumTitle, first.albumImageUrl(),
