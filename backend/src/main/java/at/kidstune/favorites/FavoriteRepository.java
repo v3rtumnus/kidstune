@@ -10,4 +10,8 @@ public interface FavoriteRepository extends JpaRepository<Favorite, String> {
     List<Favorite> findByProfileId(String profileId);
 
     List<Favorite> findByProfileIdAndAddedAtAfter(String profileId, Instant since);
+
+    boolean existsByProfileIdAndSpotifyTrackUri(String profileId, String spotifyTrackUri);
+
+    void deleteByProfileIdAndSpotifyTrackUri(String profileId, String spotifyTrackUri);
 }

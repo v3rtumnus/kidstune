@@ -22,7 +22,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Prompt 4.2 – Backend Sync Endpoint
 - ✅ Prompt 4.3 – Kids App Sync + Room Storage
 - ✅ Prompt 4.4 – Spotify Playback Integration
-- ⬅️ **NEXT: Prompt 4.5 – Kids App Real Favorites + Spotify Liked Songs Sync**
+- ✅ Prompt 4.5 – Kids App Real Favorites + Spotify Liked Songs Sync
+- ⬅️ **NEXT: Prompt 4.6**
 
 ---
 

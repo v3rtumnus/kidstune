@@ -2,6 +2,8 @@ package at.kidstune.kids.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import at.kidstune.kids.data.local.TrackDao
+import at.kidstune.kids.domain.usecase.ToggleFavoriteUseCase
 import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.playback.PlaybackController
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +22,9 @@ sealed interface NowPlayingIntent {
 
 @HiltViewModel
 class NowPlayingViewModel @Inject constructor(
-    private val playbackController: PlaybackController
+    private val playbackController: PlaybackController,
+    private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
+    private val trackDao: TrackDao
 ) : ViewModel() {
 
     val state: StateFlow<NowPlayingState> = playbackController.nowPlaying
@@ -35,7 +39,12 @@ class NowPlayingViewModel @Inject constructor(
 
                 NowPlayingIntent.SkipForward -> playbackController.skipNext()
                 NowPlayingIntent.SkipBack    -> playbackController.skipPrevious()
-                NowPlayingIntent.ToggleFavorite -> { /* Favorites write implemented in prompt 5.x */ }
+
+                NowPlayingIntent.ToggleFavorite -> {
+                    val trackUri = state.value.trackUri ?: return@launch
+                    val track = trackDao.getByUri(trackUri) ?: return@launch
+                    toggleFavoriteUseCase(track)
+                }
             }
         }
     }

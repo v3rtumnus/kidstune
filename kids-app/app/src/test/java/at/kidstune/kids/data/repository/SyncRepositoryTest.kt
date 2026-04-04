@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import at.kidstune.kids.data.local.KidstuneDatabase
+import at.kidstune.kids.data.local.entities.LocalFavorite
+import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.data.remote.KidstuneApiClient
+import at.kidstune.kids.data.remote.dto.FavoriteResponseDto
 import at.kidstune.kids.data.remote.dto.SyncAlbumDto
 import at.kidstune.kids.data.remote.dto.SyncContentEntryDto
 import at.kidstune.kids.data.remote.dto.SyncFavoriteDto
@@ -20,8 +23,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -31,6 +37,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -38,10 +45,14 @@ class SyncRepositoryTest {
 
     private lateinit var db: KidstuneDatabase
     private lateinit var syncRepository: SyncRepository
-
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private lateinit var favoriteRepository: FavoriteRepository
 
     private val testProfileId = "profile-test-001"
+    private val prefs = mockk<ProfilePreferences> {
+        every { boundProfileId } returns testProfileId
+    }
+
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private val samplePayload = SyncPayloadDto(
         profile = SyncProfileDto(id = testProfileId, name = "Emma"),
@@ -92,18 +103,34 @@ class SyncRepositoryTest {
             .build()
 
         val serializedPayload = json.encodeToString(SyncPayloadDto.serializer(), samplePayload)
-        val mockEngine = MockEngine {
-            respond(
-                content = ByteReadChannel(serializedPayload),
-                status  = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, "application/json")
+        val favResponseJson = json.encodeToString(
+            FavoriteResponseDto(
+                id = "fav-server-1", profileId = testProfileId,
+                spotifyTrackUri = "spotify:track:fav1", trackTitle = "Lieblingslied"
             )
+        )
+        val mockEngine = MockEngine { request ->
+            when {
+                request.url.encodedPath.contains("favorites") ->
+                    respond(
+                        content = ByteReadChannel(favResponseJson),
+                        status  = HttpStatusCode.Created,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                else ->
+                    respond(
+                        content = ByteReadChannel(serializedPayload),
+                        status  = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+            }
         }
         val mockClient = HttpClient(mockEngine) {
             install(ContentNegotiation) { json(json) }
         }
         val apiClient = KidstuneApiClient(mockClient, baseUrl = "")
-        syncRepository = SyncRepository(apiClient, db)
+        favoriteRepository = FavoriteRepository(db.favoriteDao(), apiClient, prefs)
+        syncRepository = SyncRepository(apiClient, db, favoriteRepository)
     }
 
     @After
@@ -166,7 +193,9 @@ class SyncRepositoryTest {
         val emptyEngine  = MockEngine { respond(ByteReadChannel(serialized), HttpStatusCode.OK,
             headersOf(HttpHeaders.ContentType, "application/json")) }
         val emptyClient  = HttpClient(emptyEngine) { install(ContentNegotiation) { json(json) } }
-        val repo2        = SyncRepository(KidstuneApiClient(emptyClient, ""), db)
+        val emptyApiClient = KidstuneApiClient(emptyClient, "")
+        val emptyFavRepo = FavoriteRepository(db.favoriteDao(), emptyApiClient, prefs)
+        val repo2        = SyncRepository(emptyApiClient, db, emptyFavRepo)
 
         repo2.fullSync(testProfileId)
 
@@ -183,7 +212,9 @@ class SyncRepositoryTest {
         // Wire up a failing client
         val failEngine = MockEngine { respond(ByteReadChannel(""), HttpStatusCode.ServiceUnavailable) }
         val failClient = HttpClient(failEngine) { install(ContentNegotiation) { json(json) } }
-        val failRepo   = SyncRepository(KidstuneApiClient(failClient, ""), db)
+        val failApiClient = KidstuneApiClient(failClient, "")
+        val failFavRepo = FavoriteRepository(db.favoriteDao(), failApiClient, prefs)
+        val failRepo   = SyncRepository(failApiClient, db, failFavRepo)
 
         val result = failRepo.fullSync(testProfileId)
 
@@ -216,6 +247,33 @@ class SyncRepositoryTest {
         assertTrue(
             "Unsynced local favorite should survive a full sync",
             favorites.any { it.spotifyTrackUri == "spotify:track:localonly" }
+        )
+    }
+
+    @Test
+    fun `full sync uploads unsynced favorites and marks them synced`() = runTest {
+        // Seed an unsynced favorite before the sync
+        db.favoriteDao().insert(
+            LocalFavorite(
+                id              = "fav__${testProfileId}__spotify:track:fav1",
+                profileId       = testProfileId,
+                spotifyTrackUri = "spotify:track:fav1",
+                title           = "Lieblingslied",
+                artistName      = "Bibi & Tina",
+                imageUrl        = null,
+                addedAt         = Instant.now(),
+                synced          = false
+            )
+        )
+
+        val result = syncRepository.fullSync(testProfileId)
+
+        assertTrue("Sync should succeed", result.isSuccess)
+        // After sync, the previously unsynced favorite should be marked synced
+        val unsynced = db.favoriteDao().getUnsynced(testProfileId)
+        assertTrue(
+            "No unsynced favorites should remain after a successful sync",
+            unsynced.none { it.spotifyTrackUri == "spotify:track:fav1" }
         )
     }
 }

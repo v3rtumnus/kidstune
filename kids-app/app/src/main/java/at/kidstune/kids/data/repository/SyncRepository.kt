@@ -23,7 +23,8 @@ import javax.inject.Singleton
 @Singleton
 class SyncRepository @Inject constructor(
     private val apiClient: KidstuneApiClient,
-    private val db: KidstuneDatabase
+    private val db: KidstuneDatabase,
+    private val favoriteRepository: FavoriteRepository
 ) {
 
     /**
@@ -124,5 +125,9 @@ class SyncRepository @Inject constructor(
             // ── 4. Persist profile name for display ───────────────────────
             // (Profile preferences are updated by the caller after this returns.)
         }
+
+        // ── 5. Upload unsynced favorites to backend ───────────────────────
+        // Runs outside the transaction (network I/O).
+        favoriteRepository.uploadUnsynced(profileId)
     }
 }

@@ -1,5 +1,7 @@
 package at.kidstune.kids.ui
 
+import at.kidstune.kids.data.local.TrackDao
+import at.kidstune.kids.domain.usecase.ToggleFavoriteUseCase
 import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.playback.PlaybackController
 import at.kidstune.kids.playback.SpotifyRemote
@@ -48,7 +50,11 @@ class NowPlayingViewModelTest {
             every { spotifyRemote } returns mockk<SpotifyRemote>(relaxed = true)
         }
 
-        viewModel = NowPlayingViewModel(playbackController)
+        viewModel = NowPlayingViewModel(
+            playbackController   = playbackController,
+            toggleFavoriteUseCase = mockk(relaxed = true),
+            trackDao             = mockk(relaxed = true)
+        )
     }
 
     @After
