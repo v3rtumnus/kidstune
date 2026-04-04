@@ -20,6 +20,9 @@ android {
         versionName   = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "BASE_URL",     "\"https://kidstune.altenburger.io\"")
+        buildConfigField("String", "DEVICE_TOKEN", "\"dev-test-token-placeholder\"")
     }
 
     buildTypes {
@@ -43,6 +46,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
@@ -90,6 +94,15 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
+    // ── Ktor ─────────────────────────────────────────────────────────────────
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.neg)
+    implementation(libs.ktor.serialization.json)
+
+    // ── Serialization ────────────────────────────────────────────────────────
+    implementation(libs.serialization.json)
+
     // ── Unit tests ───────────────────────────────────────────────────────────
     testImplementation(libs.junit5.api)
     testRuntimeOnly(libs.junit5.engine)
@@ -101,7 +114,8 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
-    implementation(libs.serialization.json)
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.mockwebserver)
 
     // ── Screenshot tests ─────────────────────────────────────────────────────
     screenshotTestImplementation(composeBom)

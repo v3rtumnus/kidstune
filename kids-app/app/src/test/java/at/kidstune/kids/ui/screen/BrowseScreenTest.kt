@@ -9,10 +9,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
-import at.kidstune.kids.data.mock.MockContentProvider
+import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.domain.model.BrowseCategory
+import at.kidstune.kids.domain.model.ContentScope
+import at.kidstune.kids.domain.model.ContentType
 import at.kidstune.kids.ui.screens.BrowseScreen
 import at.kidstune.kids.ui.theme.KidstuneTheme
+import at.kidstune.kids.ui.viewmodel.BrowseIntent
 import at.kidstune.kids.ui.viewmodel.BrowseState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -22,6 +25,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
@@ -31,15 +35,30 @@ class BrowseScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
+    // Six music entries so we get two pages (4 + 2)
+    private val sixMusicEntries: List<LocalContentEntry> = (1..6).map { i ->
+        LocalContentEntry(
+            id          = "music-$i",
+            profileId   = "p1",
+            spotifyUri  = "spotify:artist:$i",
+            scope       = if (i == 1) ContentScope.ARTIST else ContentScope.ALBUM,
+            contentType = ContentType.MUSIC,
+            title       = "Musik Eintrag $i",
+            imageUrl    = null,
+            artistName  = "Künstler $i",
+            lastSyncedAt = Instant.parse("2025-01-01T00:00:00Z")
+        )
+    }
+
     private val musicState = BrowseState(
         category = BrowseCategory.MUSIC,
-        tiles    = MockContentProvider.mockMusicTiles,
-        pages    = MockContentProvider.mockMusicTiles.chunked(4)
+        entries  = sixMusicEntries,
+        pages    = sixMusicEntries.chunked(4)
     )
 
     private val favoritesState = BrowseState(
         category = BrowseCategory.FAVORITES,
-        tiles    = emptyList(),
+        entries  = emptyList(),
         pages    = emptyList()
     )
 
@@ -49,19 +68,17 @@ class BrowseScreenTest {
             KidstuneTheme { BrowseScreen(state = musicState) }
         }
 
-        val firstPage = MockContentProvider.mockMusicTiles.take(4)
-        firstPage.forEach { tile ->
-            composeTestRule.onNodeWithContentDescription(tile.title).assertIsDisplayed()
+        sixMusicEntries.take(4).forEach { entry ->
+            composeTestRule.onNodeWithContentDescription(entry.title).assertIsDisplayed()
         }
     }
 
     @Test
-    fun `page indicator shows seite 1 von 2 for music with six tiles`() {
+    fun `page indicator shows seite 1 von 2 for six entries`() {
         composeTestRule.setContent {
             KidstuneTheme { BrowseScreen(state = musicState) }
         }
 
-        // 6 music tiles → 2 pages
         assertEquals(2, musicState.totalPages)
         composeTestRule
             .onNodeWithContentDescription("Seite 1 von 2")
@@ -75,10 +92,8 @@ class BrowseScreenTest {
         }
 
         composeTestRule.onNodeWithContentDescription("Seite 1 von 2").assertIsDisplayed()
-
         composeTestRule.onNodeWithTag("browse_pager").performTouchInput { swipeLeft() }
         composeTestRule.waitForIdle()
-
         composeTestRule.onNodeWithContentDescription("Seite 2 von 2").assertIsDisplayed()
     }
 
@@ -88,33 +103,35 @@ class BrowseScreenTest {
             KidstuneTheme { BrowseScreen(state = musicState) }
         }
 
-        // Navigate to page 2
         composeTestRule.onNodeWithTag("browse_pager").performTouchInput { swipeLeft() }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("Seite 2 von 2").assertIsDisplayed()
 
-        // Swipe back to page 1
         composeTestRule.onNodeWithTag("browse_pager").performTouchInput { swipeRight() }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("Seite 1 von 2").assertIsDisplayed()
     }
 
     @Test
-    fun `tapping a tile invokes navigate to now playing`() {
-        var nowPlayingOpened = false
+    fun `tapping a tile dispatches TileTapped intent`() {
+        var capturedIntent: BrowseIntent? = null
         composeTestRule.setContent {
             KidstuneTheme {
                 BrowseScreen(
-                    state                  = musicState,
-                    onNavigateToNowPlaying = { nowPlayingOpened = true }
+                    state    = musicState,
+                    onIntent = { capturedIntent = it }
                 )
             }
         }
 
-        val firstTile = MockContentProvider.mockMusicTiles.first()
-        composeTestRule.onNodeWithContentDescription(firstTile.title).performClick()
+        val firstEntry = sixMusicEntries.first()
+        composeTestRule.onNodeWithContentDescription(firstEntry.title).performClick()
 
-        assertTrue("NowPlaying should open after tapping a tile", nowPlayingOpened)
+        assertTrue(
+            "Tapping a tile should dispatch TileTapped",
+            capturedIntent is BrowseIntent.TileTapped
+        )
+        assertEquals(firstEntry, (capturedIntent as BrowseIntent.TileTapped).entry)
     }
 
     @Test

@@ -8,11 +8,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import at.kidstune.kids.domain.model.BrowseCategory
+import at.kidstune.kids.ui.screens.AlbumGridScreen
 import at.kidstune.kids.ui.screens.BrowseScreen
 import at.kidstune.kids.ui.screens.DiscoverScreen
 import at.kidstune.kids.ui.screens.HomeScreen
 import at.kidstune.kids.ui.screens.NowPlayingScreen
 import at.kidstune.kids.ui.screens.ProfileSelectionScreen
+import at.kidstune.kids.ui.screens.TrackListScreen
 import kotlinx.serialization.Serializable
 
 // ── Route definitions (type-safe Compose Navigation) ──────────────────────
@@ -26,6 +28,14 @@ object HomeRoute
 /** [category] is a [BrowseCategory] name, e.g. "MUSIC", "AUDIOBOOK", "FAVORITES". */
 @Serializable
 data class BrowseRoute(val category: String)
+
+/** Shows the 2×2 album grid for the given content entry (ARTIST scope). */
+@Serializable
+data class AlbumGridRoute(val contentEntryId: String)
+
+/** Shows the ordered track list for a single album. */
+@Serializable
+data class TrackListRoute(val albumId: String)
 
 @Serializable
 object NowPlayingRoute
@@ -71,6 +81,28 @@ fun KidstuneNavHost(
             val category = BrowseCategory.fromString(route.category)
             BrowseScreen(
                 category               = category,
+                onNavigateUp           = { navController.navigateUp() },
+                onNavigateToAlbumGrid  = { contentEntryId ->
+                    navController.navigate(AlbumGridRoute(contentEntryId))
+                },
+                onNavigateToTrackList  = { albumId ->
+                    navController.navigate(TrackListRoute(albumId))
+                },
+                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
+            )
+        }
+
+        composable<AlbumGridRoute> {
+            AlbumGridScreen(
+                onNavigateUp         = { navController.navigateUp() },
+                onNavigateToTrackList = { albumId ->
+                    navController.navigate(TrackListRoute(albumId))
+                }
+            )
+        }
+
+        composable<TrackListRoute> {
+            TrackListScreen(
                 onNavigateUp           = { navController.navigateUp() },
                 onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
             )

@@ -35,3 +35,8 @@ val BackgroundDark       = Color(0xFF1C1B1F)
 
 // ── Tile overlay colors ───────────────────────────────────────────────────
 val TileScrimColor       = Color(0x80000000) // 50% black for text readability
+
+// ── Scope badge backgrounds (semi-transparent, readable on any cover art) ─
+val ScopeBadgeArtist    = Color(0xBB673AB7) // purple  – ARTIST
+val ScopeBadgeAlbum     = Color(0xBB1565C0) // blue    – ALBUM
+val ScopeBadgePlaylist  = Color(0xBB006064) // teal    – PLAYLIST

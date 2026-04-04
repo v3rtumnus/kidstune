@@ -4,15 +4,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.navigation.HomeRoute
 import at.kidstune.kids.navigation.KidstuneNavHost
 import at.kidstune.kids.navigation.ProfileSelectionRoute
 import at.kidstune.kids.ui.theme.KidstuneTheme
+import at.kidstune.kids.ui.viewmodel.SyncTriggerViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    // Triggers a full sync once per process lifetime (survives rotation).
+    // WorkManager-based background sync is added in prompt 5.
+    private val syncTriggerViewModel: SyncTriggerViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

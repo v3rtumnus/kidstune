@@ -32,12 +32,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.data.mock.MockContentProvider
 import at.kidstune.kids.domain.model.BrowseCategory
-import at.kidstune.kids.domain.model.BrowseTile
 import at.kidstune.kids.ui.components.ContentTile
 import at.kidstune.kids.ui.components.PageIndicator
+import at.kidstune.kids.ui.components.scopeBadgeFor
 import at.kidstune.kids.ui.theme.KidstuneTheme
+import at.kidstune.kids.ui.viewmodel.BrowseIntent
+import at.kidstune.kids.ui.viewmodel.BrowseNavigation
 import at.kidstune.kids.ui.viewmodel.BrowseState
 import at.kidstune.kids.ui.viewmodel.BrowseViewModel
 
@@ -49,15 +52,37 @@ fun BrowseScreen(
     category: BrowseCategory = BrowseCategory.MUSIC,
     viewModel: BrowseViewModel = hiltViewModel(),
     onNavigateUp: () -> Unit = {},
+    onNavigateToAlbumGrid: (contentEntryId: String) -> Unit = {},
+    onNavigateToTrackList: (albumId: String) -> Unit = {},
     onNavigateToNowPlaying: () -> Unit = {}
 ) {
     LaunchedEffect(category) { viewModel.init(category) }
     val state by viewModel.state.collectAsState()
+
+    // Consume one-shot navigation events
+    LaunchedEffect(state.navigation) {
+        when (val nav = state.navigation) {
+            is BrowseNavigation.ToAlbumGrid -> {
+                onNavigateToAlbumGrid(nav.contentEntryId)
+                viewModel.onIntent(BrowseIntent.NavigationHandled)
+            }
+            is BrowseNavigation.ToTrackList -> {
+                onNavigateToTrackList(nav.albumId)
+                viewModel.onIntent(BrowseIntent.NavigationHandled)
+            }
+            BrowseNavigation.PlayTrack -> {
+                onNavigateToNowPlaying()
+                viewModel.onIntent(BrowseIntent.NavigationHandled)
+            }
+            null -> Unit
+        }
+    }
+
     BrowseScreen(
         modifier               = modifier,
         state                  = state,
+        onIntent               = viewModel::onIntent,
         onNavigateUp           = onNavigateUp,
-        onNavigateToNowPlaying = onNavigateToNowPlaying
     )
 }
 
@@ -67,8 +92,8 @@ fun BrowseScreen(
 fun BrowseScreen(
     modifier: Modifier = Modifier,
     state: BrowseState,
-    onNavigateUp: () -> Unit = {},
-    onNavigateToNowPlaying: () -> Unit = {}
+    onIntent: (BrowseIntent) -> Unit = {},
+    onNavigateUp: () -> Unit = {}
 ) {
     val title = when (state.category) {
         BrowseCategory.MUSIC     -> "Musik"
@@ -107,7 +132,7 @@ fun BrowseScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (state.category == BrowseCategory.FAVORITES && state.tiles.isEmpty()) {
+            if (state.category == BrowseCategory.FAVORITES && state.entries.isEmpty()) {
                 FavoritesEmptyState(modifier = Modifier.fillMaxSize())
             } else if (state.pages.isNotEmpty()) {
                 val pagerState = rememberPagerState { state.totalPages }
@@ -119,8 +144,8 @@ fun BrowseScreen(
                             .semantics { testTag = "browse_pager" }
                     ) { page ->
                         BrowsePage(
-                            tiles   = state.pages.getOrElse(page) { emptyList() },
-                            onClick = onNavigateToNowPlaying
+                            entries  = state.pages.getOrElse(page) { emptyList() },
+                            onIntent = onIntent
                         )
                     }
 
@@ -144,8 +169,8 @@ fun BrowseScreen(
 @Composable
 private fun BrowsePage(
     modifier: Modifier = Modifier,
-    tiles: List<BrowseTile>,
-    onClick: () -> Unit
+    entries: List<LocalContentEntry>,
+    onIntent: (BrowseIntent) -> Unit
 ) {
     Column(
         modifier            = modifier
@@ -158,43 +183,43 @@ private fun BrowsePage(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            ContentTile(
-                title    = tiles.getOrNull(0)?.title ?: "",
-                imageUrl = tiles.getOrNull(0)?.imageUrl,
-                modifier = Modifier.weight(1f),
-                onClick  = { if (tiles.getOrNull(0) != null) onClick() }
-            )
-            ContentTile(
-                title    = tiles.getOrNull(1)?.title ?: "",
-                imageUrl = tiles.getOrNull(1)?.imageUrl,
-                modifier = Modifier.weight(1f),
-                onClick  = { if (tiles.getOrNull(1) != null) onClick() }
-            )
+            EntryTile(entry = entries.getOrNull(0), onIntent = onIntent, modifier = Modifier.weight(1f))
+            EntryTile(entry = entries.getOrNull(1), onIntent = onIntent, modifier = Modifier.weight(1f))
         }
         // Row 2
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            ContentTile(
-                title    = tiles.getOrNull(2)?.title ?: "",
-                imageUrl = tiles.getOrNull(2)?.imageUrl,
-                modifier = Modifier.weight(1f),
-                onClick  = { if (tiles.getOrNull(2) != null) onClick() }
-            )
-            if (tiles.size > 3) {
-                ContentTile(
-                    title    = tiles.getOrNull(3)?.title ?: "",
-                    imageUrl = tiles.getOrNull(3)?.imageUrl,
-                    modifier = Modifier.weight(1f),
-                    onClick  = { onClick() }
-                )
+            EntryTile(entry = entries.getOrNull(2), onIntent = onIntent, modifier = Modifier.weight(1f))
+            if (entries.size > 3) {
+                EntryTile(entry = entries.getOrNull(3), onIntent = onIntent, modifier = Modifier.weight(1f))
             } else {
-                // Ghost tile to keep grid balanced on last page
                 Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
+}
+
+@Composable
+private fun EntryTile(
+    modifier: Modifier = Modifier,
+    entry: LocalContentEntry?,
+    onIntent: (BrowseIntent) -> Unit
+) {
+    if (entry == null) {
+        Spacer(modifier = modifier)
+        return
+    }
+    val badge = scopeBadgeFor(entry.scope.name)
+    ContentTile(
+        modifier        = modifier,
+        title           = entry.title,
+        imageUrl        = entry.imageUrl,
+        scopeBadgeText  = badge?.first,
+        scopeBadgeColor = badge?.second ?: androidx.compose.ui.graphics.Color.Transparent,
+        onClick         = { onIntent(BrowseIntent.TileTapped(entry)) }
+    )
 }
 
 @Composable
@@ -227,12 +252,14 @@ private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
 @Preview(name = "BrowseScreen – Musik", showBackground = true, showSystemUi = true)
 @Composable
 private fun BrowseScreenMusicPreview() {
+    val entries = MockContentProvider.contentEntries
+        .filter { it.contentType.name == "MUSIC" }
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
                 category = BrowseCategory.MUSIC,
-                tiles    = MockContentProvider.mockMusicTiles,
-                pages    = MockContentProvider.mockMusicTiles.chunked(4)
+                entries  = entries,
+                pages    = entries.chunked(4)
             )
         )
     }
@@ -241,12 +268,14 @@ private fun BrowseScreenMusicPreview() {
 @Preview(name = "BrowseScreen – Hörbücher", showBackground = true, showSystemUi = true)
 @Composable
 private fun BrowseScreenAudiobooksPreview() {
+    val entries = MockContentProvider.contentEntries
+        .filter { it.contentType.name == "AUDIOBOOK" }
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
                 category = BrowseCategory.AUDIOBOOK,
-                tiles    = MockContentProvider.mockAudiobookTiles,
-                pages    = MockContentProvider.mockAudiobookTiles.chunked(4)
+                entries  = entries,
+                pages    = entries.chunked(4)
             )
         )
     }
@@ -259,7 +288,7 @@ private fun BrowseScreenFavoritesEmptyPreview() {
         BrowseScreen(
             state = BrowseState(
                 category = BrowseCategory.FAVORITES,
-                tiles    = emptyList(),
+                entries  = emptyList(),
                 pages    = emptyList()
             )
         )

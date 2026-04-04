@@ -25,12 +25,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import at.kidstune.kids.ui.theme.KidstuneTheme
+import at.kidstune.kids.ui.theme.ScopeBadgeAlbum
+import at.kidstune.kids.ui.theme.ScopeBadgeArtist
+import at.kidstune.kids.ui.theme.ScopeBadgePlaylist
 import coil3.compose.AsyncImage
 
 /**
  * Large square card showing album art that fills the entire card,
- * with the title overlaid at the bottom and an optional badge.
- * Used in the 2×2 browsing grid.
+ * with the title overlaid at the bottom.
+ *
+ * @param scopeBadgeText  Optional label shown in the bottom-left corner
+ *   (e.g. "Künstler", "Album", "Playlist").  Use [scopeBadgeColorFor] to get the
+ *   matching background color.  Pass `null` to omit the badge (used for TRACK
+ *   entries and all album/track-list screens).
+ * @param scopeBadgeColor Background color for the scope badge pill.
+ * @param badgeText       Optional label shown in the top-right corner (e.g. "NEU").
  */
 @Composable
 fun ContentTile(
@@ -38,6 +47,8 @@ fun ContentTile(
     title: String,
     imageUrl: String?,
     contentDescription: String = title,
+    scopeBadgeText: String? = null,
+    scopeBadgeColor: Color = ScopeBadgeArtist,
     badgeText: String? = null,
     onClick: () -> Unit = {}
 ) {
@@ -52,10 +63,10 @@ fun ContentTile(
         Box(modifier = Modifier.fillMaxSize()) {
             // Cover art fills the entire tile
             AsyncImage(
-                model             = imageUrl,
+                model              = imageUrl,
                 contentDescription = null, // handled by card semantics above
-                contentScale      = ContentScale.Crop,
-                modifier          = Modifier.fillMaxSize()
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize()
             )
 
             // Gradient scrim at the bottom for text readability
@@ -79,7 +90,27 @@ fun ContentTile(
                 )
             }
 
-            // Optional badge (e.g., "NEU", content type label)
+            // ── Scope badge – bottom-left ─────────────────────────────────
+            // Semi-transparent pill indicating the content scope
+            // (ARTIST / ALBUM / PLAYLIST). Not shown for TRACK entries.
+            if (scopeBadgeText != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 6.dp, bottom = 36.dp) // sits above title scrim
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(scopeBadgeColor)
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text  = scopeBadgeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White
+                    )
+                }
+            }
+
+            // ── Top-right badge (e.g. "NEU") ──────────────────────────────
             if (badgeText != null) {
                 Box(
                     modifier = Modifier
@@ -98,6 +129,16 @@ fun ContentTile(
             }
         }
     }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+/** Returns the scope badge text and color for the given content scope name. */
+fun scopeBadgeFor(scope: String): Pair<String, Color>? = when (scope) {
+    "ARTIST"   -> "Künstler" to ScopeBadgeArtist
+    "ALBUM"    -> "Album"    to ScopeBadgeAlbum
+    "PLAYLIST" -> "Playlist" to ScopeBadgePlaylist
+    else       -> null  // TRACK – no badge
 }
 
 // ── Previews ──────────────────────────────────────────────────────────────
@@ -128,7 +169,22 @@ private fun ContentTileNoImagePreview() {
     }
 }
 
-@Preview(name = "ContentTile – with badge", showBackground = true)
+@Preview(name = "ContentTile – Artist scope badge", showBackground = true)
+@Composable
+private fun ContentTileArtistBadgePreview() {
+    KidstuneTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            ContentTile(
+                title          = "Bibi & Tina",
+                imageUrl       = null,
+                scopeBadgeText = "Künstler",
+                scopeBadgeColor = ScopeBadgeArtist,
+            )
+        }
+    }
+}
+
+@Preview(name = "ContentTile – top-right badge", showBackground = true)
 @Composable
 private fun ContentTileBadgePreview() {
     KidstuneTheme {

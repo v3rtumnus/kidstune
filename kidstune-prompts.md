@@ -20,7 +20,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Prompt 3.4 – Kids App Discover Screen (Mock Data)
 - ✅ Prompt 4.1 – Backend Content Resolver
 - ✅ Prompt 4.2 – Backend Sync Endpoint
-- ⬅️ **NEXT: Prompt 4.3 – Kids App Sync + Room Storage**
+- ✅ Prompt 4.3 – Kids App Sync + Room Storage
+- ⬅️ **NEXT: Prompt 4.4 – Spotify Playback Integration**
 
 ---
 
@@ -1134,7 +1135,7 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 4.3 – Kids App Sync + Room Storage ⬅️
+### Prompt 4.3 – Kids App Sync + Room Storage ✅
 
 ```
 CONTEXT: Phase 4 of KidsTune. Backend sync endpoint exists (4.2). The Kids App has mock data (phase 3).
@@ -1204,7 +1205,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 4.4 – Spotify Playback Integration
+### Prompt 4.4 – Spotify Playback Integration ⬅️
 
 ```
 CONTEXT: Phase 4 of KidsTune. Kids App shows real content from Room (4.3). We now integrate

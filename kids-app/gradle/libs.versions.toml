@@ -27,6 +27,8 @@ robolectric     = "4.14.1"
 coroutines      = "1.9.0"
 androidx-test   = "1.6.1"
 serialization   = "1.7.3"
+ktor            = "3.0.3"
+mockwebserver   = "4.12.0"
 
 [libraries]
 # ── Compose BOM (controls all compose-* below) ────────────────────────────────
@@ -72,6 +74,14 @@ room-testing               = { group = "androidx.room",            name = "room-
 coroutines-test            = { group = "org.jetbrains.kotlinx",   name = "kotlinx-coroutines-test",  version.ref = "coroutines" }
 androidx-test-core         = { group = "androidx.test",           name = "core",                     version.ref = "androidx-test" }
 serialization-json         = { group = "org.jetbrains.kotlinx",   name = "kotlinx-serialization-json", version.ref = "serialization" }
+
+# ── Ktor ──────────────────────────────────────────────────────────────────────
+ktor-client-core           = { group = "io.ktor", name = "ktor-client-core",                      version.ref = "ktor" }
+ktor-client-okhttp         = { group = "io.ktor", name = "ktor-client-okhttp",                    version.ref = "ktor" }
+ktor-client-content-neg    = { group = "io.ktor", name = "ktor-client-content-negotiation",       version.ref = "ktor" }
+ktor-serialization-json    = { group = "io.ktor", name = "ktor-serialization-kotlinx-json",       version.ref = "ktor" }
+ktor-client-mock           = { group = "io.ktor", name = "ktor-client-mock",                      version.ref = "ktor" }
+mockwebserver              = { group = "com.squareup.okhttp3", name = "mockwebserver",             version.ref = "mockwebserver" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

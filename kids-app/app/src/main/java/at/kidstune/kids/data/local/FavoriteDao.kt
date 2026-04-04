@@ -27,4 +27,8 @@ interface FavoriteDao {
 
     @Query("UPDATE local_favorite SET synced = 1 WHERE id = :id")
     suspend fun markSynced(id: String)
+
+    /** Deletes all synced favorites for a profile (used before re-inserting from a full sync). */
+    @Query("DELETE FROM local_favorite WHERE profile_id = :profileId AND synced = 1")
+    suspend fun deleteAllSynced(profileId: String)
 }

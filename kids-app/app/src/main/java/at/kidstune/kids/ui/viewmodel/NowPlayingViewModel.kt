@@ -38,7 +38,7 @@ class NowPlayingViewModel @Inject constructor() : ViewModel() {
             NowPlayingIntent.TogglePlayPause ->
                 _state.update { it.copy(isPlaying = !it.isPlaying) }
             NowPlayingIntent.SkipForward,
-            NowPlayingIntent.SkipBack        -> { /* no-op – Spotify SDK integration in a later phase */ }
+            NowPlayingIntent.SkipBack        -> { /* Spotify SDK integration in prompt 4.4 */ }
         }
     }
 }

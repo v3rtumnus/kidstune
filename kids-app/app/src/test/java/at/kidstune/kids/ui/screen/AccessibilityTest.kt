@@ -91,21 +91,23 @@ class AccessibilityTest {
 
     @Test
     fun `browse tiles have content descriptions matching their titles`() {
+        val entries = MockContentProvider.contentEntries
+            .filter { it.contentType.name == "MUSIC" }
         composeTestRule.setContent {
             KidstuneTheme {
                 BrowseScreen(
                     state = BrowseState(
                         category = BrowseCategory.MUSIC,
-                        tiles    = MockContentProvider.mockMusicTiles,
-                        pages    = MockContentProvider.mockMusicTiles.chunked(4)
+                        entries  = entries,
+                        pages    = entries.chunked(4)
                     )
                 )
             }
         }
 
-        // First page tiles should all have descriptions
-        MockContentProvider.mockMusicTiles.take(4).forEach { tile ->
-            composeTestRule.onNodeWithContentDescription(tile.title).assertIsDisplayed()
+        // First page tiles should all have content descriptions
+        entries.take(4).forEach { entry ->
+            composeTestRule.onNodeWithContentDescription(entry.title).assertIsDisplayed()
         }
     }
 
@@ -141,13 +143,15 @@ class AccessibilityTest {
 
     @Test
     fun `browse screen back button meets 72dp minimum touch target`() {
+        val entries = MockContentProvider.contentEntries
+            .filter { it.contentType.name == "MUSIC" }
         composeTestRule.setContent {
             KidstuneTheme {
                 BrowseScreen(
                     state = BrowseState(
                         category = BrowseCategory.MUSIC,
-                        tiles    = MockContentProvider.mockMusicTiles,
-                        pages    = MockContentProvider.mockMusicTiles.chunked(4)
+                        entries  = entries,
+                        pages    = entries.chunked(4)
                     )
                 )
             }
