@@ -1173,6 +1173,15 @@ GOAL: When this task is done:
   - TrackListScreen (new screen): shows vertical list of LocalTrack rows for a given albumId,
     ordered by disc_number ASC, track_number ASC; tapping a track signals playback intent (no-op for now)
   - NowPlayingViewModel plays trackUri from LocalTrack in Room
+- Scope badge on BrowseScreen tiles (Music + Audiobook screens):
+  Each LocalContentEntry tile shows a small pill/chip in the bottom-left corner of the cover art
+  indicating its scope so kids (and parents during setup) can see what they added:
+    - ARTIST  → "Künstler"  (purple tint)
+    - ALBUM   → "Album"     (blue tint)
+    - PLAYLIST → "Playlist" (teal tint)
+    - TRACK   → "Song"      (no badge — single tracks are self-evident from context)
+  The badge uses a semi-transparent dark background so it's readable on any cover art color.
+  AlbumGridScreen and TrackListScreen tiles do NOT show scope badges (they are all albums/tracks by definition).
 - Coil image loading configured with 200MB disk cache for cover art
 
 REFERENCE: PROJECT_PLAN.md §5.1.5 (Local Room DB schema, complete offline data flow, caching strategy),
@@ -2037,6 +2046,12 @@ GOAL: When this task is done:
   - ACTIVE SEARCH: GET /api/v1/spotify/search?q=... replaces idle tiles with live Spotify results
     (max 10 items, explicit content filtered by backend). Results are large tiles, each with a
     Request button — NO play button anywhere on this screen.
+  - DiscoverTile model extended with scope: ContentScope (was missing in 3.4 mock).
+    Backend search results carry the Spotify item type; map to ContentScope:
+      Spotify "track" → TRACK, "album" → ALBUM, "artist" → ARTIST, "playlist" → PLAYLIST.
+    Each result tile shows a scope badge (same pill style as BrowseScreen):
+      TRACK → "Song", ALBUM → "Album", ARTIST → "Künstler", PLAYLIST → "Playlist"
+    Idle suggestions from known-artists.yml are all ARTIST scope.
   - ALREADY-APPROVED FILTER: Before rendering any results (both idle suggestions and active search),
     cross-check each result's Spotify URI against LocalContentEntry in Room. Any item whose
     spotify_uri already exists in the profile's Room DB is silently dropped from the result list —
