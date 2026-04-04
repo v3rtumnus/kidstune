@@ -1161,13 +1161,20 @@ GOAL: When this task is done:
   Flow<List<LocalAlbum>>, Flow<List<LocalTrack>>)
 - Replace MockContentProvider with ContentRepository in all ViewModels:
   - HomeViewModel gets content counts from Room
-  - BrowseViewModel gets entries by content type from Room
-  - Album/track views read from Room
+  - BrowseViewModel gets entries by content type from Room, exposes entries as Flow<List<LocalContentEntry>>
+  - BrowseViewModel tile tap dispatches NavigateIntent based on LocalContentEntry.scope (§5.1.8):
+    - ARTIST → navigate to AlbumGridScreen(contentEntryId)
+    - ALBUM / PLAYLIST → navigate to TrackListScreen(albumId = entry's first LocalAlbum id)
+    - TRACK → signal playback intent (no-op for now, implemented in 4.4)
+  - AlbumGridScreen (new screen): shows paginated 2x2 grid of LocalAlbum rows for a given contentEntryId;
+    tapping an album navigates to TrackListScreen(albumId)
+  - TrackListScreen (new screen): shows vertical list of LocalTrack rows for a given albumId,
+    ordered by disc_number ASC, track_number ASC; tapping a track signals playback intent (no-op for now)
   - NowPlayingViewModel plays trackUri from LocalTrack in Room
 - Coil image loading configured with 200MB disk cache for cover art
 
 REFERENCE: PROJECT_PLAN.md §5.1.5 (Local Room DB schema, complete offline data flow, caching strategy),
-§6.1 Sync endpoints (response format).
+§5.1.8 (hierarchical browse – scope-driven navigation), §6.1 Sync endpoints (response format).
 
 CONSTRAINTS:
 - Do NOT implement WorkManager sync yet (phase 5) – for now, sync is called once on app launch
@@ -1227,29 +1234,48 @@ GOAL: When this task is done:
   - Skip forward/back works (Spotify handles context-aware skipping natively)
   - Progress bar updates in real-time (poll every 500ms or use Spotify's callback)
 - MiniPlayerBar updated to show real nowPlaying data, tappable to expand to NowPlayingScreen
-- BrowseScreen:
-  - MUSIC albums: tapping tile → playAlbumFromStart(albumUri)
-  - AUDIOBOOK albums: tapping tile → navigates to chapter list screen (ChapterListScreen)
-    instead of immediately playing (see below)
-- ChapterListScreen (new screen, only for AUDIOBOOK albums):
+- TrackListScreen (introduced in 4.3) wired up for playback:
+  - MUSIC: tapping any track → playFromChapter(albumUri, trackIndex) — plays album from that track,
+    auto-advances through remaining tracks; never play(trackUri) alone
+  - AUDIOBOOK: tapping any chapter → renamed to ChapterListScreen (see below); same playFromChapter logic
+- AlbumGridScreen (introduced in 4.3) wired up:
+  - MUSIC album tile tap → playAlbumFromStart(albumUri) (no intermediate track list for music albums;
+    tapping an album starts playing it immediately from track 1)
+  - AUDIOBOOK album tile tap → navigates to ChapterListScreen instead of playing immediately
+- ChapterListScreen (rename/refine of AUDIOBOOK TrackListScreen):
   - Displays vertical list of LocalTrack ordered by disc_number ASC, track_number ASC
   - Shows album art, album title, chapter count and total duration at top
   - Each chapter row: title, duration, small progress bar if this is the last-played chapter
   - ▶ resume indicator on the chapter that matches LocalPlaybackPosition.track_uri
   - Tapping any chapter: playFromChapter(albumUri, trackIndex)
   - Tapping the resume chapter: playFromChapter(albumUri, trackIndex) then seekTo(position_ms)
+- Playlist playback: LocalContentEntry with scope=PLAYLIST has a single LocalAlbum row representing
+  the playlist. Tapping a track in its TrackListScreen calls:
+  playFromPlaylist(playlistUri: String, trackIndex: Int):
+    PlayerApi.play(playlistUri) then PlayerApi.skipToIndex(playlistUri, trackIndex)
+  playlistUri is LocalContentEntry.spotify_uri (spotify:playlist:xxx)
+- Favorites sequential playback (BrowseScreen category=FAVORITES):
+  - Tapping any favorite tile starts playing that track AND queues all other favorites after it.
+  - PlaybackController.playFavoritesFrom(favorites: List<LocalFavorite>, startIndex: Int):
+    - Plays favorites[startIndex].spotify_track_uri directly (bare track URI is acceptable here
+      since favorites are individual tracks from mixed contexts with no shared album/playlist)
+    - Subscribes to PlayerState; when a track ends (playerState.isPaused && position == 0),
+      advances to the next track in the favorites list (wraps around)
+    - The in-progress favorites queue is held in a local StateFlow<List<String>> (track URIs)
+      in PlaybackController; cleared when playback is started from a non-favorites context
 
 REFERENCE: PROJECT_PLAN.md §2.2 (Spotify App Remote SDK), §5.1.5 (offline playback flow –
 track URIs come from Room, not network), §5.1.7 (sequential & continuous playback, chapter list UX,
-playback position persistence schema). Spotify App Remote SDK docs:
-https://developer.spotify.com/documentation/android/
+playback position persistence schema), §5.1.8 (hierarchical browse), §5.1.9 (playback context rules).
+Spotify App Remote SDK docs: https://developer.spotify.com/documentation/android/
 
 CONSTRAINTS:
 - Track URIs MUST come from LocalTrack in Room DB, NOT from any network call
 - Do NOT call Spotify Web API from the kids app – all data is in Room
-- NEVER call play(trackUri) alone for albums — always use playFromChapter(albumUri, index)
-  so Spotify maintains the album as a context and auto-advances chapters
-- Do NOT implement queueing or playlist management beyond basic skip
+- NEVER call play(trackUri) alone for albums or playlists — always use playFromChapter/playFromPlaylist
+  so Spotify maintains the context and auto-advances tracks
+- Favorites are the ONLY case where bare track URIs are played one-at-a-time (no shared context)
+- Do NOT implement queueing or playlist management beyond the favorites sequential queue
 - Handle connection errors gracefully: show friendly error screen (detailed error screens come in phase 8)
 - The Spotify AAR must be manually downloaded – document the path in a comment
 
@@ -2009,6 +2035,11 @@ GOAL: When this task is done:
   - ACTIVE SEARCH: GET /api/v1/spotify/search?q=... replaces idle tiles with live Spotify results
     (max 10 items, explicit content filtered by backend). Results are large tiles, each with a
     Request button — NO play button anywhere on this screen.
+  - ALREADY-APPROVED FILTER: Before rendering any results (both idle suggestions and active search),
+    cross-check each result's Spotify URI against LocalContentEntry in Room. Any item whose
+    spotify_uri already exists in the profile's Room DB is silently dropped from the result list —
+    it is already playable in the Music/Audiobooks tabs, so a Request button would be misleading.
+    This check is pure local Room lookup; no extra network call needed.
   - Each result has a "🙏 Ich will das!" button → POST /api/v1/content-requests (or queue offline)
   - Request button DISABLED when 3 pending requests exist, with friendly message:
     "Du hast schon 3 Wünsche offen – warte bis Mama/Papa geantwortet hat!"
@@ -2046,6 +2077,8 @@ VERIFICATION:
 - UI test: rejected request shows ❌ with note
 - Unit test: time context strings ("Mama/Papa schauen sich das an" for < 1h, etc.)
 - Unit test: search rate limiting (2 queries within 5s → second blocked)
+- Unit test: already-approved filter — Room has entry with URI "spotify:album:abc" → search result
+  with same URI is dropped from rendered list; result with different URI is kept
 - Unit test: DiscoverViewModel processes WebSocket approval → triggers sync
 - Run ./gradlew test → all tests pass
 - Run ./gradlew updateDebugScreenshotTest → new PNGs generated for DiscoverScreen @Preview
@@ -2110,12 +2143,25 @@ GOAL: When this task is done:
   - Reusable HTMX confirmation modal fragment (message + confirm + cancel buttons)
   - Column sort links (append ?sort=field&dir=asc|desc to current URL)
 - Admin section linked from sidebar as "Admin ▸" with sub-items in a collapsible group
+- Danger Zone page at GET /web/admin/danger-zone (§5.2.3):
+  - Shows a red-bordered "Danger Zone" card explaining what will be deleted
+  - Single button "Wipe All Data and Start From Scratch" triggers a two-step HTMX confirmation:
+    Step 1: button replaced with text input "Type DELETE to confirm" + [Confirm] button
+    Step 2: POST /web/admin/danger-zone/wipe (only if input == "DELETE")
+  - Wipe endpoint runs in a @Transactional block, deletes in FK-safe order:
+    ContentRequest → Favorite → ResolvedTrack → ResolvedAlbum → AllowedContent →
+    PairedDevice → ChildProfile → Family
+  - On success: redirects to /web/register (fresh start)
+  - On failure: shows error page with exception message (transaction rolled back, data intact)
+  - The wipe does NOT drop schema or Liquibase changelog history — data rows only
+  - Danger Zone is linked at the bottom of the Admin sidebar section with a ⚠️ icon
 
-REFERENCE: PROJECT_PLAN.md §4.1 (all entity definitions, cascade rules), §4.2 (content scope).
+REFERENCE: PROJECT_PLAN.md §4.1 (all entity definitions, cascade rules), §4.2 (content scope),
+§5.2.3 (Danger Zone full spec including UX wireframe).
 CLAUDE.md: cascade delete rules (profile → content → resolved → favorites, requests).
 
 CONSTRAINTS:
-- Admin section uses the SAME Spotify OAuth session auth as the rest of /web/** (no extra password)
+- Admin section uses the SAME email/password session auth as the rest of /web/** (no extra password)
 - Use existing services where they have suitable methods; use repositories directly only for
   cross-family read queries that no service provides (e.g., list all profiles across all families)
 - ResolvedAlbum and ResolvedTrack are read-only – no edit forms, only delete via parent AllowedContent
@@ -2131,6 +2177,10 @@ VERIFICATION:
 - GET /web/admin/favorites → filter by profile → shows only that profile's favorites
 - GET /web/admin/requests → all statuses shown; filter by PENDING → only pending shown
 - GET /web/admin/devices → all paired devices listed
+- GET /web/admin/danger-zone → Danger Zone card shown with red border; button visible
+- Wipe flow: click button → text input appears → type "DELETE" → confirm → redirect to /web/register
+  → verify DB is empty (login fails, /web/register loads fresh)
+- Wipe with wrong text ("delete" lowercase) → confirm button disabled or shows validation error
 - Run ./gradlew test → all tests pass
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```

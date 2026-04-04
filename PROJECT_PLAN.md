@@ -415,22 +415,39 @@ The parent can always override the classification in the Parent App. The overrid
                    └─────────────┘  │
                                     │
                    EVERY LAUNCH: ◄──┘
-                   ┌──────────────────────────┐    ┌──────────────────┐
-                   │   Home                   │───>│  Category View   │
-                   │                          │    │  (paginated grid)│
-                   │  ┌────────┐ ┌──────────┐ │    │                  │
-                   │  │  🎵    │ │  📖      │ │    │ ┌──────┐┌──────┐│
-                   │  │ Music  │ │Audiobooks│ │    │ │ img  ││ img  ││
-                   │  └────────┘ └──────────┘ │    │ │      ││      ││
-                   │      ┌──────────┐        │    │ └──────┘└──────┘│
-                   │      │  ❤️      │        │    │ ┌──────┐┌──────┐│
-                   │      │Favorites │        │    │ │ img  ││ img  ││
-                   │      └──────────┘        │    │ │      ││      ││
-                   │                          │    │ └──────┘└──────┘│
-                   │  ┌──────────────────┐    │    │                  │
-                   │  │ 🔍 Discover*     │    │    │  ◄ Page 1 of 3 ►│
-                   │  └──────────────────┘    │    └──────┬───────────┘
-                   └──────────────────────────┘           │
+                   ┌──────────────────────────┐    ┌─────────────────────┐
+                   │   Home                   │───>│  Level 1: Top-level │
+                   │                          │    │  grid (artists,     │
+                   │  ┌────────┐ ┌──────────┐ │    │  albums, playlists, │
+                   │  │  🎵    │ │  📖      │ │    │  or tracks)         │
+                   │  │ Music  │ │Audiobooks│ │    │                     │
+                   │  └────────┘ └──────────┘ │    │  ┌──────┐┌──────┐  │
+                   │      ┌──────────┐        │    │  │ img  ││ img  │  │
+                   │      │  ❤️      │        │    │  │      ││      │  │
+                   │      │Favorites │        │    │  └──────┘└──────┘  │
+                   │                          │    │  ┌──────┐┌──────┐  │
+                   │  ┌──────────────────┐    │    │  │ img  ││ img  │  │
+                   │  │ 🔍 Discover*     │    │    │  │      ││      │  │
+                   │  └──────────────────┘    │    │  └──────┘└──────┘  │
+                   └──────────────────────────┘    │  ◄ Page 1 of 3 ►   │
+                                                   └──────────┬──────────┘
+                                                              │
+                                         (if scope=ARTIST     │ or ALBUM/PLAYLIST)
+                                         tap artist           ▼
+                                               ┌─────────────────────┐
+                                               │  Level 2: Albums    │
+                                               │  grid               │
+                                               │  (for ARTIST scope) │
+                                               └──────────┬──────────┘
+                                                          │
+                                                          ▼
+                                               ┌──────────────────┐
+                                               │  Level 3: Tracks │
+                                               │  (vertical list  │
+                                               │   for AUDIOBOOK, │
+                                               │   grid for MUSIC)│
+                                               └──────────┬───────┘
+                                                          │
                                                           ▼
                                                ┌──────────────────┐
                                                │  Now Playing     │
@@ -726,6 +743,7 @@ The Discover screen allows children to **search the full Spotify catalog** and r
 - **Playing is not possible** until the parent approves the request — there is no play button, only a Request button.
 - **Any Spotify content is findable** (tracks, albums, artists, playlists), not just a curated list. The safety constraint is on *playback*, not on *discovery*.
 - The backend proxies all search calls to the Spotify Web API using the family's token — the kids app never holds Spotify credentials directly.
+- **Already-approved content is excluded from results.** Before rendering search results (and curated suggestions), the Kids App cross-checks each result's Spotify URI against the local Room DB (`LocalContentEntry.spotify_uri`). Any item already in the profile's approved content is silently dropped from the Discover results — it's already playable, so showing a Request button for it would be confusing. This check runs locally against Room without any extra network call.
 
 **Idle state (no query typed yet):** The backend returns a curated list of age-appropriate suggestions from `known-artists.yml`. These render as large tiles identical to search results — each with a Request button. This gives pre-readers something to tap immediately without needing to type.
 
@@ -863,6 +881,45 @@ When `content_type == AUDIOBOOK`, the NowPlaying screen shows the chapter contex
 
 The `NowPlayingState` is extended with `chapterIndex: Int?` and `totalChapters: Int?`, populated by looking up the currently playing track URI in the `LocalTrack` Room table to retrieve `track_number` and the parent album's `total_tracks`.
 
+#### 5.1.8 Hierarchical Browse (Scope-Driven Navigation)
+
+The Music and Audiobooks screens do not show a flat list. Navigation depth depends on the **highest scope** of the content added for that profile:
+
+| Scope of AllowedContent | Level 1 (tap category) | Level 2 (tap item) | Level 3 (tap item) |
+|-------------------------|------------------------|--------------------|--------------------|
+| `ARTIST` | Artist tiles (paginated grid) | Album tiles for that artist | Track list → play |
+| `ALBUM` | Album tiles (paginated grid) | Track list → play | — |
+| `PLAYLIST` | Playlist tiles (paginated grid) | Track list → play | — |
+| `TRACK` | Track tiles directly → play | — | — |
+
+A single profile can have a mix of scopes. The top-level grid shows the `LocalContentEntry` directly (which has its own image and title regardless of scope). Tapping an entry with `scope=ARTIST` drills to an album grid; `scope=ALBUM` or `scope=PLAYLIST` drills to a track list; `scope=TRACK` starts playback immediately.
+
+**Audiobooks follow identical logic:**
+- `scope=ARTIST` (e.g., "Bibi & Tina" the series): tap artist → album/audiobook tiles → chapter list
+- `scope=ALBUM` (e.g., a single audiobook): tap directly → chapter list
+- Chapter list always uses the vertical chapter UI (§5.1.7)
+
+The `BrowseViewModel` inspects `LocalContentEntry.scope` to decide navigation target on tile tap:
+- `ARTIST` → navigate to `AlbumGridScreen(contentEntryId)`
+- `ALBUM` / `PLAYLIST` → navigate to `TrackListScreen(albumId = entry.primaryAlbumId)` or a playlist track list
+- `TRACK` → call `PlaybackController.playTrack(trackUri)` directly (plays as album context if possible)
+
+#### 5.1.9 Playback Context Rules
+
+**The core rule** (already in §5.1.7 for audiobooks) applies universally: never play a bare `spotify:track:...` when a context is available. Always use the broadest context so skip/auto-advance works.
+
+| What the kid taps | Playback call |
+|-------------------|---------------|
+| Track inside a Music album | `playFromChapter(albumUri, trackIndex)` |
+| Track inside a Playlist | `playFromPlaylist(playlistUri, trackIndex)` |
+| Album tile directly (MUSIC) | `playAlbumFromStart(albumUri)` |
+| Chapter tile (AUDIOBOOK) | `playFromChapter(albumUri, chapterIndex)` |
+| Artist tile (no drill-down yet) | `playAlbumFromStart(firstAlbumUri)` |
+| Favorites tab tile | Play all favorites sequentially (see below) |
+
+**Favorites sequential playback:**
+Favorites are individual tracks from different albums/playlists. To play them sequentially (Spotify-style), the `PlaybackController` assembles a playlist of all `LocalFavorite.spotify_track_uri` values in the order they appear in the Favorites tab (sorted by `added_at DESC` by default). It calls `PlayerApi.play(trackUri)` for the first track, then uses `subscribeToPlayerState()` to detect when a track ends and advances to the next track URI in the local favorites list. This is managed entirely in the Kids App — no Spotify playlist is created on the server side. The user can still tap any favorite tile to start from that position in the queue.
+
 ---
 
 ### 5.2 KidsTune Web Dashboard
@@ -883,6 +940,7 @@ The web dashboard is a responsive Thymeleaf + HTMX + Bootstrap 5 app served at `
 /web/approve/{token}  → One-click approve link from email (public, no login required)
 /web/settings         → Notification emails; connect/disconnect parent Spotify account
 /web/admin/**         → Admin CRUD tables for all entities (operational oversight)
+/web/admin/danger-zone → Danger Zone: full data wipe (start from scratch)
 ```
 
 Sidebar navigation with links to all sections. Left sidebar collapses to icons on small screens. All destructive actions use HTMX confirmation modals.
@@ -1000,7 +1058,55 @@ known_children_artists:
   # ... extensible list
 ```
 
-#### 5.2.3 Notification System for Content Requests
+#### 5.2.3 Admin Danger Zone
+
+The admin section includes a **Danger Zone** at `/web/admin/danger-zone` for resetting the installation back to a clean state. This is intended for development, re-gifting a device, or starting over completely.
+
+**Available action: Full Data Wipe**
+
+Deletes ALL data in the following order (respecting FK constraints):
+1. `LocalPlaybackPosition` equivalent on backend (none — this lives only on device)
+2. `ContentRequest` rows for all profiles
+3. `Favorite` rows for all profiles
+4. `LocalFavorite` equivalent: `Favorite` table
+5. `ResolvedTrack` rows (all)
+6. `ResolvedAlbum` rows (all)
+7. `AllowedContent` rows (all)
+8. `PairedDevice` rows (all)
+9. `ChildProfile` rows (all, cascades to the above if DB FK cascades are set)
+10. `Family` rows (all — this removes the login itself)
+
+After the wipe, the user is redirected to `/web/register` (the registration page) so a fresh family account can be created. Liquibase changelogs and schema are NOT dropped — only data rows.
+
+**UX:**
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  ⚠️  Danger Zone                                               │
+│  ──────────────────────────────────────────────────────────── │
+│  These actions are PERMANENT and cannot be undone.             │
+│                                                                │
+│  [🗑️ Wipe All Data and Start From Scratch]                    │
+│                                                                │
+│  This will delete:                                             │
+│  • All family accounts and child profiles                      │
+│  • All allowed content and resolved albums/tracks              │
+│  • All paired devices, favorites, and content requests         │
+│  • All Spotify tokens                                          │
+│                                                                │
+│  Schema and configuration files are NOT deleted.               │
+└────────────────────────────────────────────────────────────────┘
+```
+
+The button triggers a two-step HTMX confirmation:
+1. First click: replaces button with "Type DELETE to confirm: [text input] [Confirm]"
+2. User types "DELETE" exactly → `POST /web/admin/danger-zone/wipe` → wipe runs → redirect to `/web/register`
+
+Backend endpoint: `POST /web/admin/danger-zone/wipe` — requires active session (same auth as all `/web/**` routes). The wipe runs in a single `@Transactional` block. If it fails mid-way, it rolls back and shows an error page with the exception message.
+
+**This endpoint does NOT delete Liquibase changelog history** (`DATABASECHANGELOG` table) or the schema itself — only application data rows.
+
+#### 5.2.4 Notification System for Content Requests
 
 When a child submits a content request, the backend notifies **all configured parents** via email (guaranteed) and real-time browser push (when dashboard is open).
 
@@ -1436,7 +1542,7 @@ Phase 8 ─→ Production-hardened, admin data tables, documented, ready for dai
 
 | Module | Scope |
 |--------|-------|
-| **Web Dashboard: Admin Data Tables** | Paginated, sortable CRUD tables for all entities: Family (read-only), ChildProfile, AllowedContent, ResolvedAlbum/Track (read-only + re-resolve trigger), Favorite, ContentRequest, PairedDevice. HTMX confirmation modals before all destructive operations. |
+| **Web Dashboard: Admin Data Tables** | Paginated, sortable CRUD tables for all entities: Family (read-only), ChildProfile, AllowedContent, ResolvedAlbum/Track (read-only + re-resolve trigger), Favorite, ContentRequest, PairedDevice. HTMX confirmation modals before all destructive operations. Danger Zone section (see §5.2.3). |
 | **Kids App: Animations** | Shared element transition (tile → Now Playing cover art), button press scale animations, page swipe physics, shimmer loading states, favorite heart bounce animation |
 | **Kids App: Edge Cases** | Spotify app not installed → friendly message with setup instructions, Spotify not logged in → prompt to hand device to parent, Spotify premium expired → graceful error, device storage full → warn and suggest clearing Spotify cache |
 | **Kids App: Accessibility** | Content descriptions on all images, touch target audit (≥72dp), color contrast check (WCAG AA), test with TalkBack screen reader |
@@ -2083,7 +2189,7 @@ and: curl http://localhost:8080/actuator/health → should return 200
       celebration. Test request limit (4th request shows disabled state).
       Unit test for time context strings and rate limiting."
 
-7.5: "In parent-app, implement the three-layer notification system (§5.2.3):
+7.5: "In parent-app, implement the three-layer notification system (§5.2.4):
 
       LAYER 1 – Foreground Service (real-time):
       - NotificationService extends Service, promoted to foreground with
