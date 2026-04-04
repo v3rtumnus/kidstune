@@ -1035,7 +1035,7 @@ VERIFICATION:
 
 ## Phase 4 – Kids App Plays Real Music (Weeks 5-6)
 
-### Prompt 4.1 – Backend Content Resolver
+### Prompt 4.1 – Backend Content Resolver ✅
 
 ```
 CONTEXT: Phase 4 of KidsTune. Backend has content management and Spotify proxy. When a parent
@@ -1085,7 +1085,7 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 4.2 – Backend Sync Endpoint
+### Prompt 4.2 – Backend Sync Endpoint ⬅️
 
 ```
 CONTEXT: Phase 4 of KidsTune. Content resolver exists (4.1). We now implement the sync endpoint
