@@ -7,6 +7,7 @@ import at.kidstune.content.ContentType;
 import at.kidstune.notification.EmailNotificationService;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
+import at.kidstune.resolver.ContentResolver;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,15 +24,18 @@ public class ContentRequestService {
     private final ContentRepository        contentRepository;
     private final ProfileRepository        profileRepository;
     private final EmailNotificationService emailNotificationService;
+    private final ContentResolver          contentResolver;
 
     public ContentRequestService(ContentRequestRepository requestRepository,
                                   ContentRepository contentRepository,
                                   ProfileRepository profileRepository,
-                                  EmailNotificationService emailNotificationService) {
+                                  EmailNotificationService emailNotificationService,
+                                  ContentResolver contentResolver) {
         this.requestRepository          = requestRepository;
         this.contentRepository          = contentRepository;
         this.profileRepository          = profileRepository;
         this.emailNotificationService   = emailNotificationService;
+        this.contentResolver            = contentResolver;
     }
 
     /** Creates a new PENDING request. Enforces max-3 pending per profile. Fires email async. */
@@ -161,7 +165,8 @@ public class ContentRequestService {
         content.setTitle(request.getTitle());
         content.setImageUrl(request.getImageUrl());
         content.setArtistName(request.getArtistName());
-        contentRepository.save(content);
+        AllowedContent saved = contentRepository.save(content);
+        contentResolver.resolveAsync(saved);
     }
 
     /** Infers ContentScope from the Spotify URI prefix. Defaults to ALBUM. */
