@@ -8,21 +8,10 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 ---
 
 **Implementation Progress:**
-- ✅ Phase 1 complete (1.1 – 1.4)
-- ✅ Phase 2 backend complete (2.1 – 2.3)
-- ✅ Prompt 2.4 – Web Dashboard Foundation (login uses Spotify OAuth — superseded by 2.4b)
-- ✅ Prompt 2.4b – Refactor Dashboard Auth to Email/Password
-- ✅ Prompt 2.5 – Web Dashboard Profile, Content & Approval Queue
-- ✅ Prompt 2.6 – Email Notifications with Approve Token
-- ✅ Prompt 3.1 – Kids App Project Setup + Theme
-- ✅ Prompt 3.2 – Kids App All Screens (Mock Data)
-- ✅ Prompt 3.3 – Kids App UI Tests
-- ✅ Prompt 3.4 – Kids App Discover Screen (Mock Data)
-- ✅ Prompt 4.1 – Backend Content Resolver
-- ✅ Prompt 4.2 – Backend Sync Endpoint
-- ✅ Prompt 4.3 – Kids App Sync + Room Storage
-- ✅ Prompt 4.4 – Spotify Playback Integration
-- ✅ Prompt 4.5 – Kids App Real Favorites + Spotify Liked Songs Sync
+- ✅ **Phase 1 complete** (1.1 – 1.4) — Backend foundation, DB schema, auth, profiles
+- ✅ **Phase 2 complete** (2.1 – 2.6) — Content management, web dashboard, email notifications, per-profile Spotify tokens
+- ✅ **Phase 3 complete** (3.1 – 3.4) — Kids app setup, all screens with mock data, UI tests, Discover screen
+- ✅ **Phase 4 complete** (4.1 – 4.5) — Backend resolver + sync, kids app Room storage, Spotify playback, real favorites + Spotify Liked Songs sync
 - ⬅️ **NEXT: Prompt 4.6**
 
 ---
