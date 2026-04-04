@@ -17,7 +17,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Prompt 3.1 – Kids App Project Setup + Theme
 - ✅ Prompt 3.2 – Kids App All Screens (Mock Data)
 - ✅ Prompt 3.3 – Kids App UI Tests
-- ⬅️ **NEXT: Prompt 3.4 – Kids App Discover Screen (Mock Data)**
+- ✅ Prompt 3.4 – Kids App Discover Screen (Mock Data)
+- ⬅️ **NEXT: Prompt 3.5 – (next prompt)**
 
 ---
 
@@ -935,7 +936,7 @@ VERIFICATION:
 - No test depends on network or external services
 ```
 
-### Prompt 3.4 – Kids App Discover Screen (Mock Data)
+### Prompt 3.4 – Kids App Discover Screen (Mock Data) ✅
 
 ```
 CONTEXT: Phase 3 of KidsTune. All core screens exist and are tested (3.2/3.3). The DiscoverScreen
