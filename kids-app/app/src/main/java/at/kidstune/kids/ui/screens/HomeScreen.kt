@@ -35,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.ui.components.MiniPlayerBar
 import at.kidstune.kids.ui.theme.AudiobookPrimary
+import at.kidstune.kids.ui.theme.DiscoverPrimary
 import at.kidstune.kids.ui.theme.FavoritePrimary
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.theme.MusicPrimary
@@ -50,15 +51,17 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
     onNavigateToBrowse: (BrowseCategory) -> Unit = {},
-    onNavigateToNowPlaying: () -> Unit = {}
+    onNavigateToNowPlaying: () -> Unit = {},
+    onNavigateToDiscover: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     HomeScreen(
-        modifier              = modifier,
-        state                 = state,
-        onIntent              = viewModel::onIntent,
-        onNavigateToBrowse    = onNavigateToBrowse,
-        onNavigateToNowPlaying = onNavigateToNowPlaying
+        modifier               = modifier,
+        state                  = state,
+        onIntent               = viewModel::onIntent,
+        onNavigateToBrowse     = onNavigateToBrowse,
+        onNavigateToNowPlaying = onNavigateToNowPlaying,
+        onNavigateToDiscover   = onNavigateToDiscover
     )
 }
 
@@ -70,7 +73,8 @@ fun HomeScreen(
     state: HomeState,
     onIntent: (HomeIntent) -> Unit = {},
     onNavigateToBrowse: (BrowseCategory) -> Unit = {},
-    onNavigateToNowPlaying: () -> Unit = {}
+    onNavigateToNowPlaying: () -> Unit = {},
+    onNavigateToDiscover: () -> Unit = {}
 ) {
     Scaffold(
         modifier  = modifier,
@@ -134,14 +138,26 @@ fun HomeScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Favorites – centered, slightly narrower
-                CategoryButton(
-                    emoji    = "❤️",
-                    label    = "Lieblingssongs",
-                    color    = FavoritePrimary,
-                    modifier = Modifier.fillMaxWidth(0.6f),
-                    onClick  = { onNavigateToBrowse(BrowseCategory.FAVORITES) }
-                )
+                // Favorites + Discover side-by-side
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CategoryButton(
+                        emoji    = "❤️",
+                        label    = "Lieblingssongs",
+                        color    = FavoritePrimary,
+                        modifier = Modifier.weight(1f),
+                        onClick  = { onNavigateToBrowse(BrowseCategory.FAVORITES) }
+                    )
+                    CategoryButton(
+                        emoji    = "🔍",
+                        label    = "Entdecken",
+                        color    = DiscoverPrimary,
+                        modifier = Modifier.weight(1f),
+                        onClick  = onNavigateToDiscover
+                    )
+                }
             }
         }
     }

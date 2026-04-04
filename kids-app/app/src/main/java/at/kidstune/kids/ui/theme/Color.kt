@@ -14,6 +14,11 @@ val AudiobookPrimaryDark = Color(0xFF0F5240)
 val AudiobookContainer   = Color(0xFFB7F0D7)
 val AudiobookOnContainer = Color(0xFF00391E)
 
+// ── Quaternary palette – Discover (indigo) ───────────────────────────────
+val DiscoverPrimary      = Color(0xFF3F51B5) // Material Indigo
+val DiscoverContainer    = Color(0xFFE8EAF6)
+val DiscoverOnContainer  = Color(0xFF1A237E)
+
 // ── Tertiary palette – Favorites (pink/red) ──────────────────────────────
 val FavoritePrimary      = Color(0xFFE91E63)
 val FavoritePrimaryDark  = Color(0xFFC2185B)

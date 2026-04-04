@@ -61,7 +61,8 @@ fun KidstuneNavHost(
                 onNavigateToBrowse     = { category ->
                     navController.navigate(BrowseRoute(category.name))
                 },
-                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
+                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) },
+                onNavigateToDiscover   = { navController.navigate(DiscoverRoute) }
             )
         }
 
