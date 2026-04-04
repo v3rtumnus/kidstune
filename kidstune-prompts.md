@@ -1318,7 +1318,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 4.5 – Kids App Real Favorites + Spotify Liked Songs Sync
+### Prompt 4.5 – Kids App Real Favorites + Spotify Liked Songs Sync ✅
 
 ```
 CONTEXT: Phase 4 of KidsTune. Playback works (4.4). We now implement real favorites that
