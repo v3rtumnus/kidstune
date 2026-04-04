@@ -1900,9 +1900,15 @@ GOAL: When this task is done:
     - Creates ContentRequest with status=PENDING
     - Dispatches CONTENT_REQUEST message via WebSocket to parent (ConnectionRegistry.sendToParent)
     - Returns created request
-  - approveRequest(requestId, approvedByProfileIds?, note?):
+  - approveRequest(requestId, approvedByProfileIds?, note?, contentTypeOverride?):
     - Sets status=APPROVED, resolved_at=now, resolved_by
     - Creates AllowedContent for the requesting profile (or specified profiles)
+      - contentTypeOverride (optional): if provided, overrides the content type set by
+        the kids app when the request was created. Kids app cannot infer AUDIOBOOK vs MUSIC
+        from search results (no genre data), so the parent must be able to correct it here.
+        The approval UI (web dashboard) shows a content-type selector (MUSIC / AUDIOBOOK)
+        pre-filled with the request's current type, allowing the parent to change it before
+        clicking Approve.
     - Triggers ContentResolver to populate albums/tracks
     - Dispatches REQUEST_APPROVED via WebSocket to kids device
   - rejectRequest(requestId, note?):
