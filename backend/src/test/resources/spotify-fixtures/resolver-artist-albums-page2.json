@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "page-album-3",
+      "name": "Page Album 3",
+      "uri": "spotify:album:page-album-3",
+      "images": [{"url": "https://img.example.com/page-album-3.jpg"}],
+      "artists": [{"id": "page-artist-1", "name": "Page Artist"}],
+      "release_date": "2023-03-01",
+      "total_tracks": 5,
+      "type": "album"
+    }
+  ],
+  "total": 3,
+  "limit": 2,
+  "offset": 2,
+  "next": null
+}

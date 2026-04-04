@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "track": {
+        "id": "pg-t3", "name": "Paged Track 3", "uri": "spotify:track:pg-t3",
+        "artists": [{"id": "art-pg", "name": "Paged Artist"}],
+        "duration_ms": 220000, "track_number": 3, "disc_number": 1,
+        "album": {"id": "pg-alb-1", "name": "Paged Album", "uri": "spotify:album:pg-alb-1",
+                  "images": [{"url": "https://img.example.com/pg-alb-1.jpg"}]}
+      }
+    }
+  ],
+  "total": 3,
+  "limit": 2,
+  "offset": 2,
+  "next": null
+}

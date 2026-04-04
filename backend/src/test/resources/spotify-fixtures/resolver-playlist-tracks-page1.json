@@ -1,0 +1,26 @@
+{
+  "items": [
+    {
+      "track": {
+        "id": "pg-t1", "name": "Paged Track 1", "uri": "spotify:track:pg-t1",
+        "artists": [{"id": "art-pg", "name": "Paged Artist"}],
+        "duration_ms": 200000, "track_number": 1, "disc_number": 1,
+        "album": {"id": "pg-alb-1", "name": "Paged Album", "uri": "spotify:album:pg-alb-1",
+                  "images": [{"url": "https://img.example.com/pg-alb-1.jpg"}]}
+      }
+    },
+    {
+      "track": {
+        "id": "pg-t2", "name": "Paged Track 2", "uri": "spotify:track:pg-t2",
+        "artists": [{"id": "art-pg", "name": "Paged Artist"}],
+        "duration_ms": 210000, "track_number": 2, "disc_number": 1,
+        "album": {"id": "pg-alb-1", "name": "Paged Album", "uri": "spotify:album:pg-alb-1",
+                  "images": [{"url": "https://img.example.com/pg-alb-1.jpg"}]}
+      }
+    }
+  ],
+  "total": 3,
+  "limit": 2,
+  "offset": 0,
+  "next": "https://api.spotify.com/v1/playlists/pg-playlist/tracks?limit=2&offset=2"
+}

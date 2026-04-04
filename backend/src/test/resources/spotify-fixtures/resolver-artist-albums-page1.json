@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "id": "page-album-1",
+      "name": "Page Album 1",
+      "uri": "spotify:album:page-album-1",
+      "images": [{"url": "https://img.example.com/page-album-1.jpg"}],
+      "artists": [{"id": "page-artist-1", "name": "Page Artist"}],
+      "release_date": "2021-01-01",
+      "total_tracks": 5,
+      "type": "album"
+    },
+    {
+      "id": "page-album-2",
+      "name": "Page Album 2",
+      "uri": "spotify:album:page-album-2",
+      "images": [{"url": "https://img.example.com/page-album-2.jpg"}],
+      "artists": [{"id": "page-artist-1", "name": "Page Artist"}],
+      "release_date": "2022-02-01",
+      "total_tracks": 5,
+      "type": "album"
+    }
+  ],
+  "total": 3,
+  "limit": 2,
+  "offset": 0,
+  "next": "https://api.spotify.com/v1/artists/page-artist-1/albums?limit=2&offset=2"
+}

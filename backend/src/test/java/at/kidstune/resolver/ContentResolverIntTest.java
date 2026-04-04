@@ -326,6 +326,48 @@ class ContentResolverIntTest {
         assertThat(albumUris).contains("spotify:album:res-album-4");       // added
     }
 
+    // ── Pagination ────────────────────────────────────────────────────────────
+
+    @Test
+    void resolveArtist_paginates_all_albums_across_multiple_pages() throws Exception {
+        // Page 1: 2 albums (next != null), Page 2: 1 album (next == null) → total 3
+        mockSpotify.enqueue(json(fixture("resolver-artist-albums-page1.json")));
+        mockSpotify.enqueue(json(fixture("resolver-artist-albums-page2.json")));
+        // 5 tracks per album
+        mockSpotify.enqueue(json(fixture("resolver-album-tracks-5.json")));
+        mockSpotify.enqueue(json(fixture("resolver-album-tracks-5.json")));
+        mockSpotify.enqueue(json(fixture("resolver-album-tracks-5.json")));
+
+        AllowedContent content = saveContent("spotify:artist:page-artist-1", ContentScope.ARTIST);
+        contentResolver.resolve(content);
+
+        List<ResolvedAlbum> albums = albumRepo.findByAllowedContentId(content.getId());
+        assertThat(albums).hasSize(3);
+        assertThat(albums).extracting(ResolvedAlbum::getSpotifyAlbumUri)
+                .containsExactlyInAnyOrder(
+                        "spotify:album:page-album-1",
+                        "spotify:album:page-album-2",
+                        "spotify:album:page-album-3");
+    }
+
+    @Test
+    void resolvePlaylist_paginates_all_tracks_across_multiple_pages() throws Exception {
+        // Page 1: 2 tracks (next != null), Page 2: 1 track (next == null) → total 3
+        mockSpotify.enqueue(json(fixture("resolver-playlist-tracks-page1.json")));
+        mockSpotify.enqueue(json(fixture("resolver-playlist-tracks-page2.json")));
+
+        AllowedContent content = saveContent("spotify:playlist:paged-playlist", ContentScope.PLAYLIST);
+        contentResolver.resolve(content);
+
+        List<ResolvedAlbum> albums = albumRepo.findByAllowedContentId(content.getId());
+        assertThat(albums).hasSize(1); // all 3 tracks belong to the same album
+
+        long totalTracks = albums.stream()
+                .mapToLong(a -> trackRepo.findByResolvedAlbumId(a.getId()).size())
+                .sum();
+        assertThat(totalTracks).isEqualTo(3);
+    }
+
     // ── Track data integrity ──────────────────────────────────────────────────
 
     @Test

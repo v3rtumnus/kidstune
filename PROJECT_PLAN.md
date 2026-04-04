@@ -1305,8 +1305,10 @@ Parent adds "Bibi & Tina" (ARTIST scope) for Luna
   ├─→ Backend stores AllowedContent row (profile_id = Luna, scope = ARTIST)
   │
   ├─→ Background job triggers: ContentResolver.resolve(entry)
-  │     ├─→ Spotify API: GET /v1/artists/{id}/albums → 48 albums
-  │     ├─→ For each album: GET /v1/albums/{id}/tracks → tracks
+  │     ├─→ Spotify API: GET /v1/artists/{id}/albums (paginated, limit=50, offset++)
+  │     │     → may require multiple pages (e.g. TKKG has 200+ episodes, Benjamin
+  │     │       Blümchen 100+, Bibi Blocksberg 100+)
+  │     ├─→ For each album: GET /v1/albums/{id}/tracks (paginated, limit=50)
   │     ├─→ Apply content type heuristic per album
   │     └─→ Store resolved tree in backend DB (ResolvedAlbum, ResolvedTrack tables)
   │
@@ -1317,6 +1319,8 @@ Parent adds "Bibi & Tina" (ARTIST scope) for Luna
 ```
 
 **Periodic re-resolution:** A scheduled backend job (daily) re-resolves ARTIST and PLAYLIST scoped entries to pick up new releases. If new albums/tracks are found, the entry's `updated_at` changes and the next delta sync delivers the additions to kids' devices.
+
+**Pagination requirement:** All Spotify list endpoints used by ContentResolver (`/artists/{id}/albums`, `/albums/{id}/tracks`, `/playlists/{id}/tracks`) return at most 50 items per page. The resolver must paginate through all pages using `offset` until `next` is null. Without pagination, prolific artists (TKKG: ~300 episodes, Benjamin Blümchen: ~130, Bibi Blocksberg: ~120) would be silently truncated at 50 albums, causing missing content for kids.
 
 ### 6.2 WebSocket Endpoints
 
