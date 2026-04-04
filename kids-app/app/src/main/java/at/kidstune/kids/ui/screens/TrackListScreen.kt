@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MusicNote
@@ -50,13 +50,12 @@ fun TrackListScreen(
     onNavigateUp: () -> Unit = {},
     onNavigateToNowPlaying: () -> Unit = {}
 ) {
-    val state          by viewModel.state.collectAsState()
-    val selectedTrack  by viewModel.selectedTrackUri.collectAsState()
+    val state by viewModel.state.collectAsState()
 
-    LaunchedEffect(selectedTrack) {
-        if (selectedTrack != null) {
+    LaunchedEffect(state.navigateToNowPlaying) {
+        if (state.navigateToNowPlaying) {
             onNavigateToNowPlaying()
-            viewModel.onTrackNavigationHandled()
+            viewModel.onIntent(TrackListIntent.NavigationHandled)
         }
     }
 
@@ -109,10 +108,11 @@ fun TrackListScreen(
                 .padding(innerPadding),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            items(state.tracks) { track ->
+            itemsIndexed(state.tracks) { index, track ->
                 TrackRow(
-                    track    = track,
-                    onIntent = onIntent
+                    track      = track,
+                    trackIndex = index,
+                    onIntent   = onIntent
                 )
                 HorizontalDivider(
                     modifier  = Modifier.padding(horizontal = 16.dp),
@@ -128,13 +128,14 @@ fun TrackListScreen(
 private fun TrackRow(
     modifier: Modifier = Modifier,
     track: LocalTrack,
+    trackIndex: Int,
     onIntent: (TrackListIntent) -> Unit
 ) {
     Row(
         modifier          = modifier
             .fillMaxWidth()
-            .height(72.dp)   // minimum kids touch target
-            .clickable { onIntent(TrackListIntent.TrackTapped(track)) }
+            .height(72.dp)
+            .clickable { onIntent(TrackListIntent.TrackTapped(track, trackIndex)) }
             .padding(horizontal = 16.dp)
             .semantics { contentDescription = track.title },
         verticalAlignment = Alignment.CenterVertically,

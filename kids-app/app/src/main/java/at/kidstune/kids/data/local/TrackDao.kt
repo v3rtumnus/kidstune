@@ -33,6 +33,10 @@ interface TrackDao {
     """)
     suspend fun getIndexByUri(trackUri: String): Int
 
+    /** Fetch a single track by its Spotify URI – used by [PlaybackController] to look up Room metadata. */
+    @Query("SELECT * FROM local_track WHERE spotify_track_uri = :trackUri LIMIT 1")
+    suspend fun getByUri(trackUri: String): LocalTrack?
+
     @Query("DELETE FROM local_track WHERE album_id = :albumId")
     suspend fun deleteByAlbumId(albumId: String)
 }

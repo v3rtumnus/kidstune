@@ -17,7 +17,7 @@ import at.kidstune.kids.ui.screens.ProfileSelectionScreen
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.viewmodel.BrowseState
 import at.kidstune.kids.ui.viewmodel.HomeState
-import at.kidstune.kids.ui.viewmodel.NowPlayingState
+import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.ui.viewmodel.ProfileSelectionState
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -65,8 +65,13 @@ class AccessibilityTest {
 
     @Test
     fun `home screen interactive elements have content descriptions`() {
+        val playingState = HomeState(
+            nowPlayingTitle  = "Bibi & Tina – Folge 1",
+            nowPlayingArtist = "Bibi & Tina",
+            isPlaying        = true
+        )
         composeTestRule.setContent {
-            KidstuneTheme { HomeScreen(state = HomeState()) }
+            KidstuneTheme { HomeScreen(state = playingState) }
         }
 
         listOf("Musik", "Hörbücher", "Lieblingssongs").forEach { label ->

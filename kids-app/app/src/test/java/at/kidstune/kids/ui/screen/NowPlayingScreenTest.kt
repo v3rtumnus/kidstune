@@ -10,8 +10,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import at.kidstune.kids.ui.screens.NowPlayingScreen
 import at.kidstune.kids.ui.theme.KidstuneTheme
+import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.ui.viewmodel.NowPlayingIntent
-import at.kidstune.kids.ui.viewmodel.NowPlayingState
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -136,7 +136,7 @@ class NowPlayingScreenTest {
 
     @Test
     fun `should display time stamps`() {
-        launch(state = NowPlayingState(progressMs = 83_000L, durationMs = 225_000L))
+        launch(state = NowPlayingState(positionMs = 83_000L, durationMs = 225_000L))
 
         composeTestRule.onNodeWithText("1:23").assertIsDisplayed()
         composeTestRule.onNodeWithText("3:45").assertIsDisplayed()

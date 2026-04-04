@@ -37,11 +37,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.ui.components.FavoriteButton
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.theme.kidsTouchTarget
 import at.kidstune.kids.ui.viewmodel.NowPlayingIntent
-import at.kidstune.kids.ui.viewmodel.NowPlayingState
 import at.kidstune.kids.ui.viewmodel.NowPlayingViewModel
 import coil3.compose.AsyncImage
 
@@ -126,18 +126,24 @@ fun NowPlayingScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceEvenly
             ) {
-                // Title + artist
+                // Title + artist + optional chapter subtitle
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text      = state.title,
+                        text      = state.title ?: "–",
                         style     = MaterialTheme.typography.headlineSmall,
                         textAlign = TextAlign.Center,
                         maxLines  = 2,
                         overflow  = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.height(4.dp))
+                    // Chapter subtitle for audiobooks: "Kapitel N von M"
+                    val chapterText = if (state.chapterIndex != null && state.totalChapters != null) {
+                        "Kapitel ${state.chapterIndex + 1} von ${state.totalChapters}"
+                    } else {
+                        state.artistName ?: ""
+                    }
                     Text(
-                        text  = state.artistName,
+                        text  = chapterText,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -145,14 +151,17 @@ fun NowPlayingScreen(
 
                 // Progress bar + timestamps
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    val progress = if (state.durationMs > 0) {
+                        (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
+                    } else 0f
                     LinearProgressIndicator(
-                        progress = { state.progressMs.toFloat() / state.durationMs.toFloat() },
+                        progress = { progress },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text  = formatMs(state.progressMs),
+                            text  = formatMs(state.positionMs),
                             style = MaterialTheme.typography.labelMedium
                         )
                         Spacer(Modifier.weight(1f))
@@ -241,7 +250,35 @@ private fun formatMs(ms: Long): String {
 @Composable
 private fun NowPlayingScreenPlayingPreview() {
     KidstuneTheme {
-        NowPlayingScreen(state = NowPlayingState(isPlaying = true, isFavorite = false))
+        NowPlayingScreen(
+            state = NowPlayingState(
+                title      = "Bibi & Tina – Folge 1",
+                artistName = "Bibi & Tina",
+                imageUrl   = null,
+                isPlaying  = true,
+                durationMs = 225_000L,
+                positionMs = 83_000L
+            )
+        )
+    }
+}
+
+@Preview(name = "NowPlayingScreen – audiobook chapter", showBackground = true, showSystemUi = true)
+@Composable
+private fun NowPlayingScreenChapterPreview() {
+    KidstuneTheme {
+        NowPlayingScreen(
+            state = NowPlayingState(
+                title         = "TKKG 200 – Teil 2",
+                artistName    = "TKKG",
+                imageUrl      = null,
+                isPlaying     = true,
+                durationMs    = 1_200_000L,
+                positionMs    = 300_000L,
+                chapterIndex  = 1,
+                totalChapters = 3
+            )
+        )
     }
 }
 
@@ -249,6 +286,15 @@ private fun NowPlayingScreenPlayingPreview() {
 @Composable
 private fun NowPlayingScreenFavoritedPreview() {
     KidstuneTheme {
-        NowPlayingScreen(state = NowPlayingState(isPlaying = true, isFavorite = true))
+        NowPlayingScreen(
+            state = NowPlayingState(
+                title      = "Bibi & Tina – Folge 1",
+                artistName = "Bibi & Tina",
+                isPlaying  = true,
+                isFavorite = true,
+                durationMs = 225_000L,
+                positionMs = 83_000L
+            )
+        )
     }
 }

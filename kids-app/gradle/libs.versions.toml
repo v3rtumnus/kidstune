@@ -29,6 +29,7 @@ androidx-test   = "1.6.1"
 serialization   = "1.7.3"
 ktor            = "3.0.3"
 mockwebserver   = "4.12.0"
+mockk           = "1.13.12"
 
 [libraries]
 # ── Compose BOM (controls all compose-* below) ────────────────────────────────
@@ -82,6 +83,7 @@ ktor-client-content-neg    = { group = "io.ktor", name = "ktor-client-content-ne
 ktor-serialization-json    = { group = "io.ktor", name = "ktor-serialization-kotlinx-json",       version.ref = "ktor" }
 ktor-client-mock           = { group = "io.ktor", name = "ktor-client-mock",                      version.ref = "ktor" }
 mockwebserver              = { group = "com.squareup.okhttp3", name = "mockwebserver",             version.ref = "mockwebserver" }
+mockk                      = { group = "io.mockk",            name = "mockk",                            version.ref = "mockk" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

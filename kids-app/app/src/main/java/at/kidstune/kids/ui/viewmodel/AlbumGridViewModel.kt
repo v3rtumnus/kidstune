@@ -7,6 +7,8 @@ import at.kidstune.kids.data.local.AlbumDao
 import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.data.repository.ContentRepository
+import at.kidstune.kids.domain.model.ContentType
+import at.kidstune.kids.playback.PlaybackController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,8 +19,8 @@ import javax.inject.Inject
 
 data class AlbumGridState(
     val contentEntry: LocalContentEntry? = null,
-    val albums: List<LocalAlbum> = emptyList(),
-    val pages: List<List<LocalAlbum>> = emptyList()
+    val albums: List<LocalAlbum>         = emptyList(),
+    val pages: List<List<LocalAlbum>>    = emptyList()
 ) {
     val totalPages: Int get() = pages.size
 }
@@ -28,7 +30,12 @@ sealed interface AlbumGridIntent {
     data object NavigationHandled : AlbumGridIntent
 }
 
-data class AlbumGridNavigation(val albumId: String)
+sealed interface AlbumGridNavigation {
+    /** AUDIOBOOK album tapped – show chapter list. */
+    data class ToChapterList(val albumId: String) : AlbumGridNavigation
+    /** MUSIC album tapped – playback started, go to player. */
+    data object ToNowPlaying : AlbumGridNavigation
+}
 
 private const val ALBUMS_PER_PAGE = 4
 
@@ -36,7 +43,8 @@ private const val ALBUMS_PER_PAGE = 4
 class AlbumGridViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val contentRepository: ContentRepository,
-    private val albumDao: AlbumDao
+    private val albumDao: AlbumDao,
+    private val playbackController: PlaybackController
 ) : ViewModel() {
 
     private val contentEntryId: String = checkNotNull(savedStateHandle["contentEntryId"])
@@ -64,8 +72,22 @@ class AlbumGridViewModel @Inject constructor(
 
     fun onIntent(intent: AlbumGridIntent) {
         when (intent) {
-            is AlbumGridIntent.AlbumTapped    -> _navigation.value = AlbumGridNavigation(intent.albumId)
+            is AlbumGridIntent.AlbumTapped    -> handleAlbumTapped(intent.albumId)
             AlbumGridIntent.NavigationHandled -> _navigation.value = null
+        }
+    }
+
+    private fun handleAlbumTapped(albumId: String) {
+        viewModelScope.launch {
+            val album = albumDao.getById(albumId) ?: return@launch
+            if (album.contentType == ContentType.MUSIC) {
+                // Music: play immediately from track 1 and go to player
+                playbackController.playAlbumFromStart(album.spotifyAlbumUri)
+                _navigation.value = AlbumGridNavigation.ToNowPlaying
+            } else {
+                // Audiobook: show chapter list for deliberate chapter selection
+                _navigation.value = AlbumGridNavigation.ToChapterList(albumId)
+            }
         }
     }
 }

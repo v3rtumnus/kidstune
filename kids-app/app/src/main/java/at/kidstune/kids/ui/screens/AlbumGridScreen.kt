@@ -36,6 +36,7 @@ import at.kidstune.kids.ui.components.ContentTile
 import at.kidstune.kids.ui.components.PageIndicator
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.viewmodel.AlbumGridIntent
+import at.kidstune.kids.ui.viewmodel.AlbumGridNavigation
 import at.kidstune.kids.ui.viewmodel.AlbumGridState
 import at.kidstune.kids.ui.viewmodel.AlbumGridViewModel
 
@@ -46,22 +47,31 @@ fun AlbumGridScreen(
     modifier: Modifier = Modifier,
     viewModel: AlbumGridViewModel = hiltViewModel(),
     onNavigateUp: () -> Unit = {},
-    onNavigateToTrackList: (albumId: String) -> Unit = {}
+    onNavigateToChapterList: (albumId: String) -> Unit = {},
+    onNavigateToNowPlaying: () -> Unit = {}
 ) {
     val state      by viewModel.state.collectAsState()
     val navigation by viewModel.navigation.collectAsState()
 
     LaunchedEffect(navigation) {
-        val nav = navigation ?: return@LaunchedEffect
-        onNavigateToTrackList(nav.albumId)
-        viewModel.onIntent(AlbumGridIntent.NavigationHandled)
+        when (val nav = navigation) {
+            is AlbumGridNavigation.ToChapterList -> {
+                onNavigateToChapterList(nav.albumId)
+                viewModel.onIntent(AlbumGridIntent.NavigationHandled)
+            }
+            AlbumGridNavigation.ToNowPlaying -> {
+                onNavigateToNowPlaying()
+                viewModel.onIntent(AlbumGridIntent.NavigationHandled)
+            }
+            null -> Unit
+        }
     }
 
     AlbumGridScreen(
-        modifier              = modifier,
-        state                 = state,
-        onIntent              = viewModel::onIntent,
-        onNavigateUp          = onNavigateUp,
+        modifier     = modifier,
+        state        = state,
+        onIntent     = viewModel::onIntent,
+        onNavigateUp = onNavigateUp,
     )
 }
 
@@ -181,7 +191,6 @@ private fun AlbumTile(
         Spacer(modifier = modifier)
         return
     }
-    // No scope badge on album tiles – they are all albums by definition
     ContentTile(
         modifier  = modifier,
         title     = album.title,

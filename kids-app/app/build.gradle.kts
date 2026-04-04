@@ -103,6 +103,12 @@ dependencies {
     // ── Serialization ────────────────────────────────────────────────────────
     implementation(libs.serialization.json)
 
+    // ── Spotify App Remote SDK ────────────────────────────────────────────────
+    // IMPORTANT: Download the SDK manually from https://developer.spotify.com/documentation/android/
+    // and place the AAR at kids-app/libs/spotify-app-remote-release-0.8.0.aar
+    // Then REMOVE kids-app/app/src/main/java/com/spotify/SpotifyStubs.kt (the compile-time stub).
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+
     // ── Unit tests ───────────────────────────────────────────────────────────
     testImplementation(libs.junit5.api)
     testRuntimeOnly(libs.junit5.engine)
@@ -114,8 +120,10 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
+    releaseImplementation(libs.compose.ui.test.manifest)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.mockwebserver)
+    testImplementation(libs.mockk)
 
     // ── Screenshot tests ─────────────────────────────────────────────────────
     screenshotTestImplementation(composeBom)

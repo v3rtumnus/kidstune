@@ -1,68 +1,96 @@
 package at.kidstune.kids.ui
 
+import at.kidstune.kids.playback.NowPlayingState
+import at.kidstune.kids.playback.PlaybackController
+import at.kidstune.kids.playback.SpotifyRemote
 import at.kidstune.kids.ui.viewmodel.NowPlayingIntent
 import at.kidstune.kids.ui.viewmodel.NowPlayingViewModel
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class NowPlayingViewModelTest {
 
+    private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var viewModel: NowPlayingViewModel
+    private lateinit var playbackController: PlaybackController
 
     @Before
     fun setUp() {
-        viewModel = NowPlayingViewModel()
+        Dispatchers.setMain(testDispatcher)
+
+        val nowPlayingFlow = MutableStateFlow(
+            NowPlayingState(
+                title      = "Bibi & Tina – Folge 1",
+                artistName = "Bibi & Tina",
+                isPlaying  = true,
+                isFavorite = false,
+                positionMs = 83_000L,
+                durationMs = 225_000L
+            )
+        )
+
+        playbackController = mockk(relaxed = true) {
+            every { nowPlaying } returns nowPlayingFlow
+            every { spotifyRemote } returns mockk<SpotifyRemote>(relaxed = true)
+        }
+
+        viewModel = NowPlayingViewModel(playbackController)
     }
 
+    @After
+    fun tearDown() = Dispatchers.resetMain()
+
     @Test
-    fun `initial state has isFavorite false and isPlaying true`() {
+    fun `initial state has isFavorite false and isPlaying true`() = runTest(testDispatcher) {
         val state = viewModel.state.value
         assertFalse(state.isFavorite)
         assertTrue(state.isPlaying)
     }
 
     @Test
-    fun `ToggleFavorite sets isFavorite to true`() {
-        viewModel.onIntent(NowPlayingIntent.ToggleFavorite)
-        assertTrue(viewModel.state.value.isFavorite)
-    }
-
-    @Test
-    fun `ToggleFavorite twice returns isFavorite to false`() {
-        viewModel.onIntent(NowPlayingIntent.ToggleFavorite)
-        viewModel.onIntent(NowPlayingIntent.ToggleFavorite)
-        assertFalse(viewModel.state.value.isFavorite)
-    }
-
-    @Test
-    fun `TogglePlayPause flips isPlaying`() {
+    fun `TogglePlayPause on playing track calls pause`() = runTest(testDispatcher) {
+        // Initial state: isPlaying = true
         viewModel.onIntent(NowPlayingIntent.TogglePlayPause)
-        assertFalse(viewModel.state.value.isPlaying)
-
-        viewModel.onIntent(NowPlayingIntent.TogglePlayPause)
-        assertTrue(viewModel.state.value.isPlaying)
+        coVerify { playbackController.pause() }
     }
 
     @Test
-    fun `SkipForward and SkipBack are no-ops in mock`() {
-        val before = viewModel.state.value
+    fun `SkipForward calls skipNext on PlaybackController`() = runTest(testDispatcher) {
         viewModel.onIntent(NowPlayingIntent.SkipForward)
-        viewModel.onIntent(NowPlayingIntent.SkipBack)
-        val after = viewModel.state.value
-
-        // Only immutable mock fields – state unchanged
-        assertTrue(before.title == after.title)
-        assertTrue(before.progressMs == after.progressMs)
+        coVerify { playbackController.skipNext() }
     }
 
     @Test
-    fun `progress and duration match expected mock values`() {
+    fun `SkipBack calls skipPrevious on PlaybackController`() = runTest(testDispatcher) {
+        viewModel.onIntent(NowPlayingIntent.SkipBack)
+        coVerify { playbackController.skipPrevious() }
+    }
+
+    @Test
+    fun `nowPlaying state has correct title and artist`() = runTest(testDispatcher) {
         val state = viewModel.state.value
-        // 1:23 = 83s = 83 000 ms
-        assertTrue(state.progressMs == 83_000L)
-        // 3:45 = 225s = 225 000 ms
+        assertTrue(state.title == "Bibi & Tina – Folge 1")
+        assertTrue(state.artistName == "Bibi & Tina")
+    }
+
+    @Test
+    fun `nowPlaying positionMs and durationMs match injected values`() = runTest(testDispatcher) {
+        val state = viewModel.state.value
+        assertTrue(state.positionMs == 83_000L)
         assertTrue(state.durationMs == 225_000L)
     }
 }

@@ -10,6 +10,7 @@ import androidx.navigation.toRoute
 import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.ui.screens.AlbumGridScreen
 import at.kidstune.kids.ui.screens.BrowseScreen
+import at.kidstune.kids.ui.screens.ChapterListScreen
 import at.kidstune.kids.ui.screens.DiscoverScreen
 import at.kidstune.kids.ui.screens.HomeScreen
 import at.kidstune.kids.ui.screens.NowPlayingScreen
@@ -33,9 +34,16 @@ data class BrowseRoute(val category: String)
 @Serializable
 data class AlbumGridRoute(val contentEntryId: String)
 
-/** Shows the ordered track list for a single album. */
+/** Shows the ordered track list for a single MUSIC album or playlist. */
 @Serializable
 data class TrackListRoute(val albumId: String)
+
+/**
+ * Shows the chapter list for a single AUDIOBOOK album.
+ * Each chapter is tappable and resumes from the saved position if applicable.
+ */
+@Serializable
+data class ChapterListRoute(val albumId: String)
 
 @Serializable
 object NowPlayingRoute
@@ -94,15 +102,23 @@ fun KidstuneNavHost(
 
         composable<AlbumGridRoute> {
             AlbumGridScreen(
-                onNavigateUp         = { navController.navigateUp() },
-                onNavigateToTrackList = { albumId ->
-                    navController.navigate(TrackListRoute(albumId))
-                }
+                onNavigateUp            = { navController.navigateUp() },
+                onNavigateToChapterList = { albumId ->
+                    navController.navigate(ChapterListRoute(albumId))
+                },
+                onNavigateToNowPlaying  = { navController.navigate(NowPlayingRoute) }
             )
         }
 
         composable<TrackListRoute> {
             TrackListScreen(
+                onNavigateUp           = { navController.navigateUp() },
+                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
+            )
+        }
+
+        composable<ChapterListRoute> {
+            ChapterListScreen(
                 onNavigateUp           = { navController.navigateUp() },
                 onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
             )

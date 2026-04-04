@@ -4,20 +4,27 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import at.kidstune.kids.data.local.AlbumDao
 import at.kidstune.kids.data.local.ContentDao
+import at.kidstune.kids.data.local.FavoriteDao
 import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalContentEntry
+import at.kidstune.kids.data.local.entities.LocalFavorite
 import at.kidstune.kids.data.mock.MockContentProvider
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.data.repository.ContentRepository
 import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.domain.model.ContentScope
 import at.kidstune.kids.domain.model.ContentType
+import at.kidstune.kids.playback.PlaybackController
+import at.kidstune.kids.playback.SpotifyRemote
 import at.kidstune.kids.ui.viewmodel.BrowseIntent
 import at.kidstune.kids.ui.viewmodel.BrowseNavigation
 import at.kidstune.kids.ui.viewmodel.BrowseViewModel
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -34,7 +41,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// ── In-test fakes (avoid Room dispatcher issues in unit tests) ────────────
+// ── In-test fakes ─────────────────────────────────────────────────────────────
 
 private class FakeContentDao(private val data: List<LocalContentEntry>) : ContentDao {
     override suspend fun insertAll(entries: List<LocalContentEntry>) {}
@@ -58,6 +65,16 @@ private class FakeAlbumDao(private val data: List<LocalAlbum>) : AlbumDao {
     override suspend fun deleteByContentEntryId(entryId: String) {}
 }
 
+private class FakeFavoriteDaoEmpty : FavoriteDao {
+    override suspend fun insert(favorite: LocalFavorite) {}
+    override suspend fun deleteByUri(profileId: String, trackUri: String) {}
+    override fun getAll(profileId: String): Flow<List<LocalFavorite>> = flowOf(emptyList())
+    override fun existsByTrackUri(profileId: String, trackUri: String): Flow<Boolean> = flowOf(false)
+    override suspend fun getUnsynced(profileId: String) = emptyList<LocalFavorite>()
+    override suspend fun markSynced(id: String) {}
+    override suspend fun deleteAllSynced(profileId: String) {}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -75,10 +92,17 @@ class BrowseViewModelTest {
         val prefs = ProfilePreferences(context).also {
             it.boundProfileId = MockContentProvider.PROFILE_EMMA
         }
+        val nowPlayingFlow = MutableStateFlow(at.kidstune.kids.playback.NowPlayingState())
+        val playbackController = mockk<PlaybackController>(relaxed = true) {
+            every { nowPlaying } returns nowPlayingFlow
+            every { spotifyRemote } returns mockk<SpotifyRemote>(relaxed = true)
+        }
         viewModel = BrowseViewModel(
-            contentRepository = ContentRepository(FakeContentDao(MockContentProvider.contentEntries)),
-            albumDao          = FakeAlbumDao(MockContentProvider.albums),
-            prefs             = prefs
+            contentRepository  = ContentRepository(FakeContentDao(MockContentProvider.contentEntries)),
+            albumDao           = FakeAlbumDao(MockContentProvider.albums),
+            favoriteDao        = FakeFavoriteDaoEmpty(),
+            playbackController = playbackController,
+            prefs              = prefs
         )
     }
 
@@ -108,20 +132,18 @@ class BrowseViewModelTest {
     }
 
     @Test
-    fun `init FAVORITES yields empty entries`() = runTest(testDispatcher) {
+    fun `init FAVORITES loads from FavoriteDao – empty when no favorites`() = runTest(testDispatcher) {
         viewModel.init(BrowseCategory.FAVORITES)
         advanceUntilIdle()
 
         val state = viewModel.state.value
         assertEquals(BrowseCategory.FAVORITES, state.category)
-        assertTrue(state.entries.isEmpty())
+        assertTrue(state.favorites.isEmpty())
         assertEquals(0, state.totalPages)
     }
 
     @Test
     fun `entries are paginated into groups of 4`() = runTest(testDispatcher) {
-        // Audiobook entries in PROFILE_EMMA: entry-tkkg, entry-yakari, entry-pumuckl, entry-die-drei = 4
-        // All on one page; check that each page has at most 4
         viewModel.init(BrowseCategory.AUDIOBOOK)
         advanceUntilIdle()
 
@@ -153,7 +175,6 @@ class BrowseViewModelTest {
         advanceUntilIdle()
 
         val nav = viewModel.state.value.navigation
-        // FakeAlbumDao returns albums for the entry; first album id should be used
         assertTrue("Expected ToTrackList navigation, got: $nav", nav is BrowseNavigation.ToTrackList)
     }
 
@@ -172,7 +193,7 @@ class BrowseViewModelTest {
     }
 
     @Test
-    fun `tapping TRACK entry emits PlayTrack navigation`() = runTest(testDispatcher) {
+    fun `tapping TRACK entry emits ToNowPlaying navigation`() = runTest(testDispatcher) {
         viewModel.init(BrowseCategory.MUSIC)
         advanceUntilIdle()
 
@@ -182,6 +203,6 @@ class BrowseViewModelTest {
         viewModel.onIntent(BrowseIntent.TileTapped(trackEntry))
         advanceUntilIdle()
 
-        assertTrue(viewModel.state.value.navigation is BrowseNavigation.PlayTrack)
+        assertTrue(viewModel.state.value.navigation is BrowseNavigation.ToNowPlaying)
     }
 }

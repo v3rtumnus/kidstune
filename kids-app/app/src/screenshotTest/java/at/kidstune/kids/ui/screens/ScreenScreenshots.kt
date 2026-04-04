@@ -5,10 +5,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import at.kidstune.kids.data.mock.MockContentProvider
 import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.domain.model.mockProfiles
+import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.viewmodel.BrowseState
+import at.kidstune.kids.ui.viewmodel.ChapterListState
 import at.kidstune.kids.ui.viewmodel.HomeState
-import at.kidstune.kids.ui.viewmodel.NowPlayingState
 import at.kidstune.kids.ui.viewmodel.ProfileSelectionState
 
 /**
@@ -57,12 +58,13 @@ fun HomeScreenshot() {
 @Preview(name = "Screen_Browse_Music", showSystemUi = true)
 @Composable
 fun BrowseMusicScreenshot() {
+    val entries = MockContentProvider.contentEntries.filter { it.contentType.name == "MUSIC" }
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
                 category = BrowseCategory.MUSIC,
-                tiles    = MockContentProvider.mockMusicTiles,
-                pages    = MockContentProvider.mockMusicTiles.chunked(4)
+                entries  = entries,
+                pages    = entries.chunked(4)
             )
         )
     }
@@ -73,12 +75,13 @@ fun BrowseMusicScreenshot() {
 @Preview(name = "Screen_Browse_Audiobooks", showSystemUi = true)
 @Composable
 fun BrowseAudiobooksScreenshot() {
+    val entries = MockContentProvider.contentEntries.filter { it.contentType.name == "AUDIOBOOK" }
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
                 category = BrowseCategory.AUDIOBOOK,
-                tiles    = MockContentProvider.mockAudiobookTiles,
-                pages    = MockContentProvider.mockAudiobookTiles.chunked(4)
+                entries  = entries,
+                pages    = entries.chunked(4)
             )
         )
     }
@@ -92,9 +95,9 @@ fun FavoritesEmptyScreenshot() {
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
-                category = BrowseCategory.FAVORITES,
-                tiles    = emptyList(),
-                pages    = emptyList()
+                category       = BrowseCategory.FAVORITES,
+                favorites      = emptyList(),
+                favoritesPages = emptyList()
             )
         )
     }
@@ -106,7 +109,16 @@ fun FavoritesEmptyScreenshot() {
 @Composable
 fun NowPlayingScreenshot() {
     KidstuneTheme {
-        NowPlayingScreen(state = NowPlayingState(isPlaying = true, isFavorite = false))
+        NowPlayingScreen(
+            state = NowPlayingState(
+                title      = "Bibi & Tina – Folge 1",
+                artistName = "Bibi & Tina",
+                isPlaying  = true,
+                isFavorite = false,
+                durationMs = 225_000L,
+                positionMs = 83_000L
+            )
+        )
     }
 }
 
@@ -114,6 +126,34 @@ fun NowPlayingScreenshot() {
 @Composable
 fun NowPlayingFavoritedScreenshot() {
     KidstuneTheme {
-        NowPlayingScreen(state = NowPlayingState(isPlaying = true, isFavorite = true))
+        NowPlayingScreen(
+            state = NowPlayingState(
+                title      = "Bibi & Tina – Folge 1",
+                artistName = "Bibi & Tina",
+                isPlaying  = true,
+                isFavorite = true,
+                durationMs = 225_000L,
+                positionMs = 83_000L
+            )
+        )
+    }
+}
+
+// ── ChapterListScreen ─────────────────────────────────────────────────────
+
+@Preview(name = "Screen_ChapterList", showSystemUi = true)
+@Composable
+fun ChapterListScreenshot() {
+    val tkkg = MockContentProvider.albums.first { it.id == "album-tkkg-200" }
+    val chapters = MockContentProvider.tracks.filter { it.albumId == "album-tkkg-200" }
+    KidstuneTheme {
+        ChapterListScreen(
+            state = ChapterListState(
+                album            = tkkg,
+                chapters         = chapters,
+                resumeTrackUri   = "spotify:track:tkkg200t2",
+                resumePositionMs = 600_000L
+            )
+        )
     }
 }

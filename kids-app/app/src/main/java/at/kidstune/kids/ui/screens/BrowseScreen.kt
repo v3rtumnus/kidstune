@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import at.kidstune.kids.data.local.entities.LocalContentEntry
+import at.kidstune.kids.data.local.entities.LocalFavorite
 import at.kidstune.kids.data.mock.MockContentProvider
 import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.ui.components.ContentTile
@@ -70,7 +71,7 @@ fun BrowseScreen(
                 onNavigateToTrackList(nav.albumId)
                 viewModel.onIntent(BrowseIntent.NavigationHandled)
             }
-            BrowseNavigation.PlayTrack -> {
+            BrowseNavigation.ToNowPlaying -> {
                 onNavigateToNowPlaying()
                 viewModel.onIntent(BrowseIntent.NavigationHandled)
             }
@@ -132,33 +133,63 @@ fun BrowseScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (state.category == BrowseCategory.FAVORITES && state.entries.isEmpty()) {
-                FavoritesEmptyState(modifier = Modifier.fillMaxSize())
-            } else if (state.pages.isNotEmpty()) {
-                val pagerState = rememberPagerState { state.totalPages }
-                Column(modifier = Modifier.fillMaxSize()) {
-                    HorizontalPager(
-                        state    = pagerState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .semantics { testTag = "browse_pager" }
-                    ) { page ->
-                        BrowsePage(
-                            entries  = state.pages.getOrElse(page) { emptyList() },
-                            onIntent = onIntent
-                        )
-                    }
+            when {
+                state.category == BrowseCategory.FAVORITES && state.favorites.isEmpty() ->
+                    FavoritesEmptyState(modifier = Modifier.fillMaxSize())
 
-                    Box(
-                        modifier         = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        PageIndicator(
-                            pageCount   = state.totalPages,
-                            currentPage = pagerState.currentPage
-                        )
+                state.category == BrowseCategory.FAVORITES && state.favoritesPages.isNotEmpty() -> {
+                    val pagerState = rememberPagerState { state.favoritesPages.size }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        HorizontalPager(
+                            state    = pagerState,
+                            modifier = Modifier
+                                .weight(1f)
+                                .semantics { testTag = "favorites_pager" }
+                        ) { page ->
+                            FavoritesPage(
+                                favorites = state.favoritesPages.getOrElse(page) { emptyList() },
+                                onIntent  = onIntent
+                            )
+                        }
+                        Box(
+                            modifier         = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PageIndicator(
+                                pageCount   = state.favoritesPages.size,
+                                currentPage = pagerState.currentPage
+                            )
+                        }
+                    }
+                }
+
+                state.pages.isNotEmpty() -> {
+                    val pagerState = rememberPagerState { state.totalPages }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        HorizontalPager(
+                            state    = pagerState,
+                            modifier = Modifier
+                                .weight(1f)
+                                .semantics { testTag = "browse_pager" }
+                        ) { page ->
+                            BrowsePage(
+                                entries  = state.pages.getOrElse(page) { emptyList() },
+                                onIntent = onIntent
+                            )
+                        }
+                        Box(
+                            modifier         = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PageIndicator(
+                                pageCount   = state.totalPages,
+                                currentPage = pagerState.currentPage
+                            )
+                        }
                     }
                 }
             }
@@ -178,7 +209,6 @@ private fun BrowsePage(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Row 1
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -186,7 +216,6 @@ private fun BrowsePage(
             EntryTile(entry = entries.getOrNull(0), onIntent = onIntent, modifier = Modifier.weight(1f))
             EntryTile(entry = entries.getOrNull(1), onIntent = onIntent, modifier = Modifier.weight(1f))
         }
-        // Row 2
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -194,6 +223,39 @@ private fun BrowsePage(
             EntryTile(entry = entries.getOrNull(2), onIntent = onIntent, modifier = Modifier.weight(1f))
             if (entries.size > 3) {
                 EntryTile(entry = entries.getOrNull(3), onIntent = onIntent, modifier = Modifier.weight(1f))
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoritesPage(
+    modifier: Modifier = Modifier,
+    favorites: List<LocalFavorite>,
+    onIntent: (BrowseIntent) -> Unit
+) {
+    Column(
+        modifier            = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            FavoriteTile(fav = favorites.getOrNull(0), onIntent = onIntent, modifier = Modifier.weight(1f))
+            FavoriteTile(fav = favorites.getOrNull(1), onIntent = onIntent, modifier = Modifier.weight(1f))
+        }
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            FavoriteTile(fav = favorites.getOrNull(2), onIntent = onIntent, modifier = Modifier.weight(1f))
+            if (favorites.size > 3) {
+                FavoriteTile(fav = favorites.getOrNull(3), onIntent = onIntent, modifier = Modifier.weight(1f))
             } else {
                 Spacer(modifier = Modifier.weight(1f))
             }
@@ -219,6 +281,24 @@ private fun EntryTile(
         scopeBadgeText  = badge?.first,
         scopeBadgeColor = badge?.second ?: androidx.compose.ui.graphics.Color.Transparent,
         onClick         = { onIntent(BrowseIntent.TileTapped(entry)) }
+    )
+}
+
+@Composable
+private fun FavoriteTile(
+    modifier: Modifier = Modifier,
+    fav: LocalFavorite?,
+    onIntent: (BrowseIntent) -> Unit
+) {
+    if (fav == null) {
+        Spacer(modifier = modifier)
+        return
+    }
+    ContentTile(
+        modifier = modifier,
+        title    = fav.title,
+        imageUrl = fav.imageUrl,
+        onClick  = { onIntent(BrowseIntent.FavoriteTapped(fav)) }
     )
 }
 
@@ -252,8 +332,7 @@ private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
 @Preview(name = "BrowseScreen – Musik", showBackground = true, showSystemUi = true)
 @Composable
 private fun BrowseScreenMusicPreview() {
-    val entries = MockContentProvider.contentEntries
-        .filter { it.contentType.name == "MUSIC" }
+    val entries = MockContentProvider.contentEntries.filter { it.contentType.name == "MUSIC" }
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
@@ -268,8 +347,7 @@ private fun BrowseScreenMusicPreview() {
 @Preview(name = "BrowseScreen – Hörbücher", showBackground = true, showSystemUi = true)
 @Composable
 private fun BrowseScreenAudiobooksPreview() {
-    val entries = MockContentProvider.contentEntries
-        .filter { it.contentType.name == "AUDIOBOOK" }
+    val entries = MockContentProvider.contentEntries.filter { it.contentType.name == "AUDIOBOOK" }
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
@@ -281,15 +359,29 @@ private fun BrowseScreenAudiobooksPreview() {
     }
 }
 
+@Preview(name = "BrowseScreen – Favoriten", showBackground = true, showSystemUi = true)
+@Composable
+private fun BrowseScreenFavoritesPreview() {
+    KidstuneTheme {
+        BrowseScreen(
+            state = BrowseState(
+                category       = BrowseCategory.FAVORITES,
+                favorites      = MockContentProvider.favorites,
+                favoritesPages = MockContentProvider.favorites.chunked(4)
+            )
+        )
+    }
+}
+
 @Preview(name = "BrowseScreen – Favoriten leer", showBackground = true, showSystemUi = true)
 @Composable
 private fun BrowseScreenFavoritesEmptyPreview() {
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
-                category = BrowseCategory.FAVORITES,
-                entries  = emptyList(),
-                pages    = emptyList()
+                category       = BrowseCategory.FAVORITES,
+                favorites      = emptyList(),
+                favoritesPages = emptyList()
             )
         )
     }
