@@ -18,7 +18,9 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ Prompt 3.2 – Kids App All Screens (Mock Data)
 - ✅ Prompt 3.3 – Kids App UI Tests
 - ✅ Prompt 3.4 – Kids App Discover Screen (Mock Data)
-- ⬅️ **NEXT: Prompt 3.5 – (next prompt)**
+- ✅ Prompt 4.1 – Backend Content Resolver
+- ✅ Prompt 4.2 – Backend Sync Endpoint
+- ⬅️ **NEXT: Prompt 4.3 – Kids App Sync + Room Storage**
 
 ---
 
@@ -1085,7 +1087,7 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 4.2 – Backend Sync Endpoint ⬅️
+### Prompt 4.2 – Backend Sync Endpoint ✅
 
 ```
 CONTEXT: Phase 4 of KidsTune. Content resolver exists (4.1). We now implement the sync endpoint
@@ -1132,7 +1134,7 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 4.3 – Kids App Sync + Room Storage
+### Prompt 4.3 – Kids App Sync + Room Storage ⬅️
 
 ```
 CONTEXT: Phase 4 of KidsTune. Backend sync endpoint exists (4.2). The Kids App has mock data (phase 3).
