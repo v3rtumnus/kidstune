@@ -1,0 +1,7 @@
+{
+  "items": [
+    {"id": "hs-t1", "name": "Kapitel 1", "uri": "spotify:track:hs-t1", "artists": [{"id": "bibi-artist", "name": "Bibi Blocksberg"}], "duration_ms": 1800000, "track_number": 1, "disc_number": 1},
+    {"id": "hs-t2", "name": "Kapitel 2", "uri": "spotify:track:hs-t2", "artists": [{"id": "bibi-artist", "name": "Bibi Blocksberg"}], "duration_ms": 1920000, "track_number": 2, "disc_number": 1},
+    {"id": "hs-t3", "name": "Kapitel 3", "uri": "spotify:track:hs-t3", "artists": [{"id": "bibi-artist", "name": "Bibi Blocksberg"}], "duration_ms": 2100000, "track_number": 3, "disc_number": 1}
+  ]
+}

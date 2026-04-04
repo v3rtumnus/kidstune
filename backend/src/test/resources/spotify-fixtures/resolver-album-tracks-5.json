@@ -1,0 +1,9 @@
+{
+  "items": [
+    {"id": "res-t1", "name": "Track One",   "uri": "spotify:track:res-t1", "artists": [{"id": "res-artist-1", "name": "Resolution Artist"}], "duration_ms": 180000, "track_number": 1, "disc_number": 1},
+    {"id": "res-t2", "name": "Track Two",   "uri": "spotify:track:res-t2", "artists": [{"id": "res-artist-1", "name": "Resolution Artist"}], "duration_ms": 195000, "track_number": 2, "disc_number": 1},
+    {"id": "res-t3", "name": "Track Three", "uri": "spotify:track:res-t3", "artists": [{"id": "res-artist-1", "name": "Resolution Artist"}], "duration_ms": 210000, "track_number": 3, "disc_number": 1},
+    {"id": "res-t4", "name": "Track Four",  "uri": "spotify:track:res-t4", "artists": [{"id": "res-artist-1", "name": "Resolution Artist"}], "duration_ms": 185000, "track_number": 4, "disc_number": 1},
+    {"id": "res-t5", "name": "Track Five",  "uri": "spotify:track:res-t5", "artists": [{"id": "res-artist-1", "name": "Resolution Artist"}], "duration_ms": 200000, "track_number": 5, "disc_number": 1}
+  ]
+}

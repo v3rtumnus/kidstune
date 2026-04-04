@@ -4,6 +4,7 @@ import at.kidstune.content.dto.AddContentRequest;
 import at.kidstune.content.dto.BulkAddContentRequest;
 import at.kidstune.content.dto.ContentCheckResponse;
 import at.kidstune.content.dto.ContentResponse;
+import at.kidstune.resolver.ContentResolver;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -19,13 +20,16 @@ public class ContentService {
     private final ContentRepository     contentRepository;
     private final ScopeResolver         scopeResolver;
     private final ContentTypeClassifier classifier;
+    private final ContentResolver       resolver;
 
     public ContentService(ContentRepository contentRepository,
                           ScopeResolver scopeResolver,
-                          ContentTypeClassifier classifier) {
+                          ContentTypeClassifier classifier,
+                          ContentResolver resolver) {
         this.contentRepository = contentRepository;
         this.scopeResolver     = scopeResolver;
         this.classifier        = classifier;
+        this.resolver          = resolver;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -66,8 +70,10 @@ public class ContentService {
             ContentType type = resolveContentType(request.contentTypeOverride(), request.spotifyItemInfo());
             AllowedContent entity = buildEntity(profileId, request.spotifyUri(), request.scope(),
                     request.title(), request.imageUrl(), request.artistName(), type);
-            return ContentResponse.from(contentRepository.save(entity));
-        });
+            return contentRepository.save(entity);
+        })
+        .doOnSuccess(resolver::resolveAsync)
+        .map(ContentResponse::from);
     }
 
     // ── Bulk add ──────────────────────────────────────────────────────────────
@@ -75,16 +81,18 @@ public class ContentService {
     public Mono<List<ContentResponse>> addContentBulk(BulkAddContentRequest request) {
         return db(() -> {
             ContentType type = resolveContentType(request.contentTypeOverride(), request.spotifyItemInfo());
-            List<ContentResponse> results = new ArrayList<>();
+            List<AllowedContent> saved = new ArrayList<>();
             for (String profileId : request.profileIds()) {
                 if (!contentRepository.existsByProfileIdAndSpotifyUri(profileId, request.spotifyUri())) {
                     AllowedContent entity = buildEntity(profileId, request.spotifyUri(), request.scope(),
                             request.title(), request.imageUrl(), request.artistName(), type);
-                    results.add(ContentResponse.from(contentRepository.save(entity)));
+                    saved.add(contentRepository.save(entity));
                 }
             }
-            return results;
-        });
+            return saved;
+        })
+        .doOnSuccess(savedList -> savedList.forEach(resolver::resolveAsync))
+        .map(savedList -> savedList.stream().map(ContentResponse::from).toList());
     }
 
     // ── Remove ────────────────────────────────────────────────────────────────

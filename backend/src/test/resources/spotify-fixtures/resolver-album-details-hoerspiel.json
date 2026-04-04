@@ -1,0 +1,10 @@
+{
+  "id": "res-hoerspiel-album",
+  "name": "Bibi Blocksberg Folge 12",
+  "uri": "spotify:album:res-hoerspiel-album",
+  "images": [{"url": "https://img.example.com/hoerspiel.jpg", "height": 300, "width": 300}],
+  "artists": [{"id": "bibi-artist", "name": "Bibi Blocksberg"}],
+  "release_date": "2019-09-01",
+  "total_tracks": 3,
+  "genres": ["hörspiel", "children's music"]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "single-track-1",
+  "name": "Single Track Title",
+  "uri": "spotify:track:single-track-1",
+  "artists": [{"id": "art-solo", "name": "Solo Artist"}],
+  "duration_ms": 240000,
+  "track_number": 3,
+  "disc_number": 1,
+  "album": {
+    "id": "single-album-1",
+    "name": "Single Album Title",
+    "uri": "spotify:album:single-album-1",
+    "images": [{"url": "https://img.example.com/single-album.jpg"}]
+  }
+}

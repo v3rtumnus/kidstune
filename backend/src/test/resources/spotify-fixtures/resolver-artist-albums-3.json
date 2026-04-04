@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "id": "res-album-1",
+      "name": "Resolution Album 1",
+      "uri": "spotify:album:res-album-1",
+      "images": [{"url": "https://img.example.com/res-album-1.jpg", "height": 300, "width": 300}],
+      "artists": [{"id": "res-artist-1", "name": "Resolution Artist"}],
+      "release_date": "2020-01-15",
+      "total_tracks": 5,
+      "type": "album"
+    },
+    {
+      "id": "res-album-2",
+      "name": "Resolution Album 2",
+      "uri": "spotify:album:res-album-2",
+      "images": [{"url": "https://img.example.com/res-album-2.jpg", "height": 300, "width": 300}],
+      "artists": [{"id": "res-artist-1", "name": "Resolution Artist"}],
+      "release_date": "2021-03-10",
+      "total_tracks": 5,
+      "type": "album"
+    },
+    {
+      "id": "res-album-3",
+      "name": "Resolution Album 3",
+      "uri": "spotify:album:res-album-3",
+      "images": [{"url": "https://img.example.com/res-album-3.jpg", "height": 300, "width": 300}],
+      "artists": [{"id": "res-artist-1", "name": "Resolution Artist"}],
+      "release_date": "2022-06-20",
+      "total_tracks": 5,
+      "type": "album"
+    }
+  ]
+}
