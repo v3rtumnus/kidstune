@@ -1,6 +1,8 @@
 package at.kidstune.common;
 
+import at.kidstune.auth.PairingException;
 import at.kidstune.content.ContentException;
+import at.kidstune.device.DeviceException;
 import at.kidstune.profile.ProfileException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -20,6 +22,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ProfileException.class)
     public ResponseEntity<ApiError> handleProfileException(ProfileException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(new ApiError(ex.getMessage(), ex.getCode()));
+    }
+
+    @ExceptionHandler(PairingException.class)
+    public ResponseEntity<ApiError> handlePairingException(PairingException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(new ApiError(ex.getMessage(), ex.getCode()));
+    }
+
+    @ExceptionHandler(DeviceException.class)
+    public ResponseEntity<ApiError> handleDeviceException(DeviceException ex) {
         return ResponseEntity.status(ex.getStatus())
                 .body(new ApiError(ex.getMessage(), ex.getCode()));
     }

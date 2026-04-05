@@ -70,6 +70,7 @@ class KidstuneApplicationIntTest {
                 "family",
                 "favorite",
                 "paired_device",
+                "pairing_code",
                 "remember_me_token",
                 "resolved_album",
                 "resolved_track"

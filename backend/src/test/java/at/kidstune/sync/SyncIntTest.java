@@ -2,6 +2,8 @@ package at.kidstune.sync;
 
 import at.kidstune.auth.DeviceType;
 import at.kidstune.auth.JwtTokenService;
+import at.kidstune.device.PairedDevice;
+import at.kidstune.device.PairedDeviceRepository;
 import at.kidstune.content.AllowedContent;
 import at.kidstune.content.ContentRepository;
 import at.kidstune.content.ContentScope;
@@ -83,14 +85,15 @@ class SyncIntTest {
     String kidsToken;
     String parentToken;
 
-    @Autowired JwtTokenService         jwtTokenService;
-    @Autowired FamilyRepository        familyRepo;
-    @Autowired ProfileRepository       profileRepo;
-    @Autowired ContentRepository       contentRepo;
-    @Autowired ResolvedAlbumRepository albumRepo;
-    @Autowired ResolvedTrackRepository trackRepo;
-    @Autowired FavoriteRepository      favoriteRepo;
-    @Autowired DeletionLogRepository   deletionLogRepo;
+    @Autowired JwtTokenService          jwtTokenService;
+    @Autowired FamilyRepository         familyRepo;
+    @Autowired ProfileRepository        profileRepo;
+    @Autowired ContentRepository        contentRepo;
+    @Autowired ResolvedAlbumRepository  albumRepo;
+    @Autowired ResolvedTrackRepository  trackRepo;
+    @Autowired FavoriteRepository       favoriteRepo;
+    @Autowired DeletionLogRepository    deletionLogRepo;
+    @Autowired PairedDeviceRepository   pairedDeviceRepo;
 
     @BeforeEach
     void setUp() {
@@ -133,6 +136,17 @@ class SyncIntTest {
                 .thenReturn(Mono.just(List.of()));
         when(spotifyApiClient.getTrackUrisInPlaylist(anyString()))
                 .thenReturn(Mono.just(List.of()));
+
+        // Register the test kids device so LastSeenFilter allows it through
+        if (!pairedDeviceRepo.existsById("kids-device")) {
+            PairedDevice d = new PairedDevice();
+            d.setId("kids-device");
+            d.setFamilyId(FAMILY_ID);
+            d.setDeviceName("Test Kids Device");
+            d.setDeviceType(DeviceType.KIDS);
+            d.setDeviceTokenHash("test-hash-kids-device-sync");
+            pairedDeviceRepo.save(d);
+        }
     }
 
     // ── Full sync ──────────────────────────────────────────────────────────────

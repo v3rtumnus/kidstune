@@ -2,6 +2,8 @@ package at.kidstune.favorites;
 
 import at.kidstune.auth.DeviceType;
 import at.kidstune.auth.JwtTokenService;
+import at.kidstune.device.PairedDevice;
+import at.kidstune.device.PairedDeviceRepository;
 import at.kidstune.auth.SpotifyTokenService;
 import at.kidstune.content.SpotifyApiClient;
 import at.kidstune.family.Family;
@@ -70,10 +72,11 @@ class FavoritesIntTest {
     String kidsToken;
     String parentToken;
 
-    @Autowired JwtTokenService    jwtTokenService;
-    @Autowired FamilyRepository   familyRepo;
-    @Autowired ProfileRepository  profileRepo;
-    @Autowired FavoriteRepository favoriteRepo;
+    @Autowired JwtTokenService          jwtTokenService;
+    @Autowired FamilyRepository         familyRepo;
+    @Autowired ProfileRepository        profileRepo;
+    @Autowired FavoriteRepository       favoriteRepo;
+    @Autowired PairedDeviceRepository   pairedDeviceRepo;
 
     @BeforeEach
     void setUp() {
@@ -113,6 +116,17 @@ class FavoritesIntTest {
         when(spotifyApiClient.getAlbumUriForTrack(anyString())).thenReturn(Mono.just("spotify:album:x"));
         when(spotifyApiClient.getArtistUrisForTrack(anyString())).thenReturn(Mono.just(List.of()));
         when(spotifyApiClient.getTrackUrisInPlaylist(anyString())).thenReturn(Mono.just(List.of()));
+
+        // Register the test kids device so LastSeenFilter allows it through
+        if (!pairedDeviceRepo.existsById("kids-device")) {
+            PairedDevice d = new PairedDevice();
+            d.setId("kids-device");
+            d.setFamilyId(FAMILY_ID);
+            d.setDeviceName("Test Kids Device");
+            d.setDeviceType(DeviceType.KIDS);
+            d.setDeviceTokenHash("test-hash-kids-device-fav");
+            pairedDeviceRepo.save(d);
+        }
     }
 
     @Test

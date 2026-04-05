@@ -1,6 +1,7 @@
 package at.kidstune.config;
 
 import at.kidstune.auth.JwtAuthenticationFilter;
+import at.kidstune.auth.LastSeenFilter;
 import at.kidstune.web.RememberMeWebFilter;
 import at.kidstune.web.WebLoginController;
 import at.kidstune.web.WebSessionSecurityContextRepository;
@@ -28,13 +29,16 @@ public class SecurityConfig {
     public static final String PARENT_ROLE = "PARENT";
 
     private final JwtAuthenticationFilter              jwtAuthenticationFilter;
+    private final LastSeenFilter                       lastSeenFilter;
     private final WebSessionSecurityContextRepository  webSessionSecurityContextRepository;
     private final RememberMeWebFilter                  rememberMeWebFilter;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          LastSeenFilter lastSeenFilter,
                           WebSessionSecurityContextRepository webSessionSecurityContextRepository,
                           RememberMeWebFilter rememberMeWebFilter) {
         this.jwtAuthenticationFilter             = jwtAuthenticationFilter;
+        this.lastSeenFilter                      = lastSeenFilter;
         this.webSessionSecurityContextRepository = webSessionSecurityContextRepository;
         this.rememberMeWebFilter                 = rememberMeWebFilter;
     }
@@ -95,6 +99,7 @@ public class SecurityConfig {
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .addFilterAt(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                .addFilterAfter(lastSeenFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .authorizeExchange(exchanges -> exchanges
 
                         // ── Public ───────────────────────────────────────────
@@ -114,6 +119,7 @@ public class SecurityConfig {
 
                         // ── PARENT-only ──────────────────────────────────────
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/pair").hasRole(PARENT_ROLE)
+                        .pathMatchers("/api/v1/devices/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/profiles/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/content/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/spotify/**").hasRole(PARENT_ROLE)

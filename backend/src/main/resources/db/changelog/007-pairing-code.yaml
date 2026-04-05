@@ -1,0 +1,54 @@
+databaseChangeLog:
+
+  # ── pairing_code ─────────────────────────────────────────────────────────────
+  - changeSet:
+      id: "007-create-pairing-code"
+      author: "kidstune"
+      changes:
+        - createTable:
+            tableName: pairing_code
+            tableOptions: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: family_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_pairing_code_family
+                    references: family(id)
+                    deleteCascade: true
+              - column:
+                  name: code
+                  type: CHAR(6)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_pairing_code_code
+              - column:
+                  name: expires_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: pairing_code
+            indexName: idx_pairing_code_family_id
+            columns:
+              - column:
+                  name: family_id
+        - createIndex:
+            tableName: pairing_code
+            indexName: idx_pairing_code_expires_at
+            columns:
+              - column:
+                  name: expires_at

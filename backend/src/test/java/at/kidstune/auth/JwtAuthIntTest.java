@@ -1,5 +1,7 @@
 package at.kidstune.auth;
 
+import at.kidstune.device.PairedDevice;
+import at.kidstune.device.PairedDeviceRepository;
 import at.kidstune.family.Family;
 import at.kidstune.family.FamilyRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +45,7 @@ class JwtAuthIntTest {
 
     @Autowired JwtTokenService jwtTokenService;
     @Autowired FamilyRepository familyRepository;
+    @Autowired PairedDeviceRepository pairedDeviceRepository;
 
     @BeforeEach
     void setUp() {
@@ -57,6 +60,16 @@ class JwtAuthIntTest {
             family.setPasswordHash("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
             family.setSpotifyUserId("test-spotify-user-" + FAMILY_ID);
             familyRepository.save(family);
+        }
+        // Register "dev-kids" so LastSeenFilter allows it through
+        if (!pairedDeviceRepository.existsById("dev-kids")) {
+            PairedDevice d = new PairedDevice();
+            d.setId("dev-kids");
+            d.setFamilyId(FAMILY_ID);
+            d.setDeviceName("Test Kids Device");
+            d.setDeviceType(DeviceType.KIDS);
+            d.setDeviceTokenHash("test-hash-dev-kids");
+            pairedDeviceRepository.save(d);
         }
     }
 
