@@ -31,6 +31,7 @@ ktor            = "3.0.3"
 mockwebserver   = "4.12.0"
 mockk           = "1.13.12"
 security-crypto = "1.1.0-alpha06"
+workmanager     = "2.10.0"
 
 [libraries]
 # ── Compose BOM (controls all compose-* below) ────────────────────────────────
@@ -86,6 +87,8 @@ ktor-client-mock           = { group = "io.ktor", name = "ktor-client-mock",    
 mockwebserver              = { group = "com.squareup.okhttp3", name = "mockwebserver",             version.ref = "mockwebserver" }
 mockk                      = { group = "io.mockk",            name = "mockk",                            version.ref = "mockk" }
 security-crypto            = { group = "androidx.security",   name = "security-crypto",                  version.ref = "security-crypto" }
+work-runtime-ktx           = { group = "androidx.work",        name = "work-runtime-ktx",                 version.ref = "workmanager" }
+work-testing               = { group = "androidx.work",        name = "work-testing",                     version.ref = "workmanager" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

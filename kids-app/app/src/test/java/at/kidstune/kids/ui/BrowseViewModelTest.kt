@@ -50,6 +50,7 @@ private class FakeContentDao(private val data: List<LocalContentEntry>) : Conten
     override fun getByType(profileId: String, type: ContentType): Flow<List<LocalContentEntry>> =
         flowOf(data.filter { it.profileId == profileId && it.contentType == type })
     override suspend fun getById(id: String): LocalContentEntry? = data.find { it.id == id }
+    override suspend fun deleteById(id: String) {}
     override suspend fun deleteAll(profileId: String) {}
     override suspend fun countByType(profileId: String, type: ContentType): Int =
         data.count { it.profileId == profileId && it.contentType == type }

@@ -23,6 +23,9 @@ interface ContentDao {
     @Query("SELECT * FROM local_content_entry WHERE id = :id")
     suspend fun getById(id: String): LocalContentEntry?
 
+    @Query("DELETE FROM local_content_entry WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Query("DELETE FROM local_content_entry WHERE profile_id = :profileId")
     suspend fun deleteAll(profileId: String)
 

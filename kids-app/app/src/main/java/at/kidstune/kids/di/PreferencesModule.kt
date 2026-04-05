@@ -3,6 +3,7 @@ package at.kidstune.kids.di
 import android.content.Context
 import at.kidstune.kids.data.preferences.DeviceTokenPreferences
 import at.kidstune.kids.data.preferences.ProfilePreferences
+import at.kidstune.kids.data.preferences.SyncPreferences
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,4 +22,8 @@ object PreferencesModule {
     @Provides @Singleton
     fun provideDeviceTokenPreferences(@ApplicationContext ctx: Context): DeviceTokenPreferences =
         DeviceTokenPreferences(ctx)
+
+    @Provides @Singleton
+    fun provideSyncPreferences(@ApplicationContext ctx: Context): SyncPreferences =
+        SyncPreferences(ctx)
 }

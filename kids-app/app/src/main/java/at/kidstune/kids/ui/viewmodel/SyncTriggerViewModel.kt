@@ -1,33 +1,26 @@
 package at.kidstune.kids.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import at.kidstune.kids.data.preferences.ProfilePreferences
-import at.kidstune.kids.data.repository.SyncRepository
+import at.kidstune.kids.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Activity-scoped ViewModel that fires a full sync once per process lifetime.
+ * Activity-scoped ViewModel that triggers an immediate sync once per process lifetime.
  *
- * Because ViewModels survive configuration changes the sync runs exactly once
- * per app launch (not per rotation). WorkManager-based background sync is
- * added in prompt 5.
+ * Because ViewModels survive configuration changes [SyncManager.syncNow] is called
+ * exactly once per app launch (not per rotation). WorkManager deduplicates concurrent
+ * requests via [ExistingWorkPolicy.REPLACE], so this is safe to call from multiple
+ * entry points.
+ *
+ * If the device is not yet bound to a profile the sync is a no-op inside [SyncWorker].
  */
 @HiltViewModel
 class SyncTriggerViewModel @Inject constructor(
-    private val syncRepository: SyncRepository,
-    private val prefs: ProfilePreferences
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     init {
-        val profileId = prefs.boundProfileId
-        if (profileId != null) {
-            viewModelScope.launch {
-                // Failure is intentionally swallowed: cached Room data will be shown.
-                syncRepository.fullSync(profileId)
-            }
-        }
+        syncManager.syncNow()
     }
 }

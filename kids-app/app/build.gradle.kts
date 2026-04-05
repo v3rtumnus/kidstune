@@ -99,6 +99,9 @@ dependencies {
     implementation(libs.ktor.client.content.neg)
     implementation(libs.ktor.serialization.json)
 
+    // ── WorkManager ───────────────────────────────────────────────────────────
+    implementation(libs.work.runtime.ktx)
+
     // ── Security ─────────────────────────────────────────────────────────────
     implementation(libs.security.crypto)
 
@@ -126,6 +129,7 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.mockwebserver)
     testImplementation(libs.mockk)
+    testImplementation(libs.work.testing)
 
     // ── Screenshot tests ─────────────────────────────────────────────────────
     screenshotTestImplementation(composeBom)

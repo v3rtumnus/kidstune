@@ -2,6 +2,7 @@ package at.kidstune.kids.data.remote
 
 import at.kidstune.kids.data.remote.dto.AddFavoriteRequestDto
 import at.kidstune.kids.data.remote.dto.ApiErrorDto
+import at.kidstune.kids.data.remote.dto.DeltaSyncPayloadDto
 import at.kidstune.kids.data.remote.dto.FavoriteResponseDto
 import at.kidstune.kids.data.remote.dto.PairingConfirmRequestDto
 import at.kidstune.kids.data.remote.dto.PairingConfirmResponseDto
@@ -10,8 +11,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,11 +41,21 @@ class KidstuneApiClient @Inject constructor(
         httpClient.get("$baseUrl/api/v1/sync/$profileId").body()
 
     /**
+     * Fetches only changes since [since] (ISO-8601 string).
+     * Corresponds to `GET /api/v1/sync/{profileId}/delta?since=…`.
+     */
+    suspend fun fetchDeltaSync(profileId: String, since: String): DeltaSyncPayloadDto =
+        httpClient.get("$baseUrl/api/v1/sync/$profileId/delta") {
+            parameter("since", since)
+        }.body()
+
+    /**
      * Uploads a new favorite to the backend.
      * Corresponds to `POST /api/v1/profiles/{profileId}/favorites`.
      */
     suspend fun addFavorite(profileId: String, req: AddFavoriteRequestDto): FavoriteResponseDto =
         httpClient.post("$baseUrl/api/v1/profiles/$profileId/favorites") {
+            contentType(ContentType.Application.Json)
             setBody(req)
         }.body()
 
@@ -69,6 +83,7 @@ class KidstuneApiClient @Inject constructor(
         // This endpoint is public (no auth required). At call time the device token
         // has not yet been stored, so defaultRequest will not add an Authorization header.
         val response = httpClient.post("$baseUrl/api/v1/auth/pair/confirm") {
+            contentType(ContentType.Application.Json)
             setBody(PairingConfirmRequestDto(code, deviceName))
         }
         if (response.status.isSuccess()) return response.body()
