@@ -36,6 +36,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import at.kidstune.kids.domain.model.MockProfile
 import at.kidstune.kids.domain.model.mockProfiles
 import at.kidstune.kids.ui.theme.AudiobookPrimary
+import at.kidstune.kids.ui.theme.DiscoverPrimary
+import at.kidstune.kids.ui.theme.FavoritePrimary
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.theme.MusicPrimary
 import at.kidstune.kids.ui.viewmodel.ProfileSelectionIntent
@@ -180,10 +182,12 @@ private fun ProfileAvatarTile(
     }
 }
 
+private val profileColorPalette = listOf(MusicPrimary, AudiobookPrimary, DiscoverPrimary, FavoritePrimary)
+
 private fun profileBackgroundColor(profileId: String): Color = when (profileId) {
     "profile-luna" -> MusicPrimary
     "profile-max"  -> AudiobookPrimary
-    else           -> MusicPrimary
+    else           -> profileColorPalette[Math.abs(profileId.hashCode()) % profileColorPalette.size]
 }
 
 // ── Previews ──────────────────────────────────────────────────────────────

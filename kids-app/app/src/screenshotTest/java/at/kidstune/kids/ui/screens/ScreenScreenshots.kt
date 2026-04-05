@@ -10,6 +10,7 @@ import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.viewmodel.BrowseState
 import at.kidstune.kids.ui.viewmodel.ChapterListState
 import at.kidstune.kids.ui.viewmodel.HomeState
+import at.kidstune.kids.ui.viewmodel.PairingState
 import at.kidstune.kids.ui.viewmodel.ProfileSelectionState
 
 /**
@@ -17,6 +18,37 @@ import at.kidstune.kids.ui.viewmodel.ProfileSelectionState
  * Run:      ./gradlew updateDebugScreenshotTest   → write reference PNGs
  * Validate: ./gradlew validateDebugScreenshotTest → fail if visuals changed
  */
+
+// ── PairingScreen ─────────────────────────────────────────────────────────
+
+@Preview(name = "Screen_Pairing", showSystemUi = true)
+@Composable
+fun PairingScreenshot() {
+    KidstuneTheme {
+        PairingScreen(state = PairingState.EnteringCode())
+    }
+}
+
+@Preview(name = "Screen_Pairing_Filled", showSystemUi = true)
+@Composable
+fun PairingScreenFilledScreenshot() {
+    KidstuneTheme {
+        PairingScreen(state = PairingState.EnteringCode(listOf(1, 2, 3, 4, 5, 6)))
+    }
+}
+
+@Preview(name = "Screen_Pairing_Error", showSystemUi = true)
+@Composable
+fun PairingScreenErrorScreenshot() {
+    KidstuneTheme {
+        PairingScreen(
+            state = PairingState.Error(
+                message = "Ungültiger Code",
+                digits  = listOf(9, 9, 9, 9, 9, 9)
+            )
+        )
+    }
+}
 
 // ── ProfileSelectionScreen ────────────────────────────────────────────────
 

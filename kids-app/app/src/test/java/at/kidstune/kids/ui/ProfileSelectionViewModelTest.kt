@@ -2,6 +2,7 @@ package at.kidstune.kids.ui
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import at.kidstune.kids.data.preferences.PendingProfilesHolder
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.domain.model.mockProfiles
 import at.kidstune.kids.ui.viewmodel.ProfileSelectionIntent
@@ -28,7 +29,7 @@ class ProfileSelectionViewModelTest {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         prefs = ProfilePreferences(ctx)
         prefs.clearBinding()
-        viewModel = ProfileSelectionViewModel(prefs)
+        viewModel = ProfileSelectionViewModel(prefs, PendingProfilesHolder())
     }
 
     @Test

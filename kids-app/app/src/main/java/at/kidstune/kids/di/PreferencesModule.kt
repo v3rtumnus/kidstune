@@ -1,6 +1,7 @@
 package at.kidstune.kids.di
 
 import android.content.Context
+import at.kidstune.kids.data.preferences.DeviceTokenPreferences
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import dagger.Module
 import dagger.Provides
@@ -16,4 +17,8 @@ object PreferencesModule {
     @Provides @Singleton
     fun provideProfilePreferences(@ApplicationContext ctx: Context): ProfilePreferences =
         ProfilePreferences(ctx)
+
+    @Provides @Singleton
+    fun provideDeviceTokenPreferences(@ApplicationContext ctx: Context): DeviceTokenPreferences =
+        DeviceTokenPreferences(ctx)
 }

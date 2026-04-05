@@ -5,9 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import at.kidstune.kids.data.preferences.DeviceTokenPreferences
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.navigation.HomeRoute
 import at.kidstune.kids.navigation.KidstuneNavHost
+import at.kidstune.kids.navigation.PairingRoute
 import at.kidstune.kids.navigation.ProfileSelectionRoute
 import at.kidstune.kids.playback.PlaybackController
 import at.kidstune.kids.playback.SpotifyRemote
@@ -23,7 +25,7 @@ import dagger.hilt.components.SingletonComponent
 class MainActivity : ComponentActivity() {
 
     // Triggers a full sync once per process lifetime (survives rotation).
-    // WorkManager-based background sync is added in prompt 5.
+    // WorkManager-based background sync is added in prompt 5.4.
     private val syncTriggerViewModel: SyncTriggerViewModel by viewModels()
 
     // Access playback singletons without @Inject field injection, which avoids Hilt
@@ -45,10 +47,17 @@ class MainActivity : ComponentActivity() {
         // The manager handles reconnection automatically on failure.
         spotifyRemote.connect()
 
-        // ProfilePreferences only needs a Context – create directly to avoid
-        // Hilt field-injection which can trigger Kotlin 2.x metadata issues.
-        val prefs = ProfilePreferences(applicationContext)
-        val startDestination = if (prefs.isBound) HomeRoute else ProfileSelectionRoute
+        // Determine start screen based on device setup state:
+        //  1. No device token → PairingScreen (first launch, parent enters code)
+        //  2. Token present but no profile bound → ProfileSelectionScreen (one-time child binding)
+        //  3. Token + profile bound → HomeScreen (normal launch)
+        val tokenPrefs = DeviceTokenPreferences(applicationContext)
+        val profilePrefs = ProfilePreferences(applicationContext)
+        val startDestination = when {
+            !tokenPrefs.hasToken  -> PairingRoute
+            !profilePrefs.isBound -> ProfileSelectionRoute
+            else                  -> HomeRoute
+        }
 
         setContent {
             KidstuneTheme {

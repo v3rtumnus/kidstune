@@ -21,8 +21,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "BASE_URL",     "\"https://kidstune.altenburger.io\"")
-        buildConfigField("String", "DEVICE_TOKEN", "\"dev-test-token-placeholder\"")
+        buildConfigField("String", "BASE_URL", "\"https://kidstune.altenburger.io\"")
     }
 
     buildTypes {
@@ -99,6 +98,9 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.neg)
     implementation(libs.ktor.serialization.json)
+
+    // ── Security ─────────────────────────────────────────────────────────────
+    implementation(libs.security.crypto)
 
     // ── Serialization ────────────────────────────────────────────────────────
     implementation(libs.serialization.json)

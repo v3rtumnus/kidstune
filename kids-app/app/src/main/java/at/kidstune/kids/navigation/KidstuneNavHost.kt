@@ -14,11 +14,15 @@ import at.kidstune.kids.ui.screens.ChapterListScreen
 import at.kidstune.kids.ui.screens.DiscoverScreen
 import at.kidstune.kids.ui.screens.HomeScreen
 import at.kidstune.kids.ui.screens.NowPlayingScreen
+import at.kidstune.kids.ui.screens.PairingScreen
 import at.kidstune.kids.ui.screens.ProfileSelectionScreen
 import at.kidstune.kids.ui.screens.TrackListScreen
 import kotlinx.serialization.Serializable
 
 // ── Route definitions (type-safe Compose Navigation) ──────────────────────
+
+@Serializable
+object PairingRoute
 
 @Serializable
 object ProfileSelectionRoute
@@ -64,6 +68,16 @@ fun KidstuneNavHost(
         startDestination = startDestination,
         modifier         = modifier
     ) {
+        composable<PairingRoute> {
+            PairingScreen(
+                onPairingSuccess = {
+                    navController.navigate(ProfileSelectionRoute) {
+                        popUpTo<PairingRoute> { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable<ProfileSelectionRoute> {
             ProfileSelectionScreen(
                 onProfileBound = {

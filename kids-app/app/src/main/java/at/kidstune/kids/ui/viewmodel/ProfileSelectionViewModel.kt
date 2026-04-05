@@ -1,6 +1,7 @@
 package at.kidstune.kids.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import at.kidstune.kids.data.preferences.PendingProfilesHolder
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.domain.model.MockProfile
 import at.kidstune.kids.domain.model.mockProfiles
@@ -24,10 +25,15 @@ sealed interface ProfileSelectionIntent {
 
 @HiltViewModel
 class ProfileSelectionViewModel @Inject constructor(
-    private val prefs: ProfilePreferences
+    private val prefs: ProfilePreferences,
+    private val pendingProfilesHolder: PendingProfilesHolder
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(ProfileSelectionState())
+    private val _state = MutableStateFlow(
+        ProfileSelectionState(
+            profiles = pendingProfilesHolder.profiles ?: mockProfiles
+        )
+    )
     val state: StateFlow<ProfileSelectionState> = _state.asStateFlow()
 
     fun onIntent(intent: ProfileSelectionIntent) {
@@ -40,6 +46,7 @@ class ProfileSelectionViewModel @Inject constructor(
                 prefs.boundProfileId    = profile.id
                 prefs.boundProfileName  = profile.name
                 prefs.boundProfileEmoji = profile.emoji
+                pendingProfilesHolder.profiles = null
                 _state.update { it.copy(pendingProfile = null) }
             }
 

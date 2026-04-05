@@ -30,6 +30,7 @@ serialization   = "1.7.3"
 ktor            = "3.0.3"
 mockwebserver   = "4.12.0"
 mockk           = "1.13.12"
+security-crypto = "1.1.0-alpha06"
 
 [libraries]
 # ── Compose BOM (controls all compose-* below) ────────────────────────────────
@@ -84,6 +85,7 @@ ktor-serialization-json    = { group = "io.ktor", name = "ktor-serialization-kot
 ktor-client-mock           = { group = "io.ktor", name = "ktor-client-mock",                      version.ref = "ktor" }
 mockwebserver              = { group = "com.squareup.okhttp3", name = "mockwebserver",             version.ref = "mockwebserver" }
 mockk                      = { group = "io.mockk",            name = "mockk",                            version.ref = "mockk" }
+security-crypto            = { group = "androidx.security",   name = "security-crypto",                  version.ref = "security-crypto" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

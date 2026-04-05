@@ -1,6 +1,7 @@
 package at.kidstune.kids.di
 
 import at.kidstune.kids.BuildConfig
+import at.kidstune.kids.data.preferences.DeviceTokenPreferences
 import at.kidstune.kids.data.remote.KidstuneApiClient
 import dagger.Module
 import dagger.Provides
@@ -27,13 +28,16 @@ object NetworkModule {
     }
 
     @Provides @Singleton
-    fun provideHttpClient(json: Json): HttpClient = HttpClient(OkHttp) {
-        install(ContentNegotiation) { json(json) }
-        defaultRequest {
-            contentType(ContentType.Application.Json)
-            headers.append("Authorization", "Bearer ${BuildConfig.DEVICE_TOKEN}")
+    fun provideHttpClient(json: Json, tokenPrefs: DeviceTokenPreferences): HttpClient =
+        HttpClient(OkHttp) {
+            install(ContentNegotiation) { json(json) }
+            defaultRequest {
+                contentType(ContentType.Application.Json)
+                // Token is read on every request so it picks up the value stored after pairing.
+                val token = tokenPrefs.token
+                if (token != null) headers.append("Authorization", "Bearer $token")
+            }
         }
-    }
 
     @Provides @Singleton
     fun provideApiClient(httpClient: HttpClient): KidstuneApiClient =

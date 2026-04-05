@@ -1,7 +1,10 @@
 package at.kidstune.kids.data.remote
 
 import at.kidstune.kids.data.remote.dto.AddFavoriteRequestDto
+import at.kidstune.kids.data.remote.dto.ApiErrorDto
 import at.kidstune.kids.data.remote.dto.FavoriteResponseDto
+import at.kidstune.kids.data.remote.dto.PairingConfirmRequestDto
+import at.kidstune.kids.data.remote.dto.PairingConfirmResponseDto
 import at.kidstune.kids.data.remote.dto.SyncPayloadDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -54,4 +57,33 @@ class KidstuneApiClient @Inject constructor(
             error("Delete favorite failed: ${response.status}")
         }
     }
+
+    /**
+     * Exchanges a 6-digit pairing code for a device JWT.
+     * Corresponds to `POST /api/v1/auth/pair/confirm` (public – no auth required).
+     *
+     * @throws PairingApiException with [PairingApiException.apiCode] set to
+     *   `"PAIRING_CODE_NOT_FOUND"` or `"PAIRING_CODE_EXPIRED"` on 410 responses.
+     */
+    suspend fun pair(code: String, deviceName: String): PairingConfirmResponseDto {
+        // This endpoint is public (no auth required). At call time the device token
+        // has not yet been stored, so defaultRequest will not add an Authorization header.
+        val response = httpClient.post("$baseUrl/api/v1/auth/pair/confirm") {
+            setBody(PairingConfirmRequestDto(code, deviceName))
+        }
+        if (response.status.isSuccess()) return response.body()
+        val error = try { response.body<ApiErrorDto>() } catch (_: Exception) { null }
+        throw PairingApiException(
+            httpStatus = response.status.value,
+            apiCode    = error?.code,
+            message    = error?.error ?: "HTTP ${response.status.value}"
+        )
+    }
 }
+
+/** Thrown by [KidstuneApiClient.pair] when the backend rejects a pairing code. */
+class PairingApiException(
+    val httpStatus: Int,
+    val apiCode: String?,
+    message: String
+) : Exception(message)
