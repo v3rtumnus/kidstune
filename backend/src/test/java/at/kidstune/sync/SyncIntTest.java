@@ -315,6 +315,26 @@ class SyncIntTest {
         assertThat(delta.favoritesRemoved()).isEmpty();
     }
 
+    @Test
+    void deltaSync_favoritesRemoved_contains_deleted_favorite_uri() {
+        saveFavorite("spotify:track:to-remove", "Remove Me");
+
+        Instant since = Instant.now();
+
+        // Delete via API (ensures DeletionLog is written)
+        client.delete()
+                .uri("/api/v1/profiles/{pid}/favorites/{uri}", PROFILE_ID,
+                        "spotify:track:to-remove")
+                .header("Authorization", "Bearer " + kidsToken)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        DeltaSyncPayload delta = getDeltaSync(PROFILE_ID, since);
+
+        assertThat(delta.favoritesRemoved()).containsExactly("spotify:track:to-remove");
+        assertThat(delta.favoritesAdded()).isEmpty();
+    }
+
     // ── Performance ────────────────────────────────────────────────────────────
 
     @Test

@@ -1434,7 +1434,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 5.2 – Backend Delta Sync ⬅️
+### Prompt 5.2 – Backend Delta Sync ✅
 
 ```
 CONTEXT: Phase 5 of KidsTune. Full sync exists (4.2). We now implement efficient delta sync
@@ -1475,7 +1475,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 5.3 – Kids App Pairing Flow
+### Prompt 5.3 – Kids App Pairing Flow ⬅️
 
 ```
 CONTEXT: Phase 5 of KidsTune. Backend pairing exists (5.1). We now implement the pairing UI

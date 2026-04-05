@@ -3,6 +3,8 @@ package at.kidstune.favorites;
 import at.kidstune.favorites.dto.AddFavoriteRequest;
 import at.kidstune.favorites.dto.FavoriteResponse;
 import at.kidstune.profile.ProfileRepository;
+import at.kidstune.sync.DeletionLog;
+import at.kidstune.sync.DeletionLogRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,10 +17,13 @@ public class FavoriteService {
 
     private final FavoriteRepository favoriteRepo;
     private final ProfileRepository profileRepo;
+    private final DeletionLogRepository deletionLogRepo;
 
-    public FavoriteService(FavoriteRepository favoriteRepo, ProfileRepository profileRepo) {
-        this.favoriteRepo = favoriteRepo;
-        this.profileRepo  = profileRepo;
+    public FavoriteService(FavoriteRepository favoriteRepo, ProfileRepository profileRepo,
+                           DeletionLogRepository deletionLogRepo) {
+        this.favoriteRepo    = favoriteRepo;
+        this.profileRepo     = profileRepo;
+        this.deletionLogRepo = deletionLogRepo;
     }
 
     public List<FavoriteResponse> listFavorites(String profileId) {
@@ -56,6 +61,11 @@ public class FavoriteService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Favorite not found");
         }
         favoriteRepo.deleteByProfileIdAndSpotifyTrackUri(profileId, trackUri);
+        DeletionLog entry = new DeletionLog();
+        entry.setProfileId(profileId);
+        entry.setType(DeletionLog.DeletionType.FAVORITE);
+        entry.setSpotifyUri(trackUri);
+        deletionLogRepo.save(entry);
     }
 
     private void requireProfileExists(String profileId) {
