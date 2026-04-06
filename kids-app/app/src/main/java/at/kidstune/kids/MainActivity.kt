@@ -1,5 +1,6 @@
 package at.kidstune.kids
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,6 +12,7 @@ import at.kidstune.kids.navigation.HomeRoute
 import at.kidstune.kids.navigation.KidstuneNavHost
 import at.kidstune.kids.navigation.PairingRoute
 import at.kidstune.kids.navigation.ProfileSelectionRoute
+import at.kidstune.kids.playback.KidstuneMediaService
 import at.kidstune.kids.playback.PlaybackController
 import at.kidstune.kids.playback.SpotifyRemote
 import at.kidstune.kids.ui.theme.KidstuneTheme
@@ -46,6 +48,10 @@ class MainActivity : ComponentActivity() {
         // Connect to Spotify App Remote SDK on startup.
         // The manager handles reconnection automatically on failure.
         spotifyRemote.connect()
+
+        // Start the MediaSession service so KidsTune owns the notification shade entry.
+        // startService is idempotent — safe to call on every launch and rotation.
+        startService(Intent(this, KidstuneMediaService::class.java))
 
         // Determine start screen based on device setup state:
         //  1. No device token → PairingScreen (first launch, parent enters code)

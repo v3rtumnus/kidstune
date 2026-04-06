@@ -5,6 +5,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Required to start KidstuneMediaService as a foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14+ requires this for foregroundServiceType="mediaPlayback". -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Android 13+ requires explicit permission to post notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".KidstuneApp"
         android:allowBackup="false"
@@ -33,6 +40,27 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            KidstuneMediaService owns the media notification in the notification shade.
+            By registering an active MediaSession here, Android promotes KidsTune's
+            notification above Spotify's — so tapping the notification opens KidsTune,
+            not Spotify. This closes the Samsung Kids containment gap (prompt 6.5).
+
+            foregroundServiceType="mediaPlayback" is required on Android 14+ for any
+            service that starts foreground while playing media.
+
+            exported="true" + the MediaSessionService intent filter allow the system
+            MediaController (notification transport controls) to bind to this service.
+        -->
+        <service
+            android:name=".playback.KidstuneMediaService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
 
     </application>
 

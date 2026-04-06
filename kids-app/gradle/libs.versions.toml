@@ -32,6 +32,7 @@ mockwebserver   = "4.12.0"
 mockk           = "1.13.12"
 security-crypto = "1.1.0-alpha06"
 workmanager     = "2.10.0"
+media3          = "1.5.1"
 
 [libraries]
 # ── Compose BOM (controls all compose-* below) ────────────────────────────────
@@ -89,6 +90,12 @@ mockk                      = { group = "io.mockk",            name = "mockk",   
 security-crypto            = { group = "androidx.security",   name = "security-crypto",                  version.ref = "security-crypto" }
 work-runtime-ktx           = { group = "androidx.work",        name = "work-runtime-ktx",                 version.ref = "workmanager" }
 work-testing               = { group = "androidx.work",        name = "work-testing",                     version.ref = "workmanager" }
+
+# ── Media3 ────────────────────────────────────────────────────────────────────
+# media3-common is a transitive dependency of media3-session; listed explicitly
+# for clarity and to ensure version alignment.
+media3-session             = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
+media3-common              = { group = "androidx.media3", name = "media3-common",  version.ref = "media3" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

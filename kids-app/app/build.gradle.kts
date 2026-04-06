@@ -108,6 +108,12 @@ dependencies {
     // ── Serialization ────────────────────────────────────────────────────────
     implementation(libs.serialization.json)
 
+    // ── Media3 ───────────────────────────────────────────────────────────────────
+    // media3-session: MediaSession, MediaSessionService, DefaultMediaNotificationProvider
+    // media3-common: SimpleBasePlayer (custom Player bridge to Spotify App Remote)
+    implementation(libs.media3.session)
+    implementation(libs.media3.common)
+
     // ── Spotify App Remote SDK ────────────────────────────────────────────────
     // IMPORTANT: Download the SDK manually from https://developer.spotify.com/documentation/android/
     // and place the AAR at kids-app/libs/spotify-app-remote-release-0.8.0.aar

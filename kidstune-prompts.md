@@ -16,6 +16,7 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ **Prompt 6.1 complete** — Backend import service + liked songs pre-population
 - ✅ **Prompt 6.2 complete** — Web dashboard import wizard + liked songs import
 - ✅ **Prompt 6.4 complete** — Samsung Kids compatibility: lifecycle fixes, README setup guide
+- ✅ **Prompt 6.5 complete** — MediaSession / media notification ownership: KidstuneMediaService + SpotifyMirrorPlayer + ArtworkLoader; notification tap opens KidsTune not Spotify
 - ⬅️ **NEXT: Phase 7**
 
 ---
@@ -1812,7 +1813,7 @@ VERIFICATION:
   ☐ Child cannot exit to Spotify or other apps
 ```
 
-### Prompt 6.5 – MediaSession / Media Notification Ownership
+### Prompt 6.5 – MediaSession / Media Notification Ownership ✅
 
 ```
 CONTEXT: Phase 6 of KidsTune. Samsung Kids compatibility is verified (6.4). There is a known
