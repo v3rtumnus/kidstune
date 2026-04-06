@@ -15,7 +15,7 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ **Phase 5 complete** (5.1 – 5.4) — Device pairing, delta sync backend, kids app pairing flow, WorkManager sync manager
 - ✅ **Prompt 6.1 complete** — Backend import service + liked songs pre-population
 - ✅ **Prompt 6.2 complete** — Web dashboard import wizard + liked songs import
-- ⬅️ **NEXT: Prompt 6.3**
+- ⬅️ **NEXT: Prompt 6.4**
 
 ---
 
@@ -1720,7 +1720,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 6.3 – Kids App Offline Hardening ⬅️
+### Prompt 6.3 – Kids App Offline Hardening ✅
 
 ```
 CONTEXT: Phase 6 of KidsTune. The kids app works with sync and playback. We now stress-test
@@ -1764,7 +1764,7 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 6.4 – Samsung Kids Compatibility
+### Prompt 6.4 – Samsung Kids Compatibility ⬅️
 
 ```
 CONTEXT: Phase 6 of KidsTune. The kids app is feature-complete for the core flow.
@@ -1875,156 +1875,158 @@ VERIFICATION:
 
 ---
 
-## Phase 7 – Content Requests & Live Notifications (Weeks 9-10)
+## Phase 7 – Content Requests & Notifications (Weeks 9-10)
 
-### Prompt 7.1 – Backend WebSocket Hub
+**Notification strategy (no parent app, no FCM):**
+1. **Web Push (VAPID)** — push notification to parent's phone/browser when a new request arrives.
+   Works from any browser that supports the Push API (Chrome, Firefox, Safari 16.4+). The
+   parent subscribes once from the dashboard; the subscription endpoint is stored per-family.
+2. **Email** — unchanged reliable catch-all; already built in 2.6. Sent immediately on request
+   creation and as a daily digest at 19:00.
+3. **SSE (Server-Sent Events)** — updates the pending-requests badge on the web dashboard if
+   the tab happens to be open. Simpler than WebSocket since the dashboard only needs one-way
+   server→client updates.
+
+No WebSocket hub, no multi-layer complexity, no Android parent app.
+
+### Prompt 7.1 – Backend Content Request Workflow
 
 ```
-CONTEXT: Phase 7 of KidsTune. We implement real-time communication between backend
-and both apps using WebSocket.
+CONTEXT: Phase 7 of KidsTune. There is no parent app; parents manage content via the web
+dashboard. We implement the content request lifecycle: kids request → parents notified →
+approve/reject → content created.
 
 GOAL: When this task is done:
-- WebSocketConfig in config/ registering WebSocket endpoints with Spring WebFlux
-- WebSocketHandler in ws/ package:
-  - Accepts connections at /ws/parent/{familyId} and /ws/kids/{deviceId}
-  - Validates JWT device token from query parameter (?token=...)
-  - Maintains bidirectional message channel
-- ConnectionRegistry in ws/ package:
-  - registerParent(familyId, session), deregisterParent(familyId, session)
-  - registerKids(deviceId, session), deregisterKids(deviceId, session)
-  - sendToParent(familyId, message) → sends to all connected parent sessions for that family
-  - sendToDevice(deviceId, message) → sends to specific kids device
-  - isParentConnected(familyId): boolean
-  - getConnectedDeviceCount(familyId): int
-  - Automatic cleanup of stale sessions
-- Heartbeat: server sends PING every 30s. If no PONG within 10s, connection dropped and deregistered.
-- Message format: JSON matching §6.3 WebSocket message format
-  (type, timestamp, payload fields)
-
-REFERENCE: PROJECT_PLAN.md §6.2 (WebSocket endpoints), §6.3 (message format).
-
-CONSTRAINTS:
-- Do NOT implement content request handling (prompt 7.2)
-- Do NOT modify Android apps
-- WebSocket runs on the same port as REST (Spring WebFlux handles both)
-- Use reactive WebSocket API (not the older blocking API)
-
-VERIFICATION:
-- Integration test: connect WebSocket → send message → verify received
-- Integration test: connect → disconnect → verify deregistered from ConnectionRegistry
-- Integration test: heartbeat timeout → connection dropped
-- Integration test: sendToParent with 2 connected sessions → both receive message
-- Integration test: invalid token → connection rejected
-- Run ./gradlew test → all tests pass
-- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
-```
-
-### Prompt 7.2 – Backend Content Request Workflow
-
-```
-CONTEXT: Phase 7 of KidsTune. WebSocket hub exists (7.1). We implement the content request
-lifecycle: kids request → parents notified → approve/reject → content created.
-
-GOAL: When this task is done:
+- ContentRequest entity + Liquibase migration (007-content-requests.yaml):
+    id (UUID), profile_id (FK), spotify_uri, title, image_url, artist_name,
+    content_type (MUSIC/AUDIOBOOK), status (PENDING/APPROVED/REJECTED/EXPIRED),
+    created_at, resolved_at, resolved_by (family_id), parent_note, digest_sent_at
 - ContentRequestService in requests/ package:
-  - createRequest(profileId, spotifyUri, title, imageUrl, artistName):
+  - createRequest(profileId, spotifyUri, title, imageUrl, artistName, contentType):
     - Validates max 3 PENDING requests per profile (throw 429 if exceeded)
     - Creates ContentRequest with status=PENDING
-    - Dispatches CONTENT_REQUEST message via WebSocket to parent (ConnectionRegistry.sendToParent)
-    - Returns created request
+    - Sends email notification to family.notification_emails (reuse EmailNotificationService)
+    - Returns created request DTO
   - approveRequest(requestId, approvedByProfileIds?, note?, contentTypeOverride?):
     - Sets status=APPROVED, resolved_at=now, resolved_by
     - Creates AllowedContent for the requesting profile (or specified profiles)
-      - contentTypeOverride (optional): if provided, overrides the content type set by
-        the kids app when the request was created. Kids app cannot infer AUDIOBOOK vs MUSIC
-        from search results (no genre data), so the parent must be able to correct it here.
-        The approval UI (web dashboard) shows a content-type selector (MUSIC / AUDIOBOOK)
-        pre-filled with the request's current type, allowing the parent to change it before
-        clicking Approve.
+    - contentTypeOverride: overrides content type (kids can't distinguish MUSIC vs AUDIOBOOK
+      from Spotify search; parent corrects it in the approval UI)
     - Triggers ContentResolver to populate albums/tracks
-    - Dispatches REQUEST_APPROVED via WebSocket to kids device
+    - Returns updated request DTO
   - rejectRequest(requestId, note?):
     - Sets status=REJECTED, resolved_at=now, parent_note
-    - Dispatches REQUEST_REJECTED via WebSocket to kids device
-  - bulkApprove/bulkReject(requestIds[], status, note?)
+    - Returns updated request DTO
+  - bulkApprove(requestIds[], contentTypeOverride?, note?) / bulkReject(requestIds[], note?)
   - listRequests(familyId, statusFilter?, profileFilter?) → paginated list
   - getPendingCount(familyId) → { profiles: [{ id, name, count }], total: int }
-- ContentRequestController with endpoints from §6.1 Content Requests
-- Scheduled jobs:
-  - expireStaleRequests: @Scheduled(cron = "0 0 3 * * *")
+  - expireStaleRequests(): @Scheduled(cron = "0 0 3 * * *")
     - Sets PENDING requests older than 7 days to EXPIRED
-    - Dispatches REQUEST_EXPIRED via WebSocket to kids devices
-  - sendDailyDigest: @Scheduled(cron = "0 0 19 * * *")
-    - For each family with PENDING requests older than 4 hours:
-    - Builds DAILY_DIGEST message with per-child summary
-    - Sends via WebSocket (if parent connected)
-    - Sets digest_sent_at on the requests (for polling detection)
+  - sendDailyDigest(): @Scheduled(cron = "0 0 19 * * *")
+    - For each family with PENDING requests not yet in today's digest:
+      builds summary and sends email via EmailNotificationService
+      sets digest_sent_at on affected requests
+- ContentRequestController (REST):
+  - POST /api/v1/profiles/{profileId}/content-requests → createRequest
+  - GET  /api/v1/content-requests?familyId=&status=&profileId= → listRequests
+  - GET  /api/v1/content-requests/pending-count?familyId= → getPendingCount
+  - POST /api/v1/content-requests/{id}/approve → approveRequest
+  - POST /api/v1/content-requests/{id}/reject  → rejectRequest
+  - POST /api/v1/content-requests/bulk-approve → bulkApprove
+  - POST /api/v1/content-requests/bulk-reject  → bulkReject
+- One-click approve link: GET /web/approve/{token} (public, no login):
+  - Token is a signed JWT (familyId + requestId, 7-day expiry) embedded in the email
+  - Redirects to web dashboard requests page on success
 
-REFERENCE: PROJECT_PLAN.md §5.1.6 (request limits, auto-expiry), §5.2.3 (three-layer
-notification strategy, daily digest), §6.1 Content Requests API (lifecycle diagram, endpoints).
+REFERENCE: PROJECT_PLAN.md §5.1.6 (request limits, auto-expiry), §5.2.3 (notification
+strategy), §6.1 Content Requests API.
 
 CONSTRAINTS:
-- Do NOT modify Android apps
-- Do NOT implement the polling endpoint for Layer 2 (it's GET /pending/count, already defined)
-- ContentResolver from phase 4 handles the actual content resolution after approval
+- No WebSocket, no Android modifications
+- ContentResolver from phase 4 handles content resolution after approval
+- Email template for request notification already exists from 2.6 — reuse it
 
 VERIFICATION:
-- Integration test: create request → verify PENDING in DB → verify WebSocket message dispatched
+- Integration test: create request → PENDING in DB → email dispatched
 - Integration test: 4th request for same profile → 429 status
-- Integration test: approve → AllowedContent created → ContentResolver triggered →
-  REQUEST_APPROVED dispatched
+- Integration test: approve → AllowedContent created → ContentResolver triggered
 - Integration test: reject with note → status REJECTED, parent_note stored
 - Integration test: expire job → requests older than 7 days become EXPIRED
-- Integration test: daily digest → builds correct summary for family with 3 pending requests
-- Integration test: bulk approve 3 requests → all become APPROVED
+- Integration test: daily digest → email sent for family with 3 pending requests; digest_sent_at set
+- Integration test: bulk approve 3 requests → all APPROVED
+- Integration test: one-click approve token → valid token approves request; expired token rejected
 - Run ./gradlew test → all tests pass
-- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
+- Run the backend locally: cd backend && ./gradlew bootRun → app starts healthy
 ```
 
-### Prompt 7.3 – Backend Scheduled Jobs Tests
+### Prompt 7.2 – Backend SSE + Web Push Notifications
 
 ```
-CONTEXT: Phase 7 of KidsTune. Content request workflow exists (7.2). We add thorough tests
-for the scheduled jobs (expiry and daily digest) since they run unattended.
+CONTEXT: Phase 7 of KidsTune. Content request workflow exists (7.1). We add two real-time
+notification channels for the web dashboard: SSE (badge updates when tab is open) and
+Web Push via VAPID (push notification to parent's phone/browser on new requests).
 
 GOAL: When this task is done:
-- Comprehensive test suite for expireStaleRequests():
-  - Request exactly 7 days old → EXPIRED
-  - Request 6 days 23 hours old → still PENDING (boundary)
-  - Request already APPROVED → not touched
-  - Request already REJECTED → not touched
-  - Multiple requests across profiles → each handled independently
-  - WebSocket dispatch verified for each expired request
-- Comprehensive test suite for sendDailyDigest():
-  - Family with 2 pending requests (both > 4h) → digest sent with correct counts
-  - Family with 1 pending request < 4h old → no digest
-  - Family with requests in APPROVED/REJECTED/EXPIRED → not included in digest
-  - Multiple families → each gets their own digest
-  - digest_sent_at set on affected requests
-  - Digest message format matches §6.3 (DAILY_DIGEST type with payload)
-- Test that both jobs can be triggered manually (for debugging) via an admin endpoint
+- SSE endpoint for dashboard badge updates:
+  - GET /web/sse/requests?familyId= (requires dashboard session auth)
+  - Returns text/event-stream; emits JSON event { "pendingCount": N } whenever a request
+    is created, approved, rejected, or expired for the family
+  - Uses Spring WebFlux Flux<ServerSentEvent<String>> with a Sinks.Many per family
+  - SseRegistry singleton: registerSink(familyId), emit(familyId, count), cleanup on disconnect
+  - ContentRequestService calls sseRegistry.emit() after every state change
+  - Dashboard JS (htmx + vanilla fetch):
+    - Opens EventSource on page load, listens for events
+    - Updates the pending-requests badge count in the nav without a full page reload
+- Web Push (VAPID) notifications:
+  - VapidConfig: generates or loads VAPID key pair from application.yml on startup
+    (kidstune.vapid.public-key, kidstune.vapid.private-key — generate once, store as env vars)
+  - PushSubscription entity + Liquibase migration (008-push-subscriptions.yaml):
+    id, family_id, endpoint (TEXT), p256dh (TEXT), auth (TEXT), created_at, user_agent
+    One family can have multiple subscriptions (multiple browsers/devices)
+  - PushController:
+    - GET  /web/push/vapid-public-key → returns VAPID public key (for SW registration)
+    - POST /web/push/subscribe   → saves PushSubscription for current family session
+    - DELETE /web/push/unsubscribe → removes subscription by endpoint
+  - PushNotificationService.sendRequestNotification(familyId, request):
+    - Loads all PushSubscription rows for the family
+    - Sends Web Push message to each endpoint using the java-webpush library
+      (groupId: nl.martijndwars, artifactId: web-push, version: 5.x)
+    - Payload: JSON { "title": "Neuer Musikwunsch", "body": "{childName} möchte {title}",
+      "url": "/web/requests" }
+    - Expired/gone endpoints (410/404) are automatically deleted
+  - ContentRequestService calls pushNotificationService.sendRequestNotification() after createRequest
+  - Dashboard service worker (static/sw.js):
+    - Registered by dashboard layout JS; subscribes to push on first dashboard load (with
+      user gesture or on notification permission grant)
+    - On push event: shows notification with title, body, click → opens /web/requests
+    - On notificationclick: focuses existing tab or opens new one
 
-REFERENCE: PROJECT_PLAN.md §5.2.3 (Layer 3 daily digest details),
-§5.1.6 (auto-expiry after 7 days).
+REFERENCE: Web Push Protocol, VAPID RFC 8292.
 
 CONSTRAINTS:
-- Do NOT modify Android apps
-- These are purely backend tests
-- Use @SpyBean or direct service calls to trigger jobs in tests (not actual cron)
+- No Android modifications
+- No WebSocket
+- Web Push is best-effort: failure to send (e.g., subscription expired) must not break
+  the request workflow
+- Use the java-webpush library (already battle-tested), not a raw HTTP/2 implementation
 
 VERIFICATION:
-- All edge case tests pass for both scheduled jobs
-- Boundary conditions explicitly tested (exactly 7 days, exactly 4 hours)
-- Run ./gradlew test → all tests pass including 15+ new test cases
-- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
+- Integration test: subscribe → create request → verify push payload sent to mock endpoint
+- Integration test: 410 from push endpoint → subscription deleted
+- Integration test: SSE sink emits correct count after approve/reject
+- Unit test: VapidConfig loads key pair from config; generates new pair if absent
+- Manual: open dashboard in browser → create request from Postman → browser notification
+  appears; badge count updates without page reload
+- Run ./gradlew test → all tests pass
+- Run the backend locally → app starts healthy
 ```
 
-### Prompt 7.4 – Kids App Discover Screen
+### Prompt 7.3 – Kids App Discover Screen
 
 ```
-CONTEXT: Phase 7 of KidsTune. Backend content requests work (7.2). The Discover screen already
+CONTEXT: Phase 7 of KidsTune. Backend content requests work (7.1). The Discover screen already
 exists with full mock UX from Prompt 3.4. We now wire it to real backend endpoints: replace mock
-data with live Spotify search, real content request POSTs, and WebSocket approval events.
+data with live Spotify search, real content request POSTs, and polling-based approval detection.
 
 KEY DESIGN PRINCIPLE: Children can search and find ANY Spotify content (tracks, albums, artists,
 playlists). There is NO play button — only a Request button. Playing becomes possible only after
@@ -2041,7 +2043,7 @@ GOAL: When this task is done:
   - ACTIVE SEARCH: GET /api/v1/spotify/search?q=... replaces idle tiles with live Spotify results
     (max 10 items, explicit content filtered by backend). Results are large tiles, each with a
     Request button — NO play button anywhere on this screen.
-  - DiscoverTile model extended with scope: ContentScope (was missing in 3.4 mock).
+  - DiscoverTile model extended with scope: ContentScope.
     Backend search results carry the Spotify item type; map to ContentScope:
       Spotify "track" → TRACK, "album" → ALBUM, "artist" → ARTIST, "playlist" → PLAYLIST.
     Each result tile shows a scope badge (same pill style as BrowseScreen):
@@ -2049,27 +2051,29 @@ GOAL: When this task is done:
     Idle suggestions from known-artists.yml are all ARTIST scope.
   - ALREADY-APPROVED FILTER: Before rendering any results (both idle suggestions and active search),
     cross-check each result's Spotify URI against LocalContentEntry in Room. Any item whose
-    spotify_uri already exists in the profile's Room DB is silently dropped from the result list —
-    it is already playable in the Music/Audiobooks tabs, so a Request button would be misleading.
-    This check is pure local Room lookup; no extra network call needed.
-  - Each result has a "🙏 Ich will das!" button → POST /api/v1/content-requests (or queue offline)
+    spotify_uri already exists in the profile's Room DB is silently dropped — it is already
+    playable in the Music/Audiobooks tabs, so a Request button would be misleading.
+    Pure local Room lookup; no extra network call needed.
+  - Each result has a "🙏 Ich will das!" button → POST /api/v1/profiles/{id}/content-requests
+    (or queue offline in OfflineQueue)
   - Request button DISABLED when 3 pending requests exist, with friendly message:
     "Du hast schon 3 Wünsche offen – warte bis Mama/Papa geantwortet hat!"
   - "My wishes" section below search:
-    - Shows pending requests with kid-friendly time context:
+    - Shows pending requests from GET /api/v1/content-requests?profileId= with kid-friendly
+      time context:
       < 1 hour: "Mama/Papa schauen sich das an"
       1-24 hours: "Gestern gewünscht"
       > 24 hours: "Vor ein paar Tagen gewünscht"
     - Clock icon 🕐, no spinner
     - Rejected items: shown with ❌ and parent note (if any) for 24 hours, then hidden
     - Expired items: silently removed
-  - On REQUEST_APPROVED WebSocket message: celebration animation (confetti + cheering sound),
-    trigger SyncManager.syncNow() to fetch new content, new tile gets "NEW" badge for 24h
+  - Approval detection via polling: WorkManager's existing 15-min sync detects newly APPROVED
+    requests (content appears in Room). DiscoverViewModel observes Room contentCount to detect
+    when new content arrives and shows a celebration animation (confetti + cheering sound) if
+    a previously-pending request is now APPROVED. New tile gets "NEW" badge for 24h.
   - Search rate-limited: 1 query per 5 seconds (debounce on input, toast on rapid retry)
-- DiscoverViewModel: manages search state, pending requests, WebSocket listener for approvals
-- HomeScreen updated: Discover button (🔍) now visible and navigates to DiscoverScreen
-- WebSocket listener in kids-app: listens for REQUEST_APPROVED, REQUEST_REJECTED, REQUEST_EXPIRED
-  and updates local state accordingly
+- DiscoverViewModel: manages search state, pending requests, Room observation for approvals
+- HomeScreen: Discover button (🔍) already navigates to DiscoverScreen
 
 REFERENCE: PROJECT_PLAN.md §5.1.6 (Discover screen wireframe, free search design, request
 limits, pending UX, time context strings, auto-expiry behavior).
@@ -2079,9 +2083,8 @@ CONSTRAINTS:
   from known-artists.yml – implement alongside this prompt if not already done)
 - Search: GET /api/v1/spotify/search?q=...&limit=10 via backend proxy (requires internet)
 - Content requests: POST /api/v1/profiles/{profileId}/content-requests (or queue offline)
-- Do NOT implement parent notification (that's the backend email service's job)
-- Do NOT play requested content – there is NO play button on this screen; content is only
-  playable after parent approval + sync pushes it into the local Room DB
+- No WebSocket listener; approval detection is poll-based via WorkManager sync
+- Do NOT play requested content – there is NO play button on this screen
 
 VERIFICATION:
 - UI test: search "Frozen" → results shown → tap Request → "My wishes" section shows pending item
@@ -2091,7 +2094,7 @@ VERIFICATION:
 - Unit test: search rate limiting (2 queries within 5s → second blocked)
 - Unit test: already-approved filter — Room has entry with URI "spotify:album:abc" → search result
   with same URI is dropped from rendered list; result with different URI is kept
-- Unit test: DiscoverViewModel processes WebSocket approval → triggers sync
+- Unit test: DiscoverViewModel detects Room count change → celebration animation triggered
 - Run ./gradlew test → all tests pass
 - Run ./gradlew updateDebugScreenshotTest → new PNGs generated for DiscoverScreen @Preview
   functions (search idle, search results, pending requests, approval celebration)

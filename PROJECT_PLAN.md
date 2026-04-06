@@ -1140,9 +1140,13 @@ Kids App         Backend                    All Parents (email)
    │<───────────────┤                         │         │
 ```
 
-**Channel 2 – WebSocket browser push (real-time when dashboard is open):**
+**Channel 2 – Web Push / VAPID (push to parent's phone or browser):**
 
-When any parent has the web dashboard open, the backend pushes `CONTENT_REQUEST` events via WebSocket, causing the pending badge to update in real time without a page reload.
+The backend sends a Web Push notification to every saved push subscription for the family when a request is created. Works on any browser that supports the Push API (Chrome, Firefox, Safari 16.4+). No Firebase / FCM required. Parent subscribes once from the dashboard; the VAPID key pair is generated at startup and stored in config.
+
+**Channel 3 – SSE badge update (real-time when dashboard tab is open):**
+
+If a parent has the web dashboard open, an SSE stream (`/web/sse/requests?familyId=`) pushes a `{ "pendingCount": N }` event on every state change, updating the badge without a page reload.
 
 **Daily digest email (catch-all for forgotten requests):**
 
@@ -1322,41 +1326,31 @@ Parent adds "Bibi & Tina" (ARTIST scope) for Luna
 
 **Pagination requirement:** All Spotify list endpoints used by ContentResolver (`/artists/{id}/albums`, `/albums/{id}/tracks`, `/playlists/{id}/tracks`) return at most 50 items per page. The resolver must paginate through all pages using `offset` until `next` is null. Without pagination, prolific artists (TKKG: ~300 episodes, Benjamin Blümchen: ~130, Bibi Blocksberg: ~120) would be silently truncated at 50 albums, causing missing content for kids.
 
-### 6.2 WebSocket Endpoints
+### 6.2 SSE Endpoint (dashboard badge updates)
 
 ```
-wss://kidstune.altenburger.io/ws/parent/{familyId}
-  # Parent receives:
-  #   - CONTENT_REQUEST: new request from child (immediate notification trigger)
-  #   - CONTENT_ADDED: another parent added content
-  #   - DEVICE_ONLINE/OFFLINE: kids device connectivity changes
+GET /web/sse/requests?familyId={familyId}   (requires session auth)
+Content-Type: text/event-stream
 
-wss://kidstune.altenburger.io/ws/kids/{deviceId}
-  # Kids device receives:
-  #   - REQUEST_APPROVED: content request was approved (update UI instantly)
-  #   - REQUEST_REJECTED: content request was rejected
-  #   - CONTENT_UPDATED: new content added by parent (trigger sync)
-  #   - PROFILE_UPDATED: profile settings changed
+# Server emits on every state change for the family:
+data: {"pendingCount": 3}
+
+# Client (dashboard JS):
+const es = new EventSource('/web/sse/requests?familyId=' + familyId);
+es.onmessage = e => document.querySelector('.badge').textContent = JSON.parse(e.data).pendingCount;
 ```
 
-### 6.3 WebSocket Message Format
+### 6.3 Web Push Notification Payload
 
 ```json
 {
-  "type": "CONTENT_REQUEST",
-  "timestamp": "2026-03-22T14:30:00Z",
-  "payload": {
-    "requestId": "uuid-here",
-    "profileId": "uuid-here",
-    "profileName": "Luna",
-    "profileAvatar": "bear",
-    "spotifyUri": "spotify:album:abc123",
-    "title": "Frozen (Original Motion Picture Soundtrack)",
-    "imageUrl": "https://i.scdn.co/image/...",
-    "artistName": "Various Artists"
-  }
+  "title": "Neuer Musikwunsch",
+  "body": "Luna möchte: Frozen (Original Motion Picture Soundtrack)",
+  "url": "/web/requests"
 }
 ```
+
+Push subscriptions are stored in the `push_subscription` table (id, family_id, endpoint, p256dh, auth, created_at). The VAPID public key is served at `GET /web/push/vapid-public-key` for service worker registration. Expired subscriptions (HTTP 410 from push endpoint) are automatically deleted.
 
 ---
 
@@ -1523,19 +1517,18 @@ Phase 8 ─→ Production-hardened, admin data tables, documented, ready for dai
 
 | Module | Scope | Tests |
 |--------|-------|-------|
-| **Backend: WebSocket Hub** | Spring WebFlux WebSocket handler, connection registry per familyId/deviceId, heartbeat/ping-pong (30s), automatic stale connection cleanup, reconnection support | Integration: connection lifecycle, message delivery after reconnection |
-| **Backend: Content Requests** | ContentRequest CRUD with status lifecycle (PENDING → APPROVED/REJECTED/EXPIRED). Max 3 pending per profile (429 on excess). On approval: auto-create AllowedContent + trigger ContentResolver + WebSocket notify to kids device. Reject with optional parent note. Bulk operations. `approve_token` generated on creation. | Integration: full lifecycle, 429 limit, bulk operations |
-| **Backend: Email Notifications** | Spring Mail sends email to all `family.notification_emails` on request creation: child name, content title, [Approve] link with `approve_token`, [View Dashboard] link. Public `/web/approve/{token}` endpoint (no auth). `sendDailyDigest()` at 19:00 for pending > 4h. `expireStaleRequests()` at 03:00 (PENDING > 7 days → EXPIRED). | Unit: email content, token expiry. Integration: MockSmtp verifies email sent with correct approve URL. Digest boundary conditions. |
-| **Kids App: Discover Screen** | Search with voice input, request button (disabled at 3 pending), "My wishes" section with kid-friendly time context (no spinners), rejected items shown 24h then hidden, expired items silently removed, celebration animation on approval, NEW badge on fresh content | UI test: full flow including limit state. Unit: time context strings |
-| **Web Dashboard: Approval Queue** | Already built in Phase 2. In this phase: wire up real-time badge update via WebSocket push (HTMX hx-trigger on SSE or polling fragment). | Integration: WS push → badge updates in open browser |
+| **Backend: Content Requests** | ContentRequest CRUD with status lifecycle (PENDING → APPROVED/REJECTED/EXPIRED). Max 3 pending per profile (429 on excess). On approval: auto-create AllowedContent + trigger ContentResolver. Reject with optional parent note. Bulk operations. JWT `approve_token` (7-day expiry). Email notification to all `notification_emails` on creation. `expireStaleRequests()` at 03:00. `sendDailyDigest()` at 19:00. | Integration: full lifecycle, 429 limit, bulk operations, MockSmtp email delivery |
+| **Backend: SSE + Web Push** | SSE endpoint (`/web/sse/requests`) for real-time badge updates when dashboard tab is open. VAPID Web Push: store subscriptions per family, send push notification on new request, auto-delete expired endpoints (410). Service worker (`static/sw.js`) handles push events and click-to-open. | Integration: push to mock endpoint; SSE emit verified; 410 → subscription deleted |
+| **Kids App: Discover Screen** | Search with voice input, request button (disabled at 3 pending), "My wishes" section with kid-friendly time context, rejected items shown 24h then hidden, expired items silently removed, celebration animation when Room count changes after approval, NEW badge on fresh content | UI test: full flow including limit state. Unit: time context strings, Room-change detection |
 
 **Milestone deliverable:** The approval workflow is live with guaranteed delivery:
 - Luna searches "Frozen" on her device → taps "Request" (2 of 3 slots used)
 - **All parents get email immediately** with [Approve] link – no app needed, works from any device
-- **Dashboard is open:** Pending badge updates in real time via WebSocket
+- **Browser push notification** arrives on parent's phone/desktop if subscribed
+- **Dashboard is open:** Pending badge updates in real time via SSE stream
 - **Forgotten requests:** At 19:00, digest email lists all pending requests with approve links
 - Parent clicks [Approve] in email → content added without login → confirmation page shown
-- Luna's device shows celebration animation → Frozen Soundtrack now playable
+- Luna's WorkManager sync detects new content → celebration animation → Frozen Soundtrack playable
 - After 7 days without response: request silently expires, Luna can re-request
 
 ---
@@ -2134,115 +2127,48 @@ and: curl http://localhost:8080/actuator/health → should return 200
       Document the setup procedure in README.md with step-by-step instructions."
 ```
 
-#### Phase 7 – Content Requests & Live Notifications
+#### Phase 7 – Content Requests & Notifications
 ```
-7.1: "Implement the WebSocket hub in the backend ws/ package using Spring
-      WebFlux. Create:
-      - WebSocketHandler: accepts connections at /ws/parent/{familyId} and
-        /ws/kids/{deviceId}
-      - ConnectionRegistry: tracks connected devices/parents by ID, provides
-        sendToParent(familyId, message) and sendToDevice(deviceId, message)
-      - Heartbeat: server sends ping every 30s, drops connections that don't
-        pong within 10s
-      Write integration tests: connect → send message → verify received,
-      reconnection after drop, stale connection cleanup."
+7.1: "Implement ContentRequest workflow in the backend requests/ package.
+      - ContentRequest entity + Liquibase migration.
+      - POST /api/v1/profiles/{profileId}/content-requests: creates request
+        with status=PENDING. REJECT with 429 if profile already has 3+ PENDING.
+        Sends email to family.notification_emails via EmailNotificationService.
+        Sends Web Push notification to all saved PushSubscription rows for family.
+      - POST /api/v1/content-requests/{id}/approve: sets APPROVED, creates
+        AllowedContent, triggers ContentResolver. Supports contentTypeOverride.
+      - POST /api/v1/content-requests/{id}/reject: sets REJECTED, parent_note.
+      - POST /api/v1/content-requests/bulk-approve and bulk-reject.
+      - GET  /api/v1/content-requests?familyId=&status=&profileId=
+      - GET  /api/v1/content-requests/pending-count?familyId=
+      - GET  /web/approve/{token}: public one-click approve (JWT token, 7-day expiry).
+      - expireStaleRequests(): @Scheduled(cron='0 0 3 * * *'), PENDING > 7 days → EXPIRED.
+      - sendDailyDigest(): @Scheduled(cron='0 0 19 * * *'), email summary for pending > 4h.
+      Write integration tests for full lifecycle, 429 limit, bulk operations,
+      token expiry, MockSmtp email delivery, digest boundary conditions."
 
-7.2: "Implement ContentRequest workflow in the backend requests/ package.
-      - POST /api/v1/content-requests: creates request with status=PENDING.
-        REJECT with 429 if profile already has 3+ PENDING requests.
-        Dispatches CONTENT_REQUEST via WebSocket to parent.
-      - PUT /api/v1/content-requests/{id}: approve or reject. On APPROVED:
-        auto-create AllowedContent for the requesting profile + trigger
-        ContentResolver + dispatch REQUEST_APPROVED to kids device.
-        On REJECTED: dispatch REQUEST_REJECTED to kids device with optional
-        parent note.
-      - PUT /api/v1/content-requests/bulk: bulk approve/reject
-      - GET /api/v1/content-requests: list with status filter and profileId filter
-      - GET /api/v1/content-requests/pending/count: returns count per profile
-        (used by Layer 2 polling in parent app)
-      Write integration tests for: full lifecycle (request → notify → approve →
-      content created → notify kids), 429 when limit exceeded, bulk operations."
+7.2: "Implement SSE badge updates + Web Push (VAPID) notifications.
+      - GET /web/sse/requests?familyId= (session auth): SSE stream emitting
+        {pendingCount: N} on every state change. SseRegistry singleton tracks
+        Sinks.Many<ServerSentEvent<String>> per family.
+      - ContentRequestService calls sseRegistry.emit() after every state change.
+      - Dashboard layout.html: opens EventSource on load, updates badge element.
+      - VapidConfig: generate/load VAPID key pair from application.yml on startup.
+      - PushSubscription entity + migration (push_subscription table).
+      - GET  /web/push/vapid-public-key: returns VAPID public key.
+      - POST /web/push/subscribe: saves PushSubscription for current session.
+      - DELETE /web/push/unsubscribe: removes by endpoint.
+      - PushNotificationService.sendRequestNotification(familyId, request):
+        sends Web Push to all subscriptions; deletes 410/404 endpoints.
+        Uses java-webpush (nl.martijndwars:web-push:5.x).
+      - static/sw.js: registers for push, shows notification, click opens /web/requests.
+      Write integration tests: push to mock endpoint, 410 cleanup, SSE emit count."
 
-7.3: "Implement backend scheduled jobs for content requests:
-      - expireStaleRequests(): runs daily at 03:00, sets PENDING requests
-        older than 7 days to EXPIRED, notifies kids devices via WebSocket
-      - sendDailyDigest(): runs daily at 19:00, for each family with PENDING
-        requests older than 4 hours: builds DAILY_DIGEST WebSocket message
-        with summary (count per child, titles, oldest request age), sets
-        digest_sent_at flag for Layer 2 polling detection
-      Write unit tests for expiry logic (boundary: exactly 7 days, 6 days 23h).
-      Write integration test for digest generation with mock data."
-
-7.4: "In kids-app, implement the Discover screen (§5.1.6):
-      - Search box with voice input button (Android SpeechRecognizer)
-      - Results display: max 10 items, explicit content filtered, large tiles
-      - 'Request' button on each result → POST to backend (or queue offline)
-      - Request button DISABLED with friendly message when 3 pending requests
-        exist (check local count, verified on backend too)
-      - 'My wishes' section below search, showing pending requests with
-        kid-friendly time context (not spinners):
-        < 1h: 'Mama/Papa schauen sich das an'
-        1-24h: 'Gestern gewünscht'
-        > 24h: 'Vor ein paar Tagen gewünscht'
-      - Rejected requests shown with ❌ and parent note for 24h, then hidden
-      - Expired requests silently removed from UI
-      - On REQUEST_APPROVED WebSocket: celebration animation (confetti + sound),
-        trigger delta sync, new tile gets 'NEW' badge for 24h
-      - Search rate-limited to 1 query per 5 seconds
-      Write UI tests for: search → results → request → pending state → approved
-      celebration. Test request limit (4th request shows disabled state).
-      Unit test for time context strings and rate limiting."
-
-7.5: "In parent-app, implement the three-layer notification system (§5.2.4):
-
-      LAYER 1 – Foreground Service (real-time):
-      - NotificationService extends Service, promoted to foreground with
-        persistent notification: 'KidsTune – listening for requests'
-      - Maintains WebSocket connection to wss://backend/ws/parent/{familyId}
-      - Auto-reconnect with exponential backoff: 1s → 2s → 4s → ... → 30s max
-      - On CONTENT_REQUEST message: create high-priority notification with
-        child avatar, content artwork, [Approve] [Reject] action buttons
-      - On DAILY_DIGEST message: create summary notification bundling all
-        pending requests ('Luna and Max have 4 open wishes')
-      - ApproveRejectReceiver (BroadcastReceiver): handles action button taps,
-        calls PUT /api/v1/content-requests/{id} without opening app
-      - Notifications tagged with requestId for deduplication
-
-      LAYER 2 – WorkManager polling (fallback):
-      - PendingRequestPollWorker: PeriodicWorkRequest every 15 minutes
-      - Calls GET /api/v1/content-requests/pending/count
-      - Compares with locally stored 'last seen request IDs' in SharedPrefs
-      - Creates notification only if NEW requests found AND Layer 1 has NOT
-        already delivered them (check via shared flag)
-      - Survives app force-kill, phone reboot, Doze mode
-
-      BOOT_COMPLETED:
-      - BootReceiver re-registers WorkManager periodic poll and optionally
-        restarts Foreground Service on device boot
-
-      SETUP WIZARD:
-      - On first launch: explain notification layers, request battery
-        optimization exemption (Android system dialog), register WorkManager
-
-      Write integration tests for:
-      - Layer 1: service starts → WS connects → mock message → notification shown
-      - Layer 2: service NOT running → WorkManager fires → polls backend →
-        notification shown for new requests
-      - Deduplication: Layer 1 delivers → Layer 2 polls → no duplicate notification
-      - Boot receiver: simulate boot → verify WorkManager re-registered"
-
-7.6: "In parent-app, implement the approval queue screen:
-      - List of pending requests sorted by recency (newest first)
-      - Each item shows: child avatar + name, content artwork, title,
-        artist name, time ago, request age indicator
-      - Approve options: 'Add for [child] only' / 'Add for all children'
-      - Reject button with optional text note (shown to child)
-      - Bulk 'Approve All' / 'Reject All' buttons at top
-      - Expired requests tab showing 'Expired – not reviewed' with option
-        to retroactively approve
-      - Badge count on dashboard navigation item (pending count)
-      Write UI tests for: list rendering, approve flow (single + bulk),
-      reject with note, empty state, expired requests tab."
+7.3: "In kids-app, implement the Discover screen (§5.1.6):
+      Same scope as prompt 7.4 in the old plan (search, request, My wishes,
+      celebration animation via Room count observation, rate limiting).
+      Approval detection is poll-based (WorkManager sync, Room countAllFlow).
+      No WebSocket listener."
 ```
 
 #### Phase 8 – Polish, Hardening & Documentation
