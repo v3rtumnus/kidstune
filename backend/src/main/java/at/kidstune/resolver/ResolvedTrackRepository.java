@@ -14,4 +14,22 @@ public interface ResolvedTrackRepository extends JpaRepository<ResolvedTrack, St
     /** Batch-fetch tracks for multiple albums, ordered by disc then track number. */
     @Query("SELECT t FROM ResolvedTrack t WHERE t.resolvedAlbumId IN :ids ORDER BY t.discNumber ASC, t.trackNumber ASC")
     List<ResolvedTrack> findByResolvedAlbumIdInOrderByDiscTrack(@Param("ids") Collection<String> ids);
+
+    /**
+     * Finds resolved tracks that (a) belong to the given profile's approved content and
+     * (b) have a URI in the given set. Used by liked-songs import to check against the whitelist.
+     */
+    @Query("""
+            SELECT t FROM ResolvedTrack t
+            WHERE t.spotifyTrackUri IN :uris
+              AND t.resolvedAlbumId IN (
+                  SELECT a.id FROM ResolvedAlbum a
+                  WHERE a.allowedContentId IN (
+                      SELECT c.id FROM AllowedContent c WHERE c.profileId = :profileId
+                  )
+              )
+            """)
+    List<ResolvedTrack> findByProfileIdAndSpotifyTrackUriIn(
+            @Param("profileId") String profileId,
+            @Param("uris") Collection<String> uris);
 }

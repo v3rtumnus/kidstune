@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "artist-bibi-tina",
+      "name": "Bibi & Tina",
+      "uri": "spotify:artist:artist-bibi-tina",
+      "images": [{"url": "https://example.com/bibi.jpg"}],
+      "genres": ["kinderlieder"]
+    },
+    {
+      "id": "artist-drei-kids",
+      "name": "Die drei ??? Kids",
+      "uri": "spotify:artist:artist-drei-kids",
+      "images": [{"url": "https://example.com/drei-kids.jpg"}],
+      "genres": ["hörspiel"]
+    }
+  ]
+}

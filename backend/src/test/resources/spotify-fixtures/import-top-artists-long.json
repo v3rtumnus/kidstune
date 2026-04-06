@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "id": "artist-pop-1",
+      "name": "Popular Artist",
+      "uri": "spotify:artist:artist-pop-1",
+      "images": [{"url": "https://example.com/pop1.jpg"}],
+      "genres": ["pop"]
+    }
+  ]
+}

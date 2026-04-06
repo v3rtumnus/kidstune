@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": "playlist-kinder-1",
+      "name": "Kinderlieder Mix",
+      "uri": "spotify:playlist:playlist-kinder-1",
+      "images": [{"url": "https://example.com/playlist1.jpg"}]
+    },
+    {
+      "id": "playlist-mixed-1",
+      "name": "Meine Playlist",
+      "uri": "spotify:playlist:playlist-mixed-1",
+      "images": []
+    }
+  ]
+}

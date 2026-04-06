@@ -13,7 +13,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ **Phase 3 complete** (3.1 – 3.4) — Kids app setup, all screens with mock data, UI tests, Discover screen
 - ✅ **Phase 4 complete** (4.1 – 4.5) — Backend resolver + sync, kids app Room storage, Spotify playback, real favorites + Spotify Liked Songs sync
 - ✅ **Phase 5 complete** (5.1 – 5.4) — Device pairing, delta sync backend, kids app pairing flow, WorkManager sync manager
-- ⬅️ **NEXT: Prompt 6.1**
+- ✅ **Prompt 6.1 complete** — Backend import service + liked songs pre-population
+- ⬅️ **NEXT: Prompt 6.2**
 
 ---
 

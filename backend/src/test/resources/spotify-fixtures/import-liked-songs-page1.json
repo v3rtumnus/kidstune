@@ -1,0 +1,50 @@
+{
+  "items": [
+    {
+      "added_at": "2024-03-01T10:00:00Z",
+      "track": {
+        "id": "liked-track-1",
+        "name": "Track In Whitelist 1",
+        "uri": "spotify:track:liked-track-1",
+        "artists": [{"id": "artist-bibi-tina", "name": "Bibi & Tina"}]
+      }
+    },
+    {
+      "added_at": "2024-03-01T09:00:00Z",
+      "track": {
+        "id": "liked-track-2",
+        "name": "Track In Whitelist 2",
+        "uri": "spotify:track:liked-track-2",
+        "artists": [{"id": "artist-bibi-tina", "name": "Bibi & Tina"}]
+      }
+    },
+    {
+      "added_at": "2024-03-01T08:00:00Z",
+      "track": {
+        "id": "liked-track-not-in-whitelist",
+        "name": "Track NOT In Whitelist",
+        "uri": "spotify:track:liked-track-not-in-whitelist",
+        "artists": [{"id": "artist-pop-1", "name": "Popular Artist"}]
+      }
+    },
+    {
+      "added_at": "2024-03-01T07:00:00Z",
+      "track": {
+        "id": "liked-track-3",
+        "name": "Track In Whitelist 3",
+        "uri": "spotify:track:liked-track-3",
+        "artists": [{"id": "artist-bibi-tina", "name": "Bibi & Tina"}]
+      }
+    },
+    {
+      "added_at": "2024-03-01T06:00:00Z",
+      "track": {
+        "id": "liked-track-4",
+        "name": "Track NOT In Whitelist 2",
+        "uri": "spotify:track:liked-track-4",
+        "artists": [{"id": "artist-pop-1", "name": "Popular Artist"}]
+      }
+    }
+  ],
+  "next": null
+}

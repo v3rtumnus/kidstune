@@ -16,6 +16,7 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.util.matcher.OrServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.PathPatternParserServerWebExchangeMatcher;
 import reactor.core.publisher.Mono;
 
@@ -57,7 +58,10 @@ public class SecurityConfig {
     @Order(1)
     public SecurityWebFilterChain webFilterChain(ServerHttpSecurity http) {
         return http
-                .securityMatcher(new PathPatternParserServerWebExchangeMatcher("/web/**"))
+                .securityMatcher(new OrServerWebExchangeMatcher(
+                        new PathPatternParserServerWebExchangeMatcher("/web/**"),
+                        new PathPatternParserServerWebExchangeMatcher("/api/v1/profiles/*/import-liked-songs")
+                ))
                 .securityContextRepository(webSessionSecurityContextRepository)
                 .addFilterBefore(rememberMeWebFilter, SecurityWebFiltersOrder.SECURITY_CONTEXT_SERVER_WEB_EXCHANGE)
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)

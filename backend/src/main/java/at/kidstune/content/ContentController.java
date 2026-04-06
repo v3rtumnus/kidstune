@@ -4,6 +4,8 @@ import at.kidstune.content.dto.AddContentRequest;
 import at.kidstune.content.dto.BulkAddContentRequest;
 import at.kidstune.content.dto.ContentCheckResponse;
 import at.kidstune.content.dto.ContentResponse;
+import at.kidstune.content.dto.ImportContentRequest;
+import at.kidstune.content.dto.ImportContentResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -58,6 +60,16 @@ public class ContentController {
             @RequestBody @Valid BulkAddContentRequest request) {
 
         return contentService.addContentBulk(request)
+                .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(r));
+    }
+
+    // ── POST /api/v1/content/import ──────────────────────────────────────────
+
+    @PostMapping("/api/v1/content/import")
+    public Mono<ResponseEntity<ImportContentResponse>> importContent(
+            @RequestBody @Valid ImportContentRequest request) {
+
+        return contentService.importContent(request)
                 .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(r));
     }
 

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "track": {
+        "id": "bibi-track-1",
+        "name": "Bibi und der Zaubertrank",
+        "uri": "spotify:track:bibi-track-1",
+        "artists": [{"id": "artist-bibi-tina", "name": "Bibi & Tina"}]
+      },
+      "played_at": "2024-03-01T12:00:00Z"
+    },
+    {
+      "track": {
+        "id": "pop-track-1",
+        "name": "Unknown Pop Song",
+        "uri": "spotify:track:pop-track-1",
+        "artists": [{"id": "artist-pop-1", "name": "Popular Artist"}]
+      },
+      "played_at": "2024-03-01T11:00:00Z"
+    }
+  ]
+}

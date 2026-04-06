@@ -4,6 +4,9 @@ import at.kidstune.content.dto.AddContentRequest;
 import at.kidstune.content.dto.BulkAddContentRequest;
 import at.kidstune.content.dto.ContentCheckResponse;
 import at.kidstune.content.dto.ContentResponse;
+import at.kidstune.content.dto.ImportContentRequest;
+import at.kidstune.content.dto.ImportContentResponse;
+import at.kidstune.profile.ProfileRepository;
 import at.kidstune.resolver.ContentResolver;
 import at.kidstune.sync.DeletionLog;
 import at.kidstune.sync.DeletionLogRepository;
@@ -13,7 +16,9 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 @Service
@@ -24,17 +29,20 @@ public class ContentService {
     private final ContentTypeClassifier classifier;
     private final ContentResolver       resolver;
     private final DeletionLogRepository deletionLogRepository;
+    private final ProfileRepository     profileRepository;
 
     public ContentService(ContentRepository contentRepository,
                           ScopeResolver scopeResolver,
                           ContentTypeClassifier classifier,
                           ContentResolver resolver,
-                          DeletionLogRepository deletionLogRepository) {
+                          DeletionLogRepository deletionLogRepository,
+                          ProfileRepository profileRepository) {
         this.contentRepository    = contentRepository;
         this.scopeResolver        = scopeResolver;
         this.classifier           = classifier;
         this.resolver             = resolver;
         this.deletionLogRepository = deletionLogRepository;
+        this.profileRepository    = profileRepository;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -98,6 +106,55 @@ public class ContentService {
         })
         .doOnSuccess(savedList -> savedList.forEach(resolver::resolveAsync))
         .map(savedList -> savedList.stream().map(ContentResponse::from).toList());
+    }
+
+    // ── Import ───────────────────────────────────────────────────────────────
+
+    /**
+     * Batch-imports content from the import wizard.
+     *
+     * For each item in the request, creates one {@link AllowedContent} row per profile
+     * (skipping profiles that already have that URI). Triggers {@link ContentResolver}
+     * asynchronously for every newly created row.
+     *
+     * @return summary with total created count and per-profile breakdown
+     */
+    public Mono<ImportContentResponse> importContent(ImportContentRequest request) {
+        return db(() -> {
+            // profileId → newContentCount
+            Map<String, Integer> countByProfile = new LinkedHashMap<>();
+
+            List<AllowedContent> saved = new ArrayList<>();
+
+            for (ImportContentRequest.ImportItem item : request.items()) {
+                ContentType type = resolveContentType(item.contentTypeOverride(), item.spotifyItemInfo());
+
+                for (String profileId : item.profileIds()) {
+                    if (!contentRepository.existsByProfileIdAndSpotifyUri(profileId, item.spotifyUri())) {
+                        AllowedContent entity = buildEntity(profileId, item.spotifyUri(), item.scope(),
+                                item.title(), item.imageUrl(), item.artistName(), type);
+                        saved.add(contentRepository.save(entity));
+                        countByProfile.merge(profileId, 1, Integer::sum);
+                    }
+                }
+            }
+
+            // Build per-profile summary (preserve insertion order)
+            List<ImportContentResponse.ProfileSummary> profiles = countByProfile.entrySet().stream()
+                    .map(e -> {
+                        String name = profileRepository.findById(e.getKey())
+                                .map(p -> p.getName())
+                                .orElse(e.getKey());
+                        return new ImportContentResponse.ProfileSummary(e.getKey(), name, e.getValue());
+                    })
+                    .toList();
+
+            // Trigger async resolution for every saved entry
+            saved.forEach(resolver::resolveAsync);
+
+            int totalCreated = saved.size();
+            return new ImportContentResponse(totalCreated, profiles);
+        });
     }
 
     // ── Remove ────────────────────────────────────────────────────────────────
