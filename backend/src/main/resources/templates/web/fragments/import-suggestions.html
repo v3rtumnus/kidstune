@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  HTMX partial fragment returned by POST /web/import/suggestions.
+  Rendered inside #suggestions-container in step1.html.
+-->
+<div th:fragment="suggestions">
+
+    <!-- Error states -->
+    <div th:if="${noProfilesSelected}" class="alert alert-warning mb-3">
+        Bitte mindestens ein Profil ausw&auml;hlen.
+    </div>
+    <div th:if="${noSpotifyLinked}" class="alert alert-info mb-3">
+        Kein ausgew&auml;hltes Profil hat ein verkn&uuml;pftes Spotify-Konto.
+        <a th:href="@{/web/profiles}">Profile verwalten</a>
+    </div>
+    <div th:if="${suggestionsError}" class="alert alert-danger mb-3">
+        Vorschl&auml;ge konnten nicht geladen werden. Bitte Spotify-Verbindung pr&uuml;fen.
+    </div>
+
+    <!-- Suggestion sections (only shown when suggestions were loaded successfully) -->
+    <div th:if="${suggestions != null}">
+
+        <!-- ── Erkannte Kinder-Inhalte ── -->
+        <div th:unless="${suggestions.detectedChildrenContent().isEmpty()}"
+             class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white">
+                <span class="fw-semibold">Erkannte Kinder-Inhalte</span>
+                <small class="text-muted ms-2">vorausgew&auml;hlt basierend auf Altersgruppe</small>
+            </div>
+            <div class="card-body p-0">
+                <div th:each="item, stat : ${suggestions.detectedChildrenContent()}"
+                     class="suggestion-item border-bottom px-3 py-2 d-flex align-items-start gap-3"
+                     th:data-uri="${item.spotifyUri}"
+                     th:data-scope="ARTIST"
+                     th:data-title="${item.title}"
+                     th:data-image="${item.imageUrl}"
+                     th:data-artist="${item.title}">
+
+                    <!-- Master checkbox -->
+                    <input class="form-check-input item-master-check mt-2 flex-shrink-0"
+                           type="checkbox"
+                           th:id="'det-' + ${stat.index}"
+                           th:checked="${item.preSelected}"
+                           title="Diesen Inhalt importieren">
+
+                    <!-- Cover image -->
+                    <img th:if="${item.imageUrl != null}"
+                         th:src="${item.imageUrl}"
+                         alt=""
+                         width="48" height="48"
+                         class="rounded flex-shrink-0 object-fit-cover">
+                    <div th:unless="${item.imageUrl != null}"
+                         class="bg-secondary rounded flex-shrink-0 d-flex align-items-center justify-content-center"
+                         style="width:48px;height:48px;font-size:1.4rem;">&#127925;</div>
+
+                    <div class="flex-grow-1 min-width-0">
+                        <div class="fw-semibold text-truncate" th:text="${item.title}">K&uuml;nstler</div>
+                        <small class="text-muted">Als Typ hinzuf&uuml;gen: K&uuml;nstler</small>
+
+                        <!-- Per-profile checkboxes -->
+                        <div class="mt-1 d-flex flex-wrap gap-2">
+                            <div th:each="prof : ${profiles}" class="form-check form-check-inline mb-0">
+                                <input class="form-check-input item-profile-check"
+                                       type="checkbox"
+                                       th:id="'det-' + ${stat.index} + '-prof-' + ${prof.profile.id}"
+                                       th:value="${prof.profile.id}"
+                                       th:checked="${item.preSelected}">
+                                <label class="form-check-label small"
+                                       th:for="'det-' + ${stat.index} + '-prof-' + ${prof.profile.id}"
+                                       th:text="${prof.profile.name}">Luna</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Deine Playlists ── -->
+        <div th:unless="${suggestions.playlists().isEmpty()}"
+             class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Deine Playlists</div>
+            <div class="card-body p-0">
+                <div th:each="item, stat : ${suggestions.playlists()}"
+                     class="suggestion-item border-bottom px-3 py-2 d-flex align-items-start gap-3"
+                     th:data-uri="${item.spotifyUri}"
+                     th:data-scope="PLAYLIST"
+                     th:data-title="${item.title}"
+                     th:data-image="${item.imageUrl}"
+                     data-artist="">
+
+                    <input class="form-check-input item-master-check mt-2 flex-shrink-0"
+                           type="checkbox"
+                           th:id="'pl-' + ${stat.index}"
+                           th:checked="${item.preSelected}"
+                           title="Diese Playlist importieren">
+
+                    <img th:if="${item.imageUrl != null}"
+                         th:src="${item.imageUrl}"
+                         alt=""
+                         width="48" height="48"
+                         class="rounded flex-shrink-0 object-fit-cover">
+                    <div th:unless="${item.imageUrl != null}"
+                         class="bg-secondary rounded flex-shrink-0 d-flex align-items-center justify-content-center"
+                         style="width:48px;height:48px;font-size:1.4rem;">&#127925;</div>
+
+                    <div class="flex-grow-1 min-width-0">
+                        <div class="fw-semibold text-truncate" th:text="${item.title}">Playlist</div>
+                        <small class="text-muted">Als Typ hinzuf&uuml;gen: Playlist</small>
+
+                        <div class="mt-1 d-flex flex-wrap gap-2">
+                            <div th:each="prof : ${profiles}" class="form-check form-check-inline mb-0">
+                                <input class="form-check-input item-profile-check"
+                                       type="checkbox"
+                                       th:id="'pl-' + ${stat.index} + '-prof-' + ${prof.profile.id}"
+                                       th:value="${prof.profile.id}"
+                                       th:checked="${item.preSelected}">
+                                <label class="form-check-label small"
+                                       th:for="'pl-' + ${stat.index} + '-prof-' + ${prof.profile.id}"
+                                       th:text="${prof.profile.name}">Luna</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Weitere K&uuml;nstler ── -->
+        <div th:unless="${suggestions.otherArtists().isEmpty()}"
+             class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white">
+                <span class="fw-semibold">Weitere K&uuml;nstler</span>
+                <small class="text-muted ms-2">standardm&auml;&szlig;ig nicht ausgew&auml;hlt</small>
+            </div>
+            <div class="card-body p-0">
+                <div th:each="item, stat : ${suggestions.otherArtists()}"
+                     class="suggestion-item border-bottom px-3 py-2 d-flex align-items-start gap-3"
+                     th:data-uri="${item.spotifyUri}"
+                     th:data-scope="ARTIST"
+                     th:data-title="${item.title}"
+                     th:data-image="${item.imageUrl}"
+                     th:data-artist="${item.title}">
+
+                    <input class="form-check-input item-master-check mt-2 flex-shrink-0"
+                           type="checkbox"
+                           th:id="'oth-' + ${stat.index}"
+                           title="Diesen K&uuml;nstler importieren">
+
+                    <img th:if="${item.imageUrl != null}"
+                         th:src="${item.imageUrl}"
+                         alt=""
+                         width="48" height="48"
+                         class="rounded flex-shrink-0 object-fit-cover">
+                    <div th:unless="${item.imageUrl != null}"
+                         class="bg-secondary rounded flex-shrink-0 d-flex align-items-center justify-content-center"
+                         style="width:48px;height:48px;font-size:1.4rem;">&#127925;</div>
+
+                    <div class="flex-grow-1 min-width-0">
+                        <div class="fw-semibold text-truncate" th:text="${item.title}">K&uuml;nstler</div>
+                        <small class="text-muted">Als Typ hinzuf&uuml;gen: K&uuml;nstler</small>
+
+                        <div class="mt-1 d-flex flex-wrap gap-2">
+                            <div th:each="prof : ${profiles}" class="form-check form-check-inline mb-0">
+                                <input class="form-check-input item-profile-check"
+                                       type="checkbox"
+                                       th:id="'oth-' + ${stat.index} + '-prof-' + ${prof.profile.id}"
+                                       th:value="${prof.profile.id}">
+                                <label class="form-check-label small"
+                                       th:for="'oth-' + ${stat.index} + '-prof-' + ${prof.profile.id}"
+                                       th:text="${prof.profile.name}">Max</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Empty state: all lists empty -->
+        <div th:if="${suggestions.detectedChildrenContent().isEmpty()
+                      and suggestions.playlists().isEmpty()
+                      and suggestions.otherArtists().isEmpty()}"
+             class="alert alert-info mb-3">
+            Keine Vorschl&auml;ge gefunden. Der H&ouml;rverlauf des Kindes ist m&ouml;glicherweise noch leer.
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

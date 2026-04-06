@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  Step-2 panel fragment.
+  Included in step1.html via th:replace="~{web/import/step2 :: step2-panel}".
+  Contains the HTMX target div for suggestion groups, the live step summary,
+  and the Import submit button.
+-->
+<div th:fragment="step2-panel">
+
+    <!-- ── Vorschl&auml;ge (gef&uuml;llt via HTMX) ── -->
+    <div id="suggestions-container" class="mb-3">
+        <!-- Filled by POST /web/import/suggestions via HTMX -->
+    </div>
+
+    <!-- ── Schritt-Zusammenfassung + Import-Button ── -->
+    <div id="step2-footer" class="d-flex align-items-center gap-3 flex-wrap">
+        <span id="step-summary-text" class="text-muted small">
+            Bitte erst Profile ausw&auml;hlen und Vorschl&auml;ge laden.
+        </span>
+        <button type="submit" id="import-btn" class="btn btn-primary ms-auto" disabled>
+            Importieren
+        </button>
+    </div>
+
+</div>
+
+</body>
+</html>

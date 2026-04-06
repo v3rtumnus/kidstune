@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Spotify importieren</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+    <h1 class="h3 mb-1">Spotify importieren</h1>
+    <p class="text-muted mb-4">W&auml;hle Profile aus, lade Vorschl&auml;ge und importiere Inhalte in einem Schritt.</p>
+
+    <form id="import-form" method="post" th:action="@{/web/import}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" id="itemsJson" name="itemsJson" value="[]">
+
+        <!-- ── Schritt 1: Profile ausw&auml;hlen ── -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white fw-semibold">
+                Schritt 1 &mdash; Profile ausw&auml;hlen
+            </div>
+            <div class="card-body">
+                <div th:if="${profiles.isEmpty()}" class="text-muted">
+                    Noch keine Profile vorhanden.
+                    <a th:href="@{/web/profiles/new}">Erstes Profil anlegen</a>
+                </div>
+
+                <div class="row g-3" th:unless="${profiles.isEmpty()}">
+                    <div class="col-12 col-sm-6 col-lg-4"
+                         th:each="item : ${profiles}">
+                        <label class="card h-100 border p-3 cursor-pointer"
+                               th:for="'prof-' + ${item.profile.id}">
+                            <div class="d-flex align-items-start gap-2">
+                                <input class="form-check-input profile-check mt-1 flex-shrink-0"
+                                       type="checkbox"
+                                       name="allProfileIds"
+                                       th:id="'prof-' + ${item.profile.id}"
+                                       th:value="${item.profile.id}">
+                                <div>
+                                    <div class="fw-semibold" th:text="${item.profile.name}">Luna</div>
+                                    <small class="text-muted"
+                                           th:text="${item.profile.ageGroup}">SCHOOL</small>
+                                    <span th:if="${item.spotifyLinked}"
+                                          class="badge bg-success ms-1 d-inline">Spotify</span>
+                                    <span th:unless="${item.spotifyLinked}"
+                                          class="badge bg-light text-muted ms-1 d-inline">Kein Spotify</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-3" th:unless="${profiles.isEmpty()}">
+                    <button type="button" id="fetch-suggestions-btn"
+                            class="btn btn-outline-primary"
+                            hx-post="/web/import/suggestions"
+                            hx-include=".profile-check:checked"
+                            hx-target="#suggestions-container"
+                            hx-swap="innerHTML"
+                            hx-indicator="#fetch-spinner">
+                        Vorschl&auml;ge laden
+                        <span id="fetch-spinner"
+                              class="spinner-border spinner-border-sm htmx-indicator ms-1"
+                              role="status"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Schritt 2: Vorschl&auml;ge und Import ── (inlined step2 structure) -->
+        <div th:replace="~{web/import/step2 :: step2-panel}"></div>
+
+    </form>
+
+</th:block>
+<th:block layout:fragment="scripts">
+<script>
+// Serialize selected suggestion items into the hidden #itemsJson field on submit.
+document.getElementById('import-form').addEventListener('submit', function () {
+    var items = [];
+    document.querySelectorAll('.suggestion-item').forEach(function (card) {
+        var masterCheck = card.querySelector('.item-master-check');
+        if (!masterCheck || !masterCheck.checked) return;
+        var profileIds = [];
+        card.querySelectorAll('.item-profile-check:checked').forEach(function (cb) {
+            profileIds.push(cb.value);
+        });
+        if (profileIds.length === 0) return;
+        items.push({
+            spotifyUri:  card.dataset.uri,
+            scope:       card.dataset.scope,
+            title:       card.dataset.title,
+            imageUrl:    card.dataset.image  || null,
+            artistName:  card.dataset.artist || null,
+            profileIds:  profileIds
+        });
+    });
+    document.getElementById('itemsJson').value = JSON.stringify(items);
+});
+
+// After HTMX loads suggestions, update the step summary counter and enable the import button.
+document.body.addEventListener('htmx:afterSwap', function (e) {
+    if (e.detail.target && e.detail.target.id === 'suggestions-container') {
+        updateStepSummary();
+        var btn = document.getElementById('import-btn');
+        if (btn) btn.disabled = false;
+    }
+});
+
+function updateStepSummary() {
+    var selected = document.querySelectorAll('.item-master-check:checked').length;
+    var total    = document.querySelectorAll('.item-master-check').length;
+    var profileSet = new Set();
+    document.querySelectorAll('.item-profile-check:checked').forEach(function (cb) {
+        profileSet.add(cb.value);
+    });
+    var el = document.getElementById('step-summary-text');
+    if (el) {
+        el.textContent = selected + ' von ' + total + ' Vorschl\u00E4gen ausgew\u00E4hlt' +
+            (profileSet.size > 0 ? ' f\u00FCr ' + profileSet.size + ' Profil(e)' : '');
+    }
+}
+
+// Live-update the summary as checkboxes change.
+document.body.addEventListener('change', function (e) {
+    if (e.target.classList.contains('item-master-check') ||
+        e.target.classList.contains('item-profile-check')) {
+        updateStepSummary();
+    }
+});
+</script>
+</th:block>
+</body>
+</html>

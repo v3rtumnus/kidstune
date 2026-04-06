@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Import abgeschlossen</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <a th:href="@{/web/import}" class="btn btn-sm btn-outline-secondary me-3">&larr;</a>
+        <h1 class="h3 mb-0">Import abgeschlossen</h1>
+    </div>
+
+    <!-- No content imported -->
+    <div th:if="${result.entries().isEmpty()}" class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <p class="text-muted mb-3">Es wurden keine neuen Inhalte importiert.</p>
+            <a th:href="@{/web/import}" class="btn btn-outline-primary">Erneut importieren</a>
+        </div>
+    </div>
+
+    <!-- Results per profile -->
+    <div th:unless="${result.entries().isEmpty()}" class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold">Ergebnis</div>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item" th:each="entry : ${result.entries()}">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-semibold" th:text="${entry.profileName()}">Luna</span>
+                    <span th:if="${entry.contentAdded() > 0}"
+                          class="badge bg-primary"
+                          th:text="${entry.contentAdded() + ' Inhalt' + (entry.contentAdded() == 1 ? '' : 'e') + ' hinzugef\u00FCgt'}">
+                        3 Inhalte hinzugef&uuml;gt
+                    </span>
+                    <span th:if="${entry.contentAdded() == 0}"
+                          class="badge bg-light text-muted">
+                        Keine neuen Inhalte (bereits vorhanden)
+                    </span>
+                    <span th:if="${entry.likedSongsImported() > 0}"
+                          class="badge bg-success"
+                          th:text="${'+ ' + entry.likedSongsImported() + ' Lieblingssong' + (entry.likedSongsImported() == 1 ? '' : 's') + ' als Favoriten importiert'}">
+                        + 5 Lieblingssongs als Favoriten importiert
+                    </span>
+                </div>
+            </li>
+        </ul>
+    </div>
+
+    <div class="d-flex gap-2" th:unless="${result.entries().isEmpty()}">
+        <a th:href="@{/web/import}" class="btn btn-outline-secondary">Weiteren Import starten</a>
+        <a th:href="@{/web/profiles}" class="btn btn-primary">Zu den Profilen</a>
+    </div>
+
+</th:block>
+</body>
+</html>
