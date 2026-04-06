@@ -31,4 +31,8 @@ interface ContentDao {
 
     @Query("SELECT COUNT(*) FROM local_content_entry WHERE profile_id = :profileId AND content_type = :type")
     suspend fun countByType(profileId: String, type: ContentType): Int
+
+    /** Reactive count of all entries for a profile. Emits a new value whenever the table changes. */
+    @Query("SELECT COUNT(*) FROM local_content_entry WHERE profile_id = :profileId")
+    fun countAllFlow(profileId: String): Flow<Int>
 }

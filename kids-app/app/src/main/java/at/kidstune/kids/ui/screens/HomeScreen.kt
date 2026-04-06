@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -94,74 +97,126 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Profile avatar – top-left
+            // Top bar: profile avatar (left) + status indicators (right)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                contentAlignment = Alignment.CenterStart
+                    .padding(16.dp)
             ) {
                 ProfileBadge(
-                    emoji = state.boundProfileEmoji,
-                    name  = state.boundProfileName
+                    emoji    = state.boundProfileEmoji,
+                    name     = state.boundProfileName,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                )
+
+                StatusIndicators(
+                    isOffline      = state.isOffline,
+                    isStaleContent = state.isStaleContent,
+                    modifier       = Modifier.align(Alignment.CenterEnd)
                 )
             }
 
-            // Category buttons – vertically centered in remaining space
-            Column(
-                modifier            = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Music + Audiobooks side-by-side
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // No-cache screen: shown when Room is empty (loading = null is treated as
+            // having content to avoid a flash on normal cold starts).
+            if (state.cachedContentCount == 0) {
+                NoCacheScreen(modifier = Modifier.weight(1f))
+            } else {
+                // Category buttons – vertically centred in remaining space
+                Column(
+                    modifier            = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    CategoryButton(
-                        emoji    = "🎵",
-                        label    = "Musik",
-                        color    = MusicPrimary,
-                        modifier = Modifier.weight(1f),
-                        onClick  = { onNavigateToBrowse(BrowseCategory.MUSIC) }
-                    )
-                    CategoryButton(
-                        emoji    = "📖",
-                        label    = "Hörbücher",
-                        color    = AudiobookPrimary,
-                        modifier = Modifier.weight(1f),
-                        onClick  = { onNavigateToBrowse(BrowseCategory.AUDIOBOOK) }
-                    )
-                }
+                    // Music + Audiobooks side-by-side
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CategoryButton(
+                            emoji    = "🎵",
+                            label    = "Musik",
+                            color    = MusicPrimary,
+                            modifier = Modifier.weight(1f),
+                            onClick  = { onNavigateToBrowse(BrowseCategory.MUSIC) }
+                        )
+                        CategoryButton(
+                            emoji    = "📖",
+                            label    = "Hörbücher",
+                            color    = AudiobookPrimary,
+                            modifier = Modifier.weight(1f),
+                            onClick  = { onNavigateToBrowse(BrowseCategory.AUDIOBOOK) }
+                        )
+                    }
 
-                Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(12.dp))
 
-                // Favorites + Discover side-by-side
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    CategoryButton(
-                        emoji    = "❤️",
-                        label    = "Lieblingssongs",
-                        color    = FavoritePrimary,
-                        modifier = Modifier.weight(1f),
-                        onClick  = { onNavigateToBrowse(BrowseCategory.FAVORITES) }
-                    )
-                    CategoryButton(
-                        emoji    = "🔍",
-                        label    = "Entdecken",
-                        color    = DiscoverPrimary,
-                        modifier = Modifier.weight(1f),
-                        onClick  = onNavigateToDiscover
-                    )
+                    // Favorites + Discover side-by-side
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CategoryButton(
+                            emoji    = "❤️",
+                            label    = "Lieblingssongs",
+                            color    = FavoritePrimary,
+                            modifier = Modifier.weight(1f),
+                            onClick  = { onNavigateToBrowse(BrowseCategory.FAVORITES) }
+                        )
+                        CategoryButton(
+                            emoji    = "🔍",
+                            label    = "Entdecken",
+                            color    = DiscoverPrimary,
+                            modifier = Modifier.weight(1f),
+                            onClick  = onNavigateToDiscover
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+// ── Status indicators (top-right) ─────────────────────────────────────────
+
+/**
+ * Shows a cloud-off icon when offline and/or a yellow dot when content is stale.
+ * Both are purely informational – they do not block any interaction.
+ */
+@Composable
+private fun StatusIndicators(
+    modifier: Modifier = Modifier,
+    isOffline: Boolean,
+    isStaleContent: Boolean
+) {
+    if (!isOffline && !isStaleContent) return
+
+    Row(
+        modifier              = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment     = Alignment.CenterVertically
+    ) {
+        if (isStaleContent) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(Color(0xFFFFCC00), CircleShape)
+                    .semantics { contentDescription = "Inhalte veraltet" }
+            )
+        }
+        if (isOffline) {
+            Icon(
+                imageVector        = Icons.Rounded.CloudOff,
+                contentDescription = "Offline",
+                tint               = MaterialTheme.colorScheme.outline,
+                modifier           = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+// ── Sub-composables ───────────────────────────────────────────────────────
 
 @Composable
 private fun ProfileBadge(
@@ -235,14 +290,38 @@ private fun HomeScreenPreview() {
     }
 }
 
+@Preview(name = "HomeScreen – offline", showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenOfflinePreview() {
+    KidstuneTheme {
+        HomeScreen(state = HomeState(isOffline = true))
+    }
+}
+
+@Preview(name = "HomeScreen – stale content", showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenStalePreview() {
+    KidstuneTheme {
+        HomeScreen(state = HomeState(isStaleContent = true))
+    }
+}
+
+@Preview(name = "HomeScreen – no cache", showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenNoCachePreview() {
+    KidstuneTheme {
+        HomeScreen(state = HomeState(isOffline = true, cachedContentCount = 0))
+    }
+}
+
 @Preview(name = "HomeScreen – nothing playing", showBackground = true, showSystemUi = true)
 @Composable
 private fun HomeScreenNothingPlayingPreview() {
     KidstuneTheme {
         HomeScreen(
             state = HomeState(
-                nowPlayingTitle  = null,
-                nowPlayingArtist = null,
+                nowPlayingTitle    = null,
+                nowPlayingArtist   = null,
                 nowPlayingImageUrl = null
             )
         )

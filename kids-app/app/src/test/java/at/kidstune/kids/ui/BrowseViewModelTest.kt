@@ -54,6 +54,8 @@ private class FakeContentDao(private val data: List<LocalContentEntry>) : Conten
     override suspend fun deleteAll(profileId: String) {}
     override suspend fun countByType(profileId: String, type: ContentType): Int =
         data.count { it.profileId == profileId && it.contentType == type }
+    override fun countAllFlow(profileId: String): Flow<Int> =
+        flowOf(data.count { it.profileId == profileId })
 }
 
 private class FakeAlbumDao(private val data: List<LocalAlbum>) : AlbumDao {

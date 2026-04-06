@@ -2,6 +2,7 @@ package at.kidstune.kids.ui.screen
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -11,6 +12,7 @@ import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.viewmodel.HomeState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,5 +120,79 @@ class HomeScreenTest {
 
         assertNotNull(nowPlayingOpened)
         assertEquals(true, nowPlayingOpened)
+    }
+
+    // ── Offline indicator ─────────────────────────────────────────────────────
+
+    @Test
+    fun `offline icon is shown when isOffline is true`() {
+        launch(state = HomeState(isOffline = true))
+        composeTestRule.onNodeWithContentDescription("Offline").assertIsDisplayed()
+    }
+
+    @Test
+    fun `offline icon is not shown when isOffline is false`() {
+        launch(state = HomeState(isOffline = false))
+        val nodes = composeTestRule.onAllNodesWithContentDescription("Offline").fetchSemanticsNodes()
+        assertTrue("Offline icon should be absent", nodes.isEmpty())
+    }
+
+    // ── Stale content indicator ───────────────────────────────────────────────
+
+    @Test
+    fun `stale dot is shown when isStaleContent is true`() {
+        launch(state = HomeState(isStaleContent = true))
+        composeTestRule.onNodeWithContentDescription("Inhalte veraltet").assertIsDisplayed()
+    }
+
+    @Test
+    fun `stale dot is not shown when isStaleContent is false`() {
+        launch(state = HomeState(isStaleContent = false))
+        val nodes = composeTestRule.onAllNodesWithContentDescription("Inhalte veraltet").fetchSemanticsNodes()
+        assertTrue("Stale dot should be absent", nodes.isEmpty())
+    }
+
+    @Test
+    fun `stale dot and offline icon can appear simultaneously`() {
+        // Edge case: device was online with stale content, then lost connectivity.
+        // isStaleContent is only true when online per ViewModel logic, but HomeScreen
+        // renders both independently based on state fields.
+        launch(state = HomeState(isOffline = true, isStaleContent = true))
+        composeTestRule.onNodeWithContentDescription("Offline").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Inhalte veraltet").assertIsDisplayed()
+    }
+
+    // ── No-cache screen ───────────────────────────────────────────────────────
+
+    @Test
+    fun `no-cache screen is shown when cachedContentCount is zero`() {
+        launch(state = HomeState(cachedContentCount = 0))
+        composeTestRule.onNodeWithContentDescription("Kein Cache verfügbar").assertIsDisplayed()
+    }
+
+    @Test
+    fun `category buttons are not shown when cachedContentCount is zero`() {
+        launch(state = HomeState(cachedContentCount = 0))
+        val nodes = composeTestRule.onAllNodesWithContentDescription("Musik").fetchSemanticsNodes()
+        assertTrue("Category buttons should be absent in no-cache state", nodes.isEmpty())
+    }
+
+    @Test
+    fun `category buttons are shown when cachedContentCount is greater than zero`() {
+        launch(state = HomeState(cachedContentCount = 5))
+        composeTestRule.onNodeWithContentDescription("Musik").assertIsDisplayed()
+    }
+
+    @Test
+    fun `category buttons are shown when cachedContentCount is null (loading)`() {
+        launch(state = HomeState(cachedContentCount = null))
+        composeTestRule.onNodeWithContentDescription("Musik").assertIsDisplayed()
+    }
+
+    @Test
+    fun `no-cache screen is shown offline with zero cached content`() {
+        launch(state = HomeState(isOffline = true, cachedContentCount = 0))
+        composeTestRule.onNodeWithContentDescription("Kein Cache verfügbar").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Offline").assertIsDisplayed()
     }
 }
