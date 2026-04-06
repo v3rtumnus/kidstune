@@ -15,7 +15,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ **Phase 5 complete** (5.1 – 5.4) — Device pairing, delta sync backend, kids app pairing flow, WorkManager sync manager
 - ✅ **Prompt 6.1 complete** — Backend import service + liked songs pre-population
 - ✅ **Prompt 6.2 complete** — Web dashboard import wizard + liked songs import
-- ⬅️ **NEXT: Prompt 6.4**
+- ✅ **Prompt 6.4 complete** — Samsung Kids compatibility: lifecycle fixes, README setup guide
+- ⬅️ **NEXT: Phase 7**
 
 ---
 
@@ -1764,7 +1765,7 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 6.4 – Samsung Kids Compatibility ⬅️
+### Prompt 6.4 – Samsung Kids Compatibility ✅
 
 ```
 CONTEXT: Phase 6 of KidsTune. The kids app is feature-complete for the core flow.

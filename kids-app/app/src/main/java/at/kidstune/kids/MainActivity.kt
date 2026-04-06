@@ -66,10 +66,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Re-establish Spotify App Remote connection when Samsung Kids brings this
+        // activity back to the foreground after a time-limit pause or parent check.
+        // SpotifyRemoteManager.connect() is idempotent – it is a no-op if already
+        // connected or in the middle of a connection attempt.
+        spotifyRemote.connect()
+    }
+
     override fun onStop() {
         super.onStop()
         // Flush playback position when the app is backgrounded (child closes app,
-        // switches Samsung Kids task, or the screen turns off).
+        // switches Samsung Kids task, time limit reached, or screen turns off).
         playbackController.onBackground()
     }
 
