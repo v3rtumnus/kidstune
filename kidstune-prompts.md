@@ -1574,7 +1574,7 @@ VERIFICATION:
 
 ## Phase 6 – Import, Offline & Samsung Kids (Week 8)
 
-### Prompt 6.1 – Backend Import Service + Liked Songs Pre-population
+### Prompt 6.1 – Backend Import Service + Liked Songs Pre-population ✅
 
 ```
 CONTEXT: Phase 6 of KidsTune. We implement the Spotify listening history import to ease
@@ -1659,7 +1659,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 6.2 – Web Dashboard Import Wizard + Liked Songs Import
+### Prompt 6.2 – Web Dashboard Import Wizard + Liked Songs Import ✅
 
 ```
 CONTEXT: Phase 6 of KidsTune. Backend import service exists (6.1), including
@@ -1720,7 +1720,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 6.3 – Kids App Offline Hardening
+### Prompt 6.3 – Kids App Offline Hardening ⬅️
 
 ```
 CONTEXT: Phase 6 of KidsTune. The kids app works with sync and playback. We now stress-test
