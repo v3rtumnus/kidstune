@@ -1891,7 +1891,7 @@ VERIFICATION:
 
 No WebSocket hub, no multi-layer complexity, no Android parent app.
 
-### Prompt 7.1 – Backend Content Request Workflow
+### Prompt 7.1 – Backend Content Request Workflow ✅
 
 ```
 CONTEXT: Phase 7 of KidsTune. There is no parent app; parents manage content via the web
@@ -1961,7 +1961,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun → app starts healthy
 ```
 
-### Prompt 7.2 – Backend SSE + Web Push Notifications
+### Prompt 7.2 – Backend SSE + Web Push Notifications ⬅️
 
 ```
 CONTEXT: Phase 7 of KidsTune. Content request workflow exists (7.1). We add two real-time

@@ -10,7 +10,7 @@ import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
 import at.kidstune.spotify.ImportSuggestionsDto;
 import at.kidstune.spotify.SpotifyImportService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

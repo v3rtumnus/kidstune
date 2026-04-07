@@ -119,7 +119,7 @@ public class SecurityConfig {
                         // ── KIDS-specific (more specific first) ──────────────
                         .pathMatchers("/api/v1/sync/**").hasRole(KIDS_ROLE)
                         .pathMatchers("/api/v1/profiles/*/favorites/**").hasAnyRole(KIDS_ROLE, PARENT_ROLE)
-                        .pathMatchers(HttpMethod.POST, "/api/v1/content-requests").hasRole(KIDS_ROLE)
+                        .pathMatchers(HttpMethod.POST, "/api/v1/profiles/*/content-requests").hasAnyRole(KIDS_ROLE, PARENT_ROLE)
 
                         // ── PARENT-only ──────────────────────────────────────
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/pair").hasRole(PARENT_ROLE)
@@ -127,8 +127,7 @@ public class SecurityConfig {
                         .pathMatchers("/api/v1/profiles/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/content/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/spotify/**").hasRole(PARENT_ROLE)
-                        .pathMatchers(HttpMethod.GET,  "/api/v1/content-requests").hasRole(PARENT_ROLE)
-                        .pathMatchers(HttpMethod.PUT,  "/api/v1/content-requests/**").hasRole(PARENT_ROLE)
+                        .pathMatchers("/api/v1/content-requests", "/api/v1/content-requests/**").hasRole(PARENT_ROLE)
 
                         // ── Anything else requires authentication ─────────────
                         .anyExchange().authenticated()

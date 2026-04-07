@@ -7,18 +7,28 @@ import at.kidstune.content.ContentType;
 import at.kidstune.notification.EmailNotificationService;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
+import at.kidstune.requests.dto.ContentRequestResponse;
+import at.kidstune.requests.dto.PendingCountResponse;
 import at.kidstune.resolver.ContentResolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
 public class ContentRequestService {
+
+    private static final Logger log = LoggerFactory.getLogger(ContentRequestService.class);
 
     private final ContentRequestRepository requestRepository;
     private final ContentRepository        contentRepository;
@@ -121,6 +131,124 @@ public class ContentRequestService {
         });
     }
 
+    /** Approve with optional profile override, content-type override, and parent note. */
+    public Mono<Void> approveRequestWithOptions(String requestId, String familyId,
+                                                List<String> approvedByProfileIds,
+                                                ContentType contentTypeOverride,
+                                                String note) {
+        return db(() -> {
+            ContentRequest request = getRequestForFamily(requestId, familyId);
+
+            List<String> targetProfileIds;
+            if (approvedByProfileIds != null && !approvedByProfileIds.isEmpty()) {
+                List<String> familyProfileIds = profileRepository.findByFamilyId(familyId)
+                        .stream().map(ChildProfile::getId).toList();
+                targetProfileIds = approvedByProfileIds.stream()
+                        .filter(familyProfileIds::contains).toList();
+            } else {
+                targetProfileIds = List.of(request.getProfileId());
+            }
+
+            ContentType effectiveType = contentTypeOverride != null
+                    ? contentTypeOverride
+                    : request.getContentType();
+
+            for (String profileId : targetProfileIds) {
+                addContentIfMissing(profileId, request, effectiveType);
+            }
+
+            request.setStatus(ContentRequestStatus.APPROVED);
+            request.setResolvedAt(Instant.now());
+            request.setResolvedBy(familyId);
+            if (note != null && !note.isBlank()) {
+                request.setParentNote(note.strip());
+            }
+            requestRepository.save(request);
+            return null;
+        });
+    }
+
+    /** Bulk-reject a list of request IDs. Skips requests that don't belong to the family. */
+    public Mono<Void> bulkReject(List<String> requestIds, String familyId, String note) {
+        return db(() -> {
+            for (String requestId : requestIds) {
+                try {
+                    ContentRequest request = getRequestForFamily(requestId, familyId);
+                    if (request.getStatus() == ContentRequestStatus.PENDING) {
+                        request.setStatus(ContentRequestStatus.REJECTED);
+                        request.setResolvedAt(Instant.now());
+                        request.setResolvedBy(familyId);
+                        if (note != null && !note.isBlank()) {
+                            request.setParentNote(note.strip());
+                        }
+                        requestRepository.save(request);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // skip — request doesn't belong to this family
+                }
+            }
+            return null;
+        });
+    }
+
+    /** Lists requests for a family, optionally filtered by status and/or profileId. */
+    public Mono<List<ContentRequestResponse>> listRequests(
+            String familyId, ContentRequestStatus status, String profileIdFilter) {
+        return db(() -> {
+            List<String> profileIds;
+            if (profileIdFilter != null) {
+                boolean belongs = profileRepository.findById(profileIdFilter)
+                        .map(p -> p.getFamilyId().equals(familyId))
+                        .orElse(false);
+                profileIds = belongs ? List.of(profileIdFilter) : List.of();
+            } else {
+                profileIds = profileRepository.findByFamilyId(familyId)
+                        .stream().map(ChildProfile::getId).toList();
+            }
+            if (profileIds.isEmpty()) return List.of();
+
+            List<ContentRequest> requests;
+            if (status != null) {
+                requests = requestRepository
+                        .findByProfileIdInAndStatusOrderByRequestedAtDesc(profileIds, status);
+            } else {
+                requests = requestRepository.findByProfileIdIn(profileIds)
+                        .stream()
+                        .sorted(Comparator.comparing(ContentRequest::getRequestedAt).reversed())
+                        .toList();
+            }
+            return requests.stream().map(ContentRequestResponse::from).toList();
+        });
+    }
+
+    /** Returns pending request counts per profile and the family total. */
+    public Mono<PendingCountResponse> getPendingCount(String familyId) {
+        return db(() -> {
+            List<ChildProfile> profiles = profileRepository.findByFamilyId(familyId);
+            List<PendingCountResponse.ProfileCount> profileCounts = profiles.stream()
+                    .map(p -> new PendingCountResponse.ProfileCount(
+                            p.getId(),
+                            p.getName(),
+                            requestRepository.countByProfileIdAndStatus(
+                                    p.getId(), ContentRequestStatus.PENDING)))
+                    .toList();
+            long total = profileCounts.stream()
+                    .mapToLong(PendingCountResponse.ProfileCount::count).sum();
+            return new PendingCountResponse(profileCounts, total);
+        });
+    }
+
+    /** Expires PENDING requests older than 7 days. Runs daily at 03:00. */
+    @Scheduled(cron = "0 0 3 * * *")
+    @Transactional
+    public void expireStaleRequests() {
+        Instant cutoff = Instant.now().minus(7, ChronoUnit.DAYS);
+        int expired = requestRepository.expireOldRequests(cutoff, Instant.now());
+        if (expired > 0) {
+            log.info("Expired {} stale content request(s) older than 7 days.", expired);
+        }
+    }
+
     /** Bulk-approve a list of request IDs. Skips requests that don't belong to the family. */
     public Mono<Void> bulkApprove(List<String> requestIds, String familyId) {
         return db(() -> {
@@ -154,13 +282,17 @@ public class ContentRequestService {
     }
 
     private void addContentIfMissing(String profileId, ContentRequest request) {
+        addContentIfMissing(profileId, request, request.getContentType());
+    }
+
+    private void addContentIfMissing(String profileId, ContentRequest request, ContentType contentType) {
         if (contentRepository.existsByProfileIdAndSpotifyUri(profileId, request.getSpotifyUri())) {
             return;
         }
         AllowedContent content = new AllowedContent();
         content.setProfileId(profileId);
         content.setSpotifyUri(request.getSpotifyUri());
-        content.setContentType(request.getContentType());
+        content.setContentType(contentType);
         content.setScope(scopeFromUri(request.getSpotifyUri()));
         content.setTitle(request.getTitle());
         content.setImageUrl(request.getImageUrl());

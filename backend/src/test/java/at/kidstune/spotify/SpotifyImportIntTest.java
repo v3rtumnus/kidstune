@@ -143,11 +143,8 @@ class SpotifyImportIntTest {
         when(spotifyTokenService.getValidProfileAccessToken(PROFILE_ID))
                 .thenReturn(Mono.just(PROFILE_TOKEN));
 
-        // Queue the 4 Spotify API calls
-        enqueueFixture("import-recently-played.json");
-        enqueueFixture("import-top-artists-medium.json");
-        enqueueFixture("import-top-artists-long.json");
-        enqueueFixture("import-user-playlists.json");
+        // Use URL-routing dispatcher so parallel Mono.zip calls get the right fixture
+        installImportDispatcher();
 
         StepVerifier.create(spotifyImportService.getImportSuggestions(PROFILE_ID))
                 .assertNext(suggestions -> {
@@ -179,10 +176,8 @@ class SpotifyImportIntTest {
         // Fixtures: medium has "Bibi & Tina" (known children, min_age 3) and
         // "Die drei ??? Kids" (known children, min_age 6).
         // For PRESCHOOL profile, Bibi & Tina should be pre-selected, Die drei ??? Kids not.
-        enqueueFixture("import-recently-played.json");
-        enqueueFixture("import-top-artists-medium.json");
-        enqueueFixture("import-top-artists-long.json");  // Popular Artist → other
-        enqueueFixture("import-user-playlists.json");
+        // Use URL-routing dispatcher so parallel Mono.zip calls get the right fixture.
+        installImportDispatcher();
 
         ImportSuggestionsDto result = spotifyImportService.getImportSuggestions(PROFILE_ID)
                 .block();
@@ -207,14 +202,49 @@ class SpotifyImportIntTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private void enqueueFixture(String filename) throws IOException {
+    /**
+     * Installs a URL-routing dispatcher on MockWebServer so that parallel WebClient calls
+     * inside Mono.zip always receive the correct fixture regardless of request order.
+     */
+    private void installImportDispatcher() throws IOException {
+        String recentlyPlayed  = readFixture("import-recently-played.json");
+        String topMedium       = readFixture("import-top-artists-medium.json");
+        String topLong         = readFixture("import-top-artists-long.json");
+        String playlists       = readFixture("import-user-playlists.json");
+
+        mockSpotify.setDispatcher(new okhttp3.mockwebserver.Dispatcher() {
+            @Override
+            public MockResponse dispatch(RecordedRequest request) {
+                String path = request.getPath() != null ? request.getPath() : "";
+                if (path.startsWith("/v1/me/player/recently-played")) {
+                    return jsonResponse(recentlyPlayed);
+                } else if (path.startsWith("/v1/me/top/artists") && path.contains("medium_term")) {
+                    return jsonResponse(topMedium);
+                } else if (path.startsWith("/v1/me/top/artists") && path.contains("long_term")) {
+                    return jsonResponse(topLong);
+                } else if (path.startsWith("/v1/me/playlists")) {
+                    return jsonResponse(playlists);
+                }
+                return new MockResponse().setResponseCode(404);
+            }
+        });
+    }
+
+    private String readFixture(String filename) throws IOException {
         try (var stream = Objects.requireNonNull(
                 getClass().getClassLoader().getResourceAsStream("spotify-fixtures/" + filename))) {
-            String body = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            mockSpotify.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .setBody(body));
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private static MockResponse jsonResponse(String body) {
+        return new MockResponse()
+                .setResponseCode(200)
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .setBody(body);
+    }
+
+    private void enqueueFixture(String filename) throws IOException {
+        mockSpotify.enqueue(jsonResponse(readFixture(filename)));
     }
 }

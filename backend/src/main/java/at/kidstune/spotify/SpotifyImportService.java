@@ -167,14 +167,14 @@ public class SpotifyImportService {
         Map<String, ApiArtist> merged = new LinkedHashMap<>();
         // Insert recently-played first (lower priority)
         for (ApiArtist a : sources.recentArtists()) {
-            merged.putIfAbsent(a.name().toLowerCase(), a);
+            if (a.name() != null) merged.putIfAbsent(a.name().toLowerCase(), a);
         }
         // Top artists override (have richer data)
         for (ApiArtist a : sources.topMedium()) {
-            merged.put(a.name().toLowerCase(), a);
+            if (a.name() != null) merged.put(a.name().toLowerCase(), a);
         }
         for (ApiArtist a : sources.topLong()) {
-            merged.put(a.name().toLowerCase(), a);
+            if (a.name() != null) merged.put(a.name().toLowerCase(), a);
         }
 
         List<ImportSuggestionsDto.Item> children  = new ArrayList<>();
