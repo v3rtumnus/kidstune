@@ -1,0 +1,56 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-push-subscriptions
+      author: kidstune
+      changes:
+        - createTable:
+            tableName: push_subscription
+            columns:
+              - column:
+                  name: id
+                  type: VARCHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: family_id
+                  type: VARCHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: endpoint
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: p256dh
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: auth
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: DATETIME(6)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_agent
+                  type: VARCHAR(512)
+            tablespace: ''
+        - addForeignKeyConstraint:
+            baseTableName: push_subscription
+            baseColumnNames: family_id
+            referencedTableName: family
+            referencedColumnNames: id
+            constraintName: fk_push_subscription_family
+            onDelete: CASCADE
+        - createIndex:
+            indexName: idx_push_subscription_family_id
+            tableName: push_subscription
+            columns:
+              - column:
+                  name: family_id

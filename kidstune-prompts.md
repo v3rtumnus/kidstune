@@ -1961,7 +1961,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun → app starts healthy
 ```
 
-### Prompt 7.2 – Backend SSE + Web Push Notifications ⬅️
+### Prompt 7.2 – Backend SSE + Web Push Notifications ✅
 
 ```
 CONTEXT: Phase 7 of KidsTune. Content request workflow exists (7.1). We add two real-time
@@ -2023,7 +2023,7 @@ VERIFICATION:
 - Run the backend locally → app starts healthy
 ```
 
-### Prompt 7.3 – Kids App Discover Screen
+### Prompt 7.3 – Kids App Discover Screen ⬅️
 
 ```
 CONTEXT: Phase 7 of KidsTune. Backend content requests work (7.1). The Discover screen already

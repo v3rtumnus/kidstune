@@ -71,7 +71,8 @@ public class SecurityConfig {
                         .pathMatchers(
                                 "/web/login",
                                 "/web/register",
-                                "/web/approve/**"
+                                "/web/approve/**",
+                                "/web/push/vapid-public-key"
                         ).permitAll()
                         .anyExchange().authenticated()
                 )
@@ -109,7 +110,7 @@ public class SecurityConfig {
                         // ── Public ───────────────────────────────────────────
                         .pathMatchers("/actuator/health").permitAll()
                         .pathMatchers("/webjars/**").permitAll()
-                        .pathMatchers("/", "/favicon.ico", "/robots.txt").permitAll()
+                        .pathMatchers("/", "/favicon.ico", "/robots.txt", "/sw.js").permitAll()
                         .pathMatchers(
                                 "/api/v1/auth/spotify/**",
                                 "/api/v1/auth/pair/confirm",

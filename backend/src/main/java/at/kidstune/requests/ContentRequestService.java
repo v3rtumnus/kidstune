@@ -7,9 +7,11 @@ import at.kidstune.content.ContentType;
 import at.kidstune.notification.EmailNotificationService;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
+import at.kidstune.push.PushNotificationService;
 import at.kidstune.requests.dto.ContentRequestResponse;
 import at.kidstune.requests.dto.PendingCountResponse;
 import at.kidstune.resolver.ContentResolver;
+import at.kidstune.sse.SseRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -23,7 +25,9 @@ import reactor.core.scheduler.Schedulers;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ContentRequestService {
@@ -35,20 +39,26 @@ public class ContentRequestService {
     private final ProfileRepository        profileRepository;
     private final EmailNotificationService emailNotificationService;
     private final ContentResolver          contentResolver;
+    private final SseRegistry             sseRegistry;
+    private final PushNotificationService  pushNotificationService;
 
     public ContentRequestService(ContentRequestRepository requestRepository,
                                   ContentRepository contentRepository,
                                   ProfileRepository profileRepository,
                                   EmailNotificationService emailNotificationService,
-                                  ContentResolver contentResolver) {
+                                  ContentResolver contentResolver,
+                                  SseRegistry sseRegistry,
+                                  PushNotificationService pushNotificationService) {
         this.requestRepository          = requestRepository;
         this.contentRepository          = contentRepository;
         this.profileRepository          = profileRepository;
         this.emailNotificationService   = emailNotificationService;
         this.contentResolver            = contentResolver;
+        this.sseRegistry                = sseRegistry;
+        this.pushNotificationService    = pushNotificationService;
     }
 
-    /** Creates a new PENDING request. Enforces max-3 pending per profile. Fires email async. */
+    /** Creates a new PENDING request. Enforces max-3 pending per profile. Fires email + push async. */
     public Mono<ContentRequest> createRequest(String profileId, String spotifyUri,
                                               String title, ContentType contentType,
                                               String imageUrl, String artistName) {
@@ -66,7 +76,14 @@ public class ContentRequestService {
             request.setImageUrl(imageUrl);
             request.setArtistName(artistName);
             return requestRepository.save(request);
-        }).doOnNext(emailNotificationService::sendRequestNotification);
+        }).doOnNext(req -> {
+            emailNotificationService.sendRequestNotification(req);
+            profileRepository.findById(profileId).ifPresent(profile -> {
+                String familyId = profile.getFamilyId();
+                emitSseCount(familyId);
+                pushNotificationService.sendRequestNotification(req, familyId);
+            });
+        });
     }
 
     /** Approves a request by its approve_token (public one-click flow – no auth required). */
@@ -83,7 +100,7 @@ public class ContentRequestService {
             request.setResolvedAt(Instant.now());
             request.setApproveToken(null); // single-use: clear after use
             return requestRepository.save(request);
-        });
+        }).doOnNext(req -> emitSseCountForProfile(req.getProfileId()));
     }
 
     /** Approve a single request: creates AllowedContent for the requesting profile. */
@@ -96,7 +113,7 @@ public class ContentRequestService {
             request.setResolvedBy(familyId);
             requestRepository.save(request);
             return null;
-        });
+        }).then(Mono.fromRunnable(() -> emitSseCount(familyId)));
     }
 
     /** Approve for all profiles in the family: creates AllowedContent for every profile. */
@@ -113,7 +130,7 @@ public class ContentRequestService {
             request.setResolvedBy(familyId);
             requestRepository.save(request);
             return null;
-        });
+        }).then(Mono.fromRunnable(() -> emitSseCount(familyId)));
     }
 
     /** Reject a request with an optional parent note. */
@@ -128,7 +145,7 @@ public class ContentRequestService {
             }
             requestRepository.save(request);
             return null;
-        });
+        }).then(Mono.fromRunnable(() -> emitSseCount(familyId)));
     }
 
     /** Approve with optional profile override, content-type override, and parent note. */
@@ -165,7 +182,7 @@ public class ContentRequestService {
             }
             requestRepository.save(request);
             return null;
-        });
+        }).then(Mono.fromRunnable(() -> emitSseCount(familyId)));
     }
 
     /** Bulk-reject a list of request IDs. Skips requests that don't belong to the family. */
@@ -188,7 +205,7 @@ public class ContentRequestService {
                 }
             }
             return null;
-        });
+        }).then(Mono.fromRunnable(() -> emitSseCount(familyId)));
     }
 
     /** Lists requests for a family, optionally filtered by status and/or profileId. */
@@ -243,9 +260,17 @@ public class ContentRequestService {
     @Transactional
     public void expireStaleRequests() {
         Instant cutoff = Instant.now().minus(7, ChronoUnit.DAYS);
+
+        // Capture affected families before the bulk update so we can emit SSE afterward.
+        Set<String> affectedFamilies = new HashSet<>();
+        requestRepository.findProfileIdsWithPendingOlderThan(cutoff).forEach(profileId ->
+                profileRepository.findById(profileId)
+                        .ifPresent(p -> affectedFamilies.add(p.getFamilyId())));
+
         int expired = requestRepository.expireOldRequests(cutoff, Instant.now());
         if (expired > 0) {
             log.info("Expired {} stale content request(s) older than 7 days.", expired);
+            affectedFamilies.forEach(this::emitSseCount);
         }
     }
 
@@ -267,7 +292,7 @@ public class ContentRequestService {
                 }
             }
             return null;
-        });
+        }).then(Mono.fromRunnable(() -> emitSseCount(familyId)));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -309,6 +334,23 @@ public class ContentRequestService {
         if (uri.startsWith("spotify:playlist:"))    return ContentScope.PLAYLIST;
         if (uri.startsWith("spotify:artist:"))      return ContentScope.ARTIST;
         return ContentScope.ALBUM;
+    }
+
+    // ── SSE emit helpers ──────────────────────────────────────────────────────
+
+    /** Emits the current pending count for the given family to all connected SSE clients. */
+    private void emitSseCount(String familyId) {
+        List<String> profileIds = profileRepository.findByFamilyId(familyId)
+                .stream().map(ChildProfile::getId).toList();
+        long count = profileIds.isEmpty() ? 0
+                : requestRepository.countByProfileIdInAndStatus(profileIds, ContentRequestStatus.PENDING);
+        sseRegistry.emit(familyId, count);
+    }
+
+    /** Resolves the family for a profile, then emits the SSE count for that family. */
+    private void emitSseCountForProfile(String profileId) {
+        profileRepository.findById(profileId)
+                .ifPresent(p -> emitSseCount(p.getFamilyId()));
     }
 
     private <T> Mono<T> db(java.util.concurrent.Callable<T> callable) {

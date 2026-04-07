@@ -47,7 +47,29 @@
       "Bash(./gradlew :app:testDebugUnitTest --tests \"at.kidstune.kids.sync.*\" --tests \"at.kidstune.kids.data.repository.SyncRepositoryTest\" -x lint -x hiltJavaCompileDebug -x hiltJavaCompileDebugUnitTest)",
       "Bash(./gradlew :app:testDebugUnitTest --tests \"at.kidstune.kids.sync.OfflineQueueTest.draining*\" -x lint -x hiltJavaCompileDebug -x hiltJavaCompileDebugUnitTest --info)",
       "Bash(./gradlew :app:testDebugUnitTest -x lint -x hiltJavaCompileDebug -x hiltJavaCompileDebugUnitTest)",
-      "Bash(./gradlew bootJar)"
+      "Bash(./gradlew bootJar)",
+      "Bash(xargs grep:*)",
+      "Bash(./gradlew :kids-app:app:testDebugUnitTest --tests \"at.kidstune.kids.connectivity.*\" --tests \"at.kidstune.kids.ui.HomeViewModelOfflineTest\" --tests \"at.kidstune.kids.data.repository.FavoriteOfflineIntTest\" --tests \"at.kidstune.kids.ui.screen.HomeScreenTest\")",
+      "Bash(./gradlew projects:*)",
+      "Bash(./gradlew testDebugUnitTest --tests \"at.kidstune.kids.connectivity.*\" --tests \"at.kidstune.kids.ui.HomeViewModelOfflineTest\" --tests \"at.kidstune.kids.data.repository.FavoriteOfflineIntTest\" --tests \"at.kidstune.kids.ui.screen.HomeScreenTest\")",
+      "Bash(./gradlew compileDebugKotlin compileDebugUnitTestKotlin)",
+      "Bash(./gradlew compileDebugKotlin --stacktrace)",
+      "Bash(./gradlew kspDebugKotlin compileDebugKotlin compileDebugUnitTestKotlin --exclude-task hiltJavaCompileDebug)",
+      "Bash(./gradlew testDebugUnitTest --tests \"at.kidstune.kids.connectivity.*\" --tests \"at.kidstune.kids.ui.HomeViewModelOfflineTest\" --tests \"at.kidstune.kids.data.repository.FavoriteOfflineIntTest\" --tests \"at.kidstune.kids.ui.screen.HomeScreenTest\" --exclude-task hiltJavaCompileDebug --exclude-task hiltAggregateDepsDebug)",
+      "Bash(./gradlew testDebugUnitTest --tests \"at.kidstune.kids.sync.SyncWorkerTest\" --exclude-task hiltJavaCompileDebug --exclude-task hiltAggregateDepsDebug --exclude-task hiltJavaCompileDebugUnitTest --exclude-task hiltAggregateDepsDebugUnitTest)",
+      "Bash(./gradlew testDebugUnitTest --tests \"at.kidstune.kids.connectivity.*\" --tests \"at.kidstune.kids.ui.HomeViewModelOfflineTest\" --tests \"at.kidstune.kids.data.repository.FavoriteOfflineIntTest\" --tests \"at.kidstune.kids.ui.screen.HomeScreenTest\" --exclude-task hiltJavaCompileDebug --exclude-task hiltAggregateDepsDebug --exclude-task hiltJavaCompileDebugUnitTest --exclude-task hiltAggregateDepsDebugUnitTest)",
+      "Bash(./gradlew testDebugUnitTest --exclude-task hiltJavaCompileDebug --exclude-task hiltAggregateDepsDebug --exclude-task hiltJavaCompileDebugUnitTest --exclude-task hiltAggregateDepsDebugUnitTest)",
+      "Bash(grep -v \"^[0-9]*:.*\\\\\\\\.7[0-9]\")",
+      "Bash(./gradlew compileTestJava)",
+      "Bash(./gradlew :backend:compileTestJava)",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.spotify.SpotifyImportIntTest\")",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.spotify.SpotifyImportIntTest\" --info)",
+      "Bash(git:*)",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.KidstuneApplicationIntTest\")",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.KidstuneApplicationIntTest.contextLoads\" --info)",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.push.VapidConfigTest\" --info)",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.sse.SseIntTest\" --info)",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.sse.SseIntTest\" --tests \"at.kidstune.push.VapidConfigTest\" --tests \"at.kidstune.push.PushNotificationIntTest\")"
     ]
   }
 }

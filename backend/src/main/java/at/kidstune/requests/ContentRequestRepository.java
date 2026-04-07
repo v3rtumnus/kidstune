@@ -33,4 +33,8 @@ public interface ContentRequestRepository extends JpaRepository<ContentRequest, 
     @Query("UPDATE ContentRequest r SET r.status = 'EXPIRED', r.resolvedAt = :now " +
            "WHERE r.status = 'PENDING' AND r.requestedAt < :cutoff")
     int expireOldRequests(@Param("cutoff") Instant cutoff, @Param("now") Instant now);
+
+    @Query("SELECT DISTINCT r.profileId FROM ContentRequest r " +
+           "WHERE r.status = 'PENDING' AND r.requestedAt < :cutoff")
+    List<String> findProfileIdsWithPendingOlderThan(@Param("cutoff") Instant cutoff);
 }

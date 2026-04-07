@@ -34,8 +34,12 @@
             </li>
             <li class="nav-item">
                 <a class="nav-link" th:href="@{/web/requests}">Anfragen
-                    <span th:if="${pendingRequestCount != null and pendingRequestCount > 0}"
+                    <span id="requests-badge"
+                          th:if="${pendingRequestCount != null and pendingRequestCount > 0}"
                           class="badge bg-danger ms-1" th:text="${pendingRequestCount}"></span>
+                    <span id="requests-badge-hidden"
+                          th:if="${pendingRequestCount == null or pendingRequestCount == 0}"
+                          class="badge bg-danger ms-1 d-none">0</span>
                 </a>
             </li>
             <li class="nav-item">
@@ -111,5 +115,80 @@
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
 <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>
 <th:block layout:fragment="scripts"></th:block>
+
+<script>
+(function () {
+    'use strict';
+
+    // ── SSE – live pending-count badge ────────────────────────────────────────
+
+    function updateBadge(count) {
+        // Both the visible badge and the hidden placeholder share the same logic:
+        // show when count > 0, hide when 0.
+        let badge = document.getElementById('requests-badge')
+                 || document.getElementById('requests-badge-hidden');
+        if (!badge) return;
+        badge.id = 'requests-badge';          // normalise id after first render
+        badge.textContent = count;
+        badge.classList.toggle('d-none', count === 0);
+    }
+
+    if (typeof EventSource !== 'undefined') {
+        const sse = new EventSource('/web/sse/requests');
+        sse.addEventListener('pendingCount', function (e) {
+            try {
+                const data = JSON.parse(e.data);
+                updateBadge(data.pendingCount || 0);
+            } catch (_) {}
+        });
+        sse.onerror = function () { sse.close(); }; // stop on auth loss / redirect
+    }
+
+    // ── Web Push – VAPID subscription ────────────────────────────────────────
+
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+        navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            reg.pushManager.getSubscription().then(function (existing) {
+                if (existing) return; // already subscribed
+
+                fetch('/web/push/vapid-public-key')
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        const appServerKey = urlBase64ToUint8Array(data.publicKey);
+                        return reg.pushManager.subscribe({
+                            userVisibleOnly:      true,
+                            applicationServerKey: appServerKey
+                        });
+                    })
+                    .then(function (sub) {
+                        const json = sub.toJSON();
+                        return fetch('/web/push/subscribe', {
+                            method:  'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body:    JSON.stringify({
+                                endpoint: json.endpoint,
+                                p256dh:   json.keys.p256dh,
+                                auth:     json.keys.auth
+                            })
+                        });
+                    })
+                    .catch(function (err) {
+                        // Push subscription is best-effort; log but never surface to user.
+                        console.debug('Push subscription skipped:', err);
+                    });
+            });
+        });
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding  = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64   = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const raw      = window.atob(base64);
+        const arr      = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; ++i) arr[i] = raw.charCodeAt(i);
+        return arr;
+    }
+})();
+</script>
 </body>
 </html>
