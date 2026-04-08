@@ -6,6 +6,7 @@ import at.kidstune.kids.data.mock.MockContentProvider
 import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.domain.model.mockProfiles
 import at.kidstune.kids.playback.NowPlayingState
+import at.kidstune.kids.playback.SpotifyConnectionError
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.viewmodel.BrowseState
 import at.kidstune.kids.ui.viewmodel.ChapterListState
@@ -82,6 +83,40 @@ fun ProfileSelectionConfirmScreenshot() {
 fun HomeScreenshot() {
     KidstuneTheme {
         HomeScreen(state = HomeState())
+    }
+}
+
+// ── Error screens ─────────────────────────────────────────────────────────
+
+@Preview(name = "Screen_Error_SpotifyNotInstalled", showSystemUi = true)
+@Composable
+fun SpotifyNotInstalledScreenshot() {
+    KidstuneTheme {
+        SpotifyNotInstalledScreen()
+    }
+}
+
+@Preview(name = "Screen_Error_SpotifyNotLoggedIn", showSystemUi = true)
+@Composable
+fun SpotifyNotLoggedInScreenshot() {
+    KidstuneTheme {
+        SpotifyNotLoggedInScreen()
+    }
+}
+
+@Preview(name = "Screen_Error_NoNetwork", showSystemUi = true)
+@Composable
+fun NoNetworkScreenshot() {
+    KidstuneTheme {
+        NoCacheScreen()
+    }
+}
+
+@Preview(name = "Screen_Error_StorageFull", showSystemUi = true)
+@Composable
+fun StorageFullScreenshot() {
+    KidstuneTheme {
+        StorageFullScreen()
     }
 }
 

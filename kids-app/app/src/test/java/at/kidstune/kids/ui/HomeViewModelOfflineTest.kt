@@ -4,8 +4,11 @@ import at.kidstune.kids.connectivity.ConnectivityObserver
 import at.kidstune.kids.data.local.ContentDao
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.data.preferences.SyncPreferences
+import at.kidstune.kids.data.repository.SyncRepository
 import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.playback.PlaybackController
+import at.kidstune.kids.playback.SpotifyConnectionError
+import at.kidstune.kids.playback.SpotifyRemote
 import at.kidstune.kids.ui.viewmodel.HomeViewModel
 import io.mockk.every
 import io.mockk.mockk
@@ -49,6 +52,8 @@ class HomeViewModelOfflineTest {
     private val contentDao           = mockk<ContentDao>()
     private val playbackController   = mockk<PlaybackController>()
     private val profilePrefs         = mockk<ProfilePreferences>()
+    private val spotifyRemote        = mockk<SpotifyRemote>()
+    private val syncRepository       = mockk<SyncRepository>()
 
     @Before
     fun setUp() {
@@ -59,6 +64,8 @@ class HomeViewModelOfflineTest {
         every { profilePrefs.boundProfileEmoji} returns "🐻"
         every { playbackController.nowPlaying } returns MutableStateFlow(NowPlayingState())
         every { contentDao.countAllFlow("profile-1") } returns flowOf(5)
+        every { spotifyRemote.connectionError } returns MutableStateFlow<SpotifyConnectionError?>(null)
+        every { syncRepository.storageFullError } returns MutableStateFlow(false)
     }
 
     @After
@@ -70,7 +77,8 @@ class HomeViewModelOfflineTest {
         onlineFlow: MutableStateFlow<Boolean> = MutableStateFlow(true)
     ): HomeViewModel {
         every { connectivityObserver.isOnline } returns onlineFlow
-        return HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs, connectivityObserver)
+        return HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs,
+            connectivityObserver, spotifyRemote, syncRepository)
     }
 
     // ── isOffline mirrors connectivity ────────────────────────────────────────
@@ -191,7 +199,8 @@ class HomeViewModelOfflineTest {
     fun `isStaleContent helper returns false when isOnline is false`() {
         every { syncPrefs.lastSyncTimestamp } returns Instant.now().minus(25, ChronoUnit.HOURS).toString()
         every { connectivityObserver.isOnline } returns flowOf(false)
-        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs, connectivityObserver)
+        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs,
+            connectivityObserver, spotifyRemote, syncRepository)
 
         assertFalse(vm.isStaleContent(isOnline = false))
     }
@@ -201,7 +210,8 @@ class HomeViewModelOfflineTest {
         // 23h59m ago – clearly within the 24h window, not yet stale
         every { syncPrefs.lastSyncTimestamp } returns Instant.now().minus(23, ChronoUnit.HOURS).minusSeconds(59 * 60).toString()
         every { connectivityObserver.isOnline } returns flowOf(true)
-        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs, connectivityObserver)
+        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs,
+            connectivityObserver, spotifyRemote, syncRepository)
 
         assertFalse(vm.isStaleContent(isOnline = true))
     }
@@ -210,7 +220,8 @@ class HomeViewModelOfflineTest {
     fun `isStaleContent helper returns true for timestamp beyond 24h boundary`() {
         every { syncPrefs.lastSyncTimestamp } returns Instant.now().minus(24, ChronoUnit.HOURS).minusSeconds(1).toString()
         every { connectivityObserver.isOnline } returns flowOf(true)
-        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs, connectivityObserver)
+        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs,
+            connectivityObserver, spotifyRemote, syncRepository)
 
         assertTrue(vm.isStaleContent(isOnline = true))
     }
@@ -219,7 +230,8 @@ class HomeViewModelOfflineTest {
     fun `isStaleContent helper returns false when timestamp is malformed`() {
         every { syncPrefs.lastSyncTimestamp } returns "not-a-timestamp"
         every { connectivityObserver.isOnline } returns flowOf(true)
-        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs, connectivityObserver)
+        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs,
+            connectivityObserver, spotifyRemote, syncRepository)
 
         assertFalse(vm.isStaleContent(isOnline = true))
     }
@@ -231,7 +243,8 @@ class HomeViewModelOfflineTest {
         every { syncPrefs.lastSyncTimestamp } returns null
         every { contentDao.countAllFlow("profile-1") } returns flowOf() // no emission yet
         every { connectivityObserver.isOnline } returns MutableStateFlow(true)
-        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs, connectivityObserver)
+        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs,
+            connectivityObserver, spotifyRemote, syncRepository)
 
         // Before any emission the count is still the initial null.
         assertNull(vm.state.value.cachedContentCount)
@@ -243,7 +256,8 @@ class HomeViewModelOfflineTest {
         every { contentDao.countAllFlow("profile-1") } returns flowOf(0)
         val onlineFlow = MutableStateFlow(true)
         every { connectivityObserver.isOnline } returns onlineFlow
-        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs, connectivityObserver)
+        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs,
+            connectivityObserver, spotifyRemote, syncRepository)
 
         advanceUntilIdle()
 
@@ -257,7 +271,8 @@ class HomeViewModelOfflineTest {
         every { contentDao.countAllFlow("profile-1") } returns countFlow
         val onlineFlow = MutableStateFlow(false)
         every { connectivityObserver.isOnline } returns onlineFlow
-        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs, connectivityObserver)
+        val vm = HomeViewModel(profilePrefs, playbackController, contentDao, syncPrefs,
+            connectivityObserver, spotifyRemote, syncRepository)
 
         advanceUntilIdle()
         assertTrue(vm.state.value.cachedContentCount == 0)

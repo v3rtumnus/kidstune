@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import at.kidstune.kids.domain.model.BrowseCategory
+import at.kidstune.kids.playback.SpotifyConnectionError
 import at.kidstune.kids.ui.components.MiniPlayerBar
 import at.kidstune.kids.ui.theme.AudiobookPrimary
 import at.kidstune.kids.ui.theme.DiscoverPrimary
@@ -126,11 +127,28 @@ fun HomeScreen(
                 )
             }
 
-            // No-cache screen: shown when Room is empty (loading = null is treated as
-            // having content to avoid a flash on normal cold starts).
-            if (state.cachedContentCount == 0) {
-                NoCacheScreen(modifier = Modifier.weight(1f))
-            } else {
+            // Content area – priority order (highest first):
+            //  1. Spotify SDK errors   → parent must fix (blocking)
+            //  2. Storage full         → parent must free space (blocking)
+            //  3. No cached content    → wait for first sync over WiFi
+            //  4. Normal category grid
+            when {
+                state.spotifyError == SpotifyConnectionError.NOT_INSTALLED ->
+                    SpotifyNotInstalledScreen(modifier = Modifier.weight(1f))
+
+                state.spotifyError == SpotifyConnectionError.NOT_LOGGED_IN ->
+                    SpotifyNotLoggedInScreen(modifier = Modifier.weight(1f))
+
+                state.spotifyError == SpotifyConnectionError.PREMIUM_REQUIRED ->
+                    SpotifyPremiumExpiredScreen(modifier = Modifier.weight(1f))
+
+                state.storageFull ->
+                    StorageFullScreen(modifier = Modifier.weight(1f))
+
+                state.cachedContentCount == 0 ->
+                    NoCacheScreen(modifier = Modifier.weight(1f))
+
+                else -> {
                 // Category buttons – vertically centred in remaining space
                 Column(
                     modifier            = Modifier
@@ -183,7 +201,8 @@ fun HomeScreen(
                         )
                     }
                 }
-            }
+                }  // else ->
+            }      // when
         }
     }
 }
@@ -352,5 +371,37 @@ private fun HomeScreenNothingPlayingPreview() {
                 nowPlayingImageUrl = null
             )
         )
+    }
+}
+
+@Preview(name = "HomeScreen – Spotify not installed", showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenSpotifyNotInstalledPreview() {
+    KidstuneTheme {
+        HomeScreen(state = HomeState(spotifyError = SpotifyConnectionError.NOT_INSTALLED))
+    }
+}
+
+@Preview(name = "HomeScreen – Spotify not logged in", showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenSpotifyNotLoggedInPreview() {
+    KidstuneTheme {
+        HomeScreen(state = HomeState(spotifyError = SpotifyConnectionError.NOT_LOGGED_IN))
+    }
+}
+
+@Preview(name = "HomeScreen – Spotify premium required", showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenSpotifyPremiumPreview() {
+    KidstuneTheme {
+        HomeScreen(state = HomeState(spotifyError = SpotifyConnectionError.PREMIUM_REQUIRED))
+    }
+}
+
+@Preview(name = "HomeScreen – storage full", showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenStorageFullPreview() {
+    KidstuneTheme {
+        HomeScreen(state = HomeState(storageFull = true))
     }
 }

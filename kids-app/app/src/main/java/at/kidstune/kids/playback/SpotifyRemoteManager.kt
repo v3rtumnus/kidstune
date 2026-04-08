@@ -158,13 +158,8 @@ class SpotifyRemoteManager @Inject constructor(
         isPaused    = isPaused
     )
 
-    private fun Throwable.toConnectionError(): SpotifyConnectionError {
-        val msg = message?.lowercase() ?: ""
-        return when {
-            "not installed" in msg || "notinstalled" in msg -> SpotifyConnectionError.NOT_INSTALLED
-            "not logged" in msg    || "notloggedin"  in msg -> SpotifyConnectionError.NOT_LOGGED_IN
-            "premium"     in msg                            -> SpotifyConnectionError.PREMIUM_REQUIRED
-            else                                            -> SpotifyConnectionError.OTHER
-        }
-    }
+    // Delegates to the internal extension in SpotifyConnectionError.kt so the
+    // mapping logic can be exercised by unit tests without touching the SDK.
+    private fun Throwable.toConnectionError(): SpotifyConnectionError =
+        toSpotifyConnectionError()
 }

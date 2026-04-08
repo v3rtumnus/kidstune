@@ -1,5 +1,6 @@
 package at.kidstune.kids.data.repository
 
+import android.database.sqlite.SQLiteFullException
 import androidx.room.withTransaction
 import at.kidstune.kids.data.local.KidstuneDatabase
 import at.kidstune.kids.data.local.entities.LocalAlbum
@@ -10,15 +11,24 @@ import at.kidstune.kids.data.remote.KidstuneApiClient
 import at.kidstune.kids.data.remote.dto.SyncContentEntryDto
 import at.kidstune.kids.domain.model.ContentScope
 import at.kidstune.kids.domain.model.ContentType
+import java.io.IOException
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Orchestrates full and delta syncs between the backend and the local Room database.
  *
  * Both methods return [Result.success]/[Result.failure]. On failure the database is
  * left untouched so the UI continues to show cached data.
+ *
+ * [storageFullError] is set to `true` when a sync fails because the device has no free
+ * storage space (SQLiteFullException or OS-level IOException with a disk-full message).
+ * It stays `true` until the next successful sync, signalling to the UI that a
+ * [StorageFullScreen] should be shown.
  */
 @Singleton
 class SyncRepository @Inject constructor(
@@ -26,6 +36,9 @@ class SyncRepository @Inject constructor(
     private val db: KidstuneDatabase,
     private val favoriteRepository: FavoriteRepository
 ) {
+
+    private val _storageFullError = MutableStateFlow(false)
+    val storageFullError: StateFlow<Boolean> = _storageFullError.asStateFlow()
 
     // ─────────────────────────────────────────────────────────────────────────
     // Delta sync
@@ -86,6 +99,9 @@ class SyncRepository @Inject constructor(
 
         // Upload locally-queued favorites (runs outside the transaction)
         favoriteRepository.uploadUnsynced(profileId)
+    }.also { result ->
+        result.onSuccess  { _storageFullError.value = false }
+        result.onFailure  { t -> if (t.isStorageFull()) _storageFullError.value = true }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -137,11 +153,25 @@ class SyncRepository @Inject constructor(
 
         // Upload unsynced favorites (runs outside the transaction)
         favoriteRepository.uploadUnsynced(profileId)
+    }.also { result ->
+        result.onSuccess  { _storageFullError.value = false }
+        result.onFailure  { t -> if (t.isStorageFull()) _storageFullError.value = true }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Shared helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns `true` when the throwable (or any chained cause) indicates a
+     * disk-full / storage-exhausted condition at the SQLite or OS level.
+     */
+    private fun Throwable.isStorageFull(): Boolean =
+        generateSequence(this) { it.cause }.any { t ->
+            t is SQLiteFullException ||
+            (t is IOException && ("no space" in (t.message?.lowercase() ?: "") ||
+                                  "disk full" in (t.message?.lowercase() ?: "")))
+        }
 
     private fun SyncContentEntryDto.toLocalEntry(
         profileId: String,

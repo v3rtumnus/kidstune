@@ -4,6 +4,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -84,6 +85,57 @@ class SpotifyRemoteManagerTest {
         assertTrue(SpotifyConnectionError.NOT_LOGGED_IN  in errors)
         assertTrue(SpotifyConnectionError.PREMIUM_REQUIRED in errors)
         assertTrue(SpotifyConnectionError.OTHER          in errors)
+    }
+
+    // ── toSpotifyConnectionError mapping ─────────────────────────────────────
+
+    @Test
+    fun `toSpotifyConnectionError maps 'not installed' message to NOT_INSTALLED`() {
+        val ex = RuntimeException("Spotify is not installed on this device")
+        assertEquals(SpotifyConnectionError.NOT_INSTALLED, ex.toSpotifyConnectionError())
+    }
+
+    @Test
+    fun `toSpotifyConnectionError maps 'notinstalled' compact message to NOT_INSTALLED`() {
+        val ex = RuntimeException("CouldNotFindSpotifyApp: notinstalled")
+        assertEquals(SpotifyConnectionError.NOT_INSTALLED, ex.toSpotifyConnectionError())
+    }
+
+    @Test
+    fun `toSpotifyConnectionError maps 'not logged' message to NOT_LOGGED_IN`() {
+        val ex = RuntimeException("User is not logged in to Spotify")
+        assertEquals(SpotifyConnectionError.NOT_LOGGED_IN, ex.toSpotifyConnectionError())
+    }
+
+    @Test
+    fun `toSpotifyConnectionError maps 'notloggedin' compact message to NOT_LOGGED_IN`() {
+        val ex = RuntimeException("AuthenticationRequired: notloggedin")
+        assertEquals(SpotifyConnectionError.NOT_LOGGED_IN, ex.toSpotifyConnectionError())
+    }
+
+    @Test
+    fun `toSpotifyConnectionError maps 'premium' message to PREMIUM_REQUIRED`() {
+        val ex = RuntimeException("Spotify Premium required for App Remote")
+        assertEquals(SpotifyConnectionError.PREMIUM_REQUIRED, ex.toSpotifyConnectionError())
+    }
+
+    @Test
+    fun `toSpotifyConnectionError maps unknown message to OTHER`() {
+        val ex = RuntimeException("Unexpected SDK failure")
+        assertEquals(SpotifyConnectionError.OTHER, ex.toSpotifyConnectionError())
+    }
+
+    @Test
+    fun `toSpotifyConnectionError maps null message to OTHER`() {
+        val ex = RuntimeException(null as String?)
+        assertEquals(SpotifyConnectionError.OTHER, ex.toSpotifyConnectionError())
+    }
+
+    @Test
+    fun `toSpotifyConnectionError is case-insensitive`() {
+        assertEquals(SpotifyConnectionError.NOT_INSTALLED,  RuntimeException("NOT INSTALLED").toSpotifyConnectionError())
+        assertEquals(SpotifyConnectionError.NOT_LOGGED_IN,  RuntimeException("NOT LOGGED IN").toSpotifyConnectionError())
+        assertEquals(SpotifyConnectionError.PREMIUM_REQUIRED, RuntimeException("PREMIUM only").toSpotifyConnectionError())
     }
 
     @Test

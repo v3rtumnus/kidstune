@@ -6,8 +6,11 @@ import at.kidstune.kids.connectivity.ConnectivityObserver
 import at.kidstune.kids.data.local.ContentDao
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.data.preferences.SyncPreferences
+import at.kidstune.kids.data.repository.SyncRepository
 import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.playback.PlaybackController
+import at.kidstune.kids.playback.SpotifyConnectionError
+import at.kidstune.kids.playback.SpotifyRemote
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,7 +40,18 @@ data class HomeState(
      * `null` until the first DB emission (loading state).
      * `0` with [isOffline] == `true` triggers the no-cache screen.
      */
-    val cachedContentCount: Int?    = null
+    val cachedContentCount: Int?    = null,
+    /**
+     * Non-null when the Spotify App Remote SDK reported a connection error.
+     * Triggers a full-screen error composable in [HomeScreen] that tells the
+     * child to hand the device to a parent.
+     */
+    val spotifyError: SpotifyConnectionError? = null,
+    /**
+     * `true` when a sync write to Room failed due to insufficient device storage.
+     * Triggers [StorageFullScreen].
+     */
+    val storageFull: Boolean        = false
 )
 
 sealed interface HomeIntent {
@@ -50,7 +64,9 @@ class HomeViewModel @Inject constructor(
     private val playbackController: PlaybackController,
     private val contentDao: ContentDao,
     private val syncPrefs: SyncPreferences,
-    private val connectivityObserver: ConnectivityObserver
+    private val connectivityObserver: ConnectivityObserver,
+    private val spotifyRemote: SpotifyRemote,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private val profileId = prefs.boundProfileId ?: ""
@@ -89,6 +105,18 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             contentDao.countAllFlow(profileId).collect { count ->
                 _state.update { it.copy(cachedContentCount = count) }
+            }
+        }
+
+        viewModelScope.launch {
+            spotifyRemote.connectionError.collect { error ->
+                _state.update { it.copy(spotifyError = error) }
+            }
+        }
+
+        viewModelScope.launch {
+            syncRepository.storageFullError.collect { isFull ->
+                _state.update { it.copy(storageFull = isFull) }
             }
         }
     }

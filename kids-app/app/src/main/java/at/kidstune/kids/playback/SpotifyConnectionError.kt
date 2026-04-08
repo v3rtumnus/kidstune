@@ -14,3 +14,20 @@ enum class SpotifyConnectionError {
     /** An unexpected error occurred during connection. */
     OTHER
 }
+
+/**
+ * Maps a connection exception thrown by the Spotify App Remote SDK to a
+ * [SpotifyConnectionError] code.
+ *
+ * Marked `internal` so unit tests in the same module can call it directly
+ * without leaking it as a public API.
+ */
+internal fun Throwable.toSpotifyConnectionError(): SpotifyConnectionError {
+    val msg = message?.lowercase() ?: ""
+    return when {
+        "not installed" in msg || "notinstalled" in msg -> SpotifyConnectionError.NOT_INSTALLED
+        "not logged"    in msg || "notloggedin"  in msg -> SpotifyConnectionError.NOT_LOGGED_IN
+        "premium"       in msg                          -> SpotifyConnectionError.PREMIUM_REQUIRED
+        else                                            -> SpotifyConnectionError.OTHER
+    }
+}
