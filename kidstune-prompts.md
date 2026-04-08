@@ -2023,7 +2023,7 @@ VERIFICATION:
 - Run the backend locally → app starts healthy
 ```
 
-### Prompt 7.3 – Kids App Discover Screen ⬅️
+### Prompt 7.3 – Kids App Discover Screen ✅
 
 ```
 CONTEXT: Phase 7 of KidsTune. Backend content requests work (7.1). The Discover screen already
@@ -2107,7 +2107,7 @@ VERIFICATION:
 
 ## Phase 8 – Admin Data Tables & Polish (Weeks 11-12)
 
-### Prompt 8.1 – Web Dashboard Admin Data Tables
+### Prompt 8.1 – Web Dashboard Admin Data Tables ⬅️
 
 ```
 CONTEXT: Phase 8 of KidsTune. All web dashboard parent features exist (phases 2.4-2.6, 6.2). We add an admin section
