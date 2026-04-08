@@ -1,6 +1,18 @@
 package at.kidstune.kids.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,12 +25,19 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,10 +53,14 @@ import coil3.compose.AsyncImage
  * Large square card showing album art that fills the entire card,
  * with the title overlaid at the bottom.
  *
+ * Animations:
+ * - **Shimmer** while the image loads.
+ * - **Press scale** (0.95×) with spring release on tap.
+ * - **Badge pulse** – the top-right badge oscillates in scale when present.
+ * - **Haptic feedback** on tap.
+ *
  * @param scopeBadgeText  Optional label shown in the bottom-left corner
- *   (e.g. "Künstler", "Album", "Playlist").  Use [scopeBadgeColorFor] to get the
- *   matching background color.  Pass `null` to omit the badge (used for TRACK
- *   entries and all album/track-list screens).
+ *   (e.g. "Künstler", "Album", "Playlist"). Pass `null` to omit.
  * @param scopeBadgeColor Background color for the scope badge pill.
  * @param badgeText       Optional label shown in the top-right corner (e.g. "NEU").
  */
@@ -52,24 +75,54 @@ fun ContentTile(
     badgeText: String? = null,
     onClick: () -> Unit = {}
 ) {
+    // ── Press-scale animation ─────────────────────────────────────────────
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue   = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label         = "tile-press-scale"
+    )
+    val haptic = LocalHapticFeedback.current
+
+    // ── Shimmer state ─────────────────────────────────────────────────────
+    // Start shimmering whenever there is a URL to fetch.
+    var isLoading by remember(imageUrl) { mutableStateOf(imageUrl != null) }
+
     Card(
         modifier = modifier
             .aspectRatio(1f)
-            .clickable(onClick = onClick)
+            .scale(pressScale)
+            .clickable(
+                interactionSource = interactionSource,
+                indication        = LocalIndication.current,
+                onClick           = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                }
+            )
             .semantics { this.contentDescription = contentDescription },
-        shape    = MaterialTheme.shapes.medium,
+        shape     = MaterialTheme.shapes.medium,
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Cover art fills the entire tile
+            // ── Shimmer placeholder ──────────────────────────────────────
+            if (isLoading) {
+                ShimmerBox(modifier = Modifier.fillMaxSize())
+            }
+
+            // ── Cover art ────────────────────────────────────────────────
             AsyncImage(
                 model              = imageUrl,
-                contentDescription = null, // handled by card semantics above
+                contentDescription = null, // handled by card semantics
                 contentScale       = ContentScale.Crop,
+                onLoading          = { isLoading = true },
+                onSuccess          = { isLoading = false },
+                onError            = { isLoading = false },
                 modifier           = Modifier.fillMaxSize()
             )
 
-            // Gradient scrim at the bottom for text readability
+            // ── Gradient scrim + title ────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -90,14 +143,12 @@ fun ContentTile(
                 )
             }
 
-            // ── Scope badge – bottom-left ─────────────────────────────────
-            // Semi-transparent pill indicating the content scope
-            // (ARTIST / ALBUM / PLAYLIST). Not shown for TRACK entries.
+            // ── Scope badge – bottom-left ──────────────────────────────────
             if (scopeBadgeText != null) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 6.dp, bottom = 36.dp) // sits above title scrim
+                        .padding(start = 6.dp, bottom = 36.dp)
                         .clip(MaterialTheme.shapes.extraSmall)
                         .background(scopeBadgeColor)
                         .padding(horizontal = 6.dp, vertical = 3.dp)
@@ -110,12 +161,23 @@ fun ContentTile(
                 }
             }
 
-            // ── Top-right badge (e.g. "NEU") ──────────────────────────────
+            // ── Top-right badge (e.g. "NEU") with pulse animation ──────────
             if (badgeText != null) {
+                val infiniteTransition = rememberInfiniteTransition(label = "badge-pulse")
+                val badgeScale by infiniteTransition.animateFloat(
+                    initialValue  = 1.00f,
+                    targetValue   = 1.20f,
+                    animationSpec = infiniteRepeatable(
+                        animation  = tween(500, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "badge-scale"
+                )
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
+                        .scale(badgeScale)
                         .clip(MaterialTheme.shapes.extraSmall)
                         .background(MaterialTheme.colorScheme.primaryContainer)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -175,9 +237,9 @@ private fun ContentTileArtistBadgePreview() {
     KidstuneTheme {
         Column(modifier = Modifier.padding(16.dp)) {
             ContentTile(
-                title          = "Bibi & Tina",
-                imageUrl       = null,
-                scopeBadgeText = "Künstler",
+                title           = "Bibi & Tina",
+                imageUrl        = null,
+                scopeBadgeText  = "Künstler",
                 scopeBadgeColor = ScopeBadgeArtist,
             )
         }

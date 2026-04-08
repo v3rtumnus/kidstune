@@ -57,6 +57,7 @@ import at.kidstune.kids.domain.model.ContentScope
 import at.kidstune.kids.domain.model.DiscoverTile
 import at.kidstune.kids.domain.model.PendingRequest
 import at.kidstune.kids.domain.model.RequestStatus
+import at.kidstune.kids.ui.components.ConfettiCanvas
 import at.kidstune.kids.ui.components.ContentTile
 import at.kidstune.kids.ui.components.scopeBadgeFor
 import at.kidstune.kids.ui.theme.KidstuneTheme
@@ -211,12 +212,18 @@ fun DiscoverScreen(
 
         // ── Celebration overlay ───────────────────────────────────────────────
         AnimatedVisibility(
-            visible = state.showCelebration,
-            enter   = fadeIn() + scaleIn(),
-            exit    = fadeOut() + scaleOut(),
-            modifier = Modifier.align(Alignment.Center)
+            visible  = state.showCelebration,
+            enter    = fadeIn(),
+            exit     = fadeOut(),
+            modifier = Modifier.fillMaxSize()
         ) {
-            CelebrationOverlay(onDismiss = { onIntent(DiscoverIntent.DismissCelebration) })
+            Box(modifier = Modifier.fillMaxSize()) {
+                ConfettiCanvas(modifier = Modifier.fillMaxSize())
+                CelebrationOverlay(
+                    modifier  = Modifier.align(Alignment.Center),
+                    onDismiss = { onIntent(DiscoverIntent.DismissCelebration) }
+                )
+            }
         }
     }
 }
@@ -428,7 +435,7 @@ private fun PendingRequestCard(
 @Composable
 private fun CelebrationOverlay(
     modifier: Modifier = Modifier,
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     LaunchedEffect(Unit) {
         delay(3_000)

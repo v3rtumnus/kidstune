@@ -2206,7 +2206,7 @@ VERIFICATION:
 
 ## Phase 8 (continued) – Polish, Hardening & Documentation
 
-### Prompt 8.2 – Kids App Animations ⬅️
+### Prompt 8.2 – Kids App Animations ✅
 
 ```
 CONTEXT: Phase 8 of KidsTune. All features work. We add polish animations to make the
@@ -2244,7 +2244,7 @@ VERIFICATION:
 - Review diffs against previous reference PNGs, confirm intentional changes, commit updated PNGs
 ```
 
-### Prompt 8.3 – Kids App Edge Cases
+### Prompt 8.3 – Kids App Edge Cases ⬅️
 
 ```
 CONTEXT: Phase 8 of KidsTune. We handle all error states in the kids app with friendly,

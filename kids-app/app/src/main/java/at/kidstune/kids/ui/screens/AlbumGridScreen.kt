@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -121,7 +124,14 @@ fun AlbumGridScreen(
                 val pagerState = rememberPagerState { state.totalPages }
                 Column(modifier = Modifier.fillMaxSize()) {
                     HorizontalPager(
-                        state    = pagerState,
+                        state         = pagerState,
+                        flingBehavior = PagerDefaults.flingBehavior(
+                            state             = pagerState,
+                            snapAnimationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness    = Spring.StiffnessMedium
+                            )
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .semantics { testTag = "album_grid_pager" }

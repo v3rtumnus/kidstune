@@ -1,6 +1,15 @@
 package at.kidstune.kids.navigation
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -57,97 +66,139 @@ object DiscoverRoute
 
 // ── NavHost ───────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun KidstuneNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startDestination: Any = HomeRoute
 ) {
-    NavHost(
-        navController    = navController,
-        startDestination = startDestination,
-        modifier         = modifier
-    ) {
-        composable<PairingRoute> {
-            PairingScreen(
-                onPairingSuccess = {
-                    navController.navigate(ProfileSelectionRoute) {
-                        popUpTo<PairingRoute> { inclusive = true }
+    // SharedTransitionLayout enables shared-element transitions between destinations.
+    // LocalSharedTransitionScope is provided to the whole tree so deep composables
+    // (e.g. MiniPlayerBar, NowPlayingScreen) can attach sharedBounds modifiers
+    // without threading SharedTransitionScope through every function signature.
+    SharedTransitionLayout {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+            NavHost(
+                navController    = navController,
+                startDestination = startDestination,
+                modifier         = modifier
+            ) {
+                composable<PairingRoute> {
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        PairingScreen(
+                            onPairingSuccess = {
+                                navController.navigate(ProfileSelectionRoute) {
+                                    popUpTo<PairingRoute> { inclusive = true }
+                                }
+                            }
+                        )
                     }
                 }
-            )
-        }
 
-        composable<ProfileSelectionRoute> {
-            ProfileSelectionScreen(
-                onProfileBound = {
-                    navController.navigate(HomeRoute) {
-                        popUpTo<ProfileSelectionRoute> { inclusive = true }
+                composable<ProfileSelectionRoute> {
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        ProfileSelectionScreen(
+                            onProfileBound = {
+                                navController.navigate(HomeRoute) {
+                                    popUpTo<ProfileSelectionRoute> { inclusive = true }
+                                }
+                            }
+                        )
                     }
                 }
-            )
-        }
 
-        composable<HomeRoute> {
-            HomeScreen(
-                onNavigateToBrowse     = { category ->
-                    navController.navigate(BrowseRoute(category.name))
-                },
-                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) },
-                onNavigateToDiscover   = { navController.navigate(DiscoverRoute) }
-            )
-        }
+                composable<HomeRoute> {
+                    // HomeRoute provides AnimatedVisibilityScope so MiniPlayerBar can
+                    // participate in the shared-element transition to NowPlayingRoute.
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        HomeScreen(
+                            onNavigateToBrowse     = { category ->
+                                navController.navigate(BrowseRoute(category.name))
+                            },
+                            onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) },
+                            onNavigateToDiscover   = { navController.navigate(DiscoverRoute) }
+                        )
+                    }
+                }
 
-        composable<BrowseRoute> { backStackEntry ->
-            val route    = backStackEntry.toRoute<BrowseRoute>()
-            val category = BrowseCategory.fromString(route.category)
-            BrowseScreen(
-                category               = category,
-                onNavigateUp           = { navController.navigateUp() },
-                onNavigateToAlbumGrid  = { contentEntryId ->
-                    navController.navigate(AlbumGridRoute(contentEntryId))
-                },
-                onNavigateToTrackList  = { albumId ->
-                    navController.navigate(TrackListRoute(albumId))
-                },
-                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
-            )
-        }
+                composable<BrowseRoute> { backStackEntry ->
+                    val route    = backStackEntry.toRoute<BrowseRoute>()
+                    val category = BrowseCategory.fromString(route.category)
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        BrowseScreen(
+                            category               = category,
+                            onNavigateUp           = { navController.navigateUp() },
+                            onNavigateToAlbumGrid  = { contentEntryId ->
+                                navController.navigate(AlbumGridRoute(contentEntryId))
+                            },
+                            onNavigateToTrackList  = { albumId ->
+                                navController.navigate(TrackListRoute(albumId))
+                            },
+                            onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
+                        )
+                    }
+                }
 
-        composable<AlbumGridRoute> {
-            AlbumGridScreen(
-                onNavigateUp            = { navController.navigateUp() },
-                onNavigateToChapterList = { albumId ->
-                    navController.navigate(ChapterListRoute(albumId))
-                },
-                onNavigateToNowPlaying  = { navController.navigate(NowPlayingRoute) }
-            )
-        }
+                composable<AlbumGridRoute> {
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        AlbumGridScreen(
+                            onNavigateUp            = { navController.navigateUp() },
+                            onNavigateToChapterList = { albumId ->
+                                navController.navigate(ChapterListRoute(albumId))
+                            },
+                            onNavigateToNowPlaying  = { navController.navigate(NowPlayingRoute) }
+                        )
+                    }
+                }
 
-        composable<TrackListRoute> {
-            TrackListScreen(
-                onNavigateUp           = { navController.navigateUp() },
-                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
-            )
-        }
+                composable<TrackListRoute> {
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        TrackListScreen(
+                            onNavigateUp           = { navController.navigateUp() },
+                            onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
+                        )
+                    }
+                }
 
-        composable<ChapterListRoute> {
-            ChapterListScreen(
-                onNavigateUp           = { navController.navigateUp() },
-                onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
-            )
-        }
+                composable<ChapterListRoute> {
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        ChapterListScreen(
+                            onNavigateUp           = { navController.navigateUp() },
+                            onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
+                        )
+                    }
+                }
 
-        composable<NowPlayingRoute> {
-            NowPlayingScreen(
-                onNavigateUp = { navController.navigateUp() }
-            )
-        }
+                composable<NowPlayingRoute>(
+                    // NowPlaying slides up from bottom and fades in; exits the same way.
+                    enterTransition = { slideInVertically(initialOffsetY = { it / 3 }) + fadeIn() },
+                    exitTransition  = { slideOutVertically(targetOffsetY = { it / 3 }) + fadeOut() },
+                    popEnterTransition = { slideInVertically(initialOffsetY = { it / 3 }) + fadeIn() },
+                    popExitTransition  = { slideOutVertically(targetOffsetY = { it / 3 }) + fadeOut() }
+                ) {
+                    // NowPlayingRoute provides AnimatedVisibilityScope so NowPlayingScreen
+                    // can participate in the shared-element transition from HomeRoute.
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        NowPlayingScreen(
+                            onNavigateUp = { navController.navigateUp() }
+                        )
+                    }
+                }
 
-        composable<DiscoverRoute> {
-            DiscoverScreen(
-                onNavigateUp = { navController.navigateUp() }
-            )
+                composable<DiscoverRoute>(
+                    enterTransition = { scaleIn(initialScale = 0.95f) + fadeIn() },
+                    exitTransition  = { scaleOut(targetScale = 0.95f) + fadeOut() },
+                    popEnterTransition = { scaleIn(initialScale = 0.95f) + fadeIn() },
+                    popExitTransition  = { scaleOut(targetScale = 0.95f) + fadeOut() }
+                ) {
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        DiscoverScreen(
+                            onNavigateUp = { navController.navigateUp() }
+                        )
+                    }
+                }
+            }
         }
     }
 }

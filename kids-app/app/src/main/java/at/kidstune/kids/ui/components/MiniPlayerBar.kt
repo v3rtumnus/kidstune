@@ -1,5 +1,6 @@
 package at.kidstune.kids.ui.components
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import at.kidstune.kids.navigation.LocalAnimatedVisibilityScope
+import at.kidstune.kids.navigation.LocalSharedTransitionScope
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.theme.kidsTouchTarget
 import coil3.compose.AsyncImage
@@ -35,8 +38,14 @@ import coil3.compose.AsyncImage
  * Persistent mini-player bar shown at the bottom of every screen.
  * Tapping the bar expands to the NowPlaying screen.
  *
+ * The thumbnail participates in the shared-element transition to/from NowPlayingScreen
+ * using the key "now-playing-cover". When the transition is not active (no
+ * [LocalSharedTransitionScope] or [LocalAnimatedVisibilityScope] in the tree)
+ * the bar behaves exactly as before.
+ *
  * When nothing is playing ([title] is null) the bar is hidden.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MiniPlayerBar(
     modifier: Modifier = Modifier,
@@ -48,6 +57,9 @@ fun MiniPlayerBar(
     onExpand: () -> Unit = {}
 ) {
     if (title == null) return
+
+    val sharedTransitionScope   = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
 
     Surface(
         modifier  = modifier.fillMaxWidth(),
@@ -64,18 +76,29 @@ fun MiniPlayerBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Thumbnail
+            // Thumbnail – shared element with NowPlayingScreen cover art
+            val thumbnailModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                with(sharedTransitionScope) {
+                    Modifier.sharedBounds(
+                        sharedContentState      = rememberSharedContentState(key = "now-playing-cover"),
+                        animatedVisibilityScope = animatedVisibilityScope
+                    )
+                }
+            } else {
+                Modifier
+            }
+
             Box(
-                modifier = Modifier
+                modifier = thumbnailModifier
                     .size(52.dp)
                     .clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.primaryContainer)
             ) {
                 AsyncImage(
-                    model             = imageUrl,
+                    model              = imageUrl,
                     contentDescription = null,
-                    contentScale      = ContentScale.Crop,
-                    modifier          = Modifier.size(52.dp)
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier.size(52.dp)
                 )
             }
 
@@ -106,10 +129,10 @@ fun MiniPlayerBar(
                     .semantics { contentDescription = if (isPlaying) "Pause" else "Abspielen" }
             ) {
                 Icon(
-                    imageVector       = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    imageVector        = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = null,
-                    tint              = MaterialTheme.colorScheme.primary,
-                    modifier          = Modifier.size(36.dp)
+                    tint               = MaterialTheme.colorScheme.primary,
+                    modifier           = Modifier.size(36.dp)
                 )
             }
         }

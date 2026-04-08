@@ -1,5 +1,6 @@
 package at.kidstune.kids.ui.screens
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import at.kidstune.kids.navigation.LocalAnimatedVisibilityScope
+import at.kidstune.kids.navigation.LocalSharedTransitionScope
 import at.kidstune.kids.playback.NowPlayingState
 import at.kidstune.kids.ui.components.FavoriteButton
 import at.kidstune.kids.ui.theme.KidstuneTheme
@@ -64,6 +67,7 @@ fun NowPlayingScreen(
 
 // ── Stateless composable (used in Previews and tests) ─────────────────────
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun NowPlayingScreen(
     modifier: Modifier = Modifier,
@@ -71,6 +75,8 @@ fun NowPlayingScreen(
     onIntent: (NowPlayingIntent) -> Unit = {},
     onNavigateUp: () -> Unit = {}
 ) {
+    val sharedTransitionScope   = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
     Scaffold(
         modifier = modifier,
         topBar   = {
@@ -100,6 +106,18 @@ fun NowPlayingScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // ── Cover art (~55 % of available height) ────────────────────
+            // Shared-element transition with MiniPlayerBar thumbnail (key = "now-playing-cover").
+            val coverSharedModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                with(sharedTransitionScope) {
+                    Modifier.sharedBounds(
+                        sharedContentState      = rememberSharedContentState(key = "now-playing-cover"),
+                        animatedVisibilityScope = animatedVisibilityScope
+                    )
+                }
+            } else {
+                Modifier
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -112,6 +130,7 @@ fun NowPlayingScreen(
                     contentScale       = ContentScale.Crop,
                     modifier           = Modifier
                         .fillMaxSize()
+                        .then(coverSharedModifier)
                         .clip(MaterialTheme.shapes.extraLarge)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                 )
