@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="pagination(page, paginationBase)" aria-label="Seitennavigation">
+    <ul class="pagination pagination-sm justify-content-center mb-0">
+        <li class="page-item" th:classappend="${page.first} ? 'disabled'">
+            <a class="page-link" th:href="${paginationBase + (page.number - 1)}">&laquo;</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link"
+                  th:text="'Seite ' + ${page.number + 1} + ' / ' + ${page.totalPages} + ' (' + ${page.totalElements} + ')'">
+            </span>
+        </li>
+        <li class="page-item" th:classappend="${page.last} ? 'disabled'">
+            <a class="page-link" th:href="${paginationBase + (page.number + 1)}">&raquo;</a>
+        </li>
+    </ul>
+</nav>
+</body>
+</html>

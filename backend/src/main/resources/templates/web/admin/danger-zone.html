@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Danger Zone</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <h1 class="h3 mb-4">&#9888; Danger Zone</h1>
+
+    <div th:if="${param.error != null}" class="alert alert-danger mb-4">
+        <strong>Fehler beim Löschen:</strong>
+        <span th:text="${param.error[0]}"></span>
+        <p class="mb-0 mt-1 small">Die Daten sind unverändert (Transaktion zurückgerollt).</p>
+    </div>
+
+    <div class="card border-danger" style="max-width:600px">
+        <div class="card-header bg-danger text-white fw-bold">
+            &#9888; Alle Daten löschen
+        </div>
+        <div class="card-body">
+            <p class="card-text">
+                Diese Aktion löscht <strong>alle Daten</strong> aus der Datenbank:
+            </p>
+            <ul class="text-muted small mb-3">
+                <li>Alle Familien und Profile</li>
+                <li>Alle erlaubten Inhalte und aufgelösten Alben/Titel</li>
+                <li>Alle Favoriten und Inhaltsanfragen</li>
+                <li>Alle gekoppelten Geräte und Pairing-Codes</li>
+                <li>Alle Sitzungen und Benachrichtigungs-Abonnements</li>
+            </ul>
+            <p class="text-muted small mb-4">
+                Das Datenbankschema und der Liquibase-Changelog bleiben erhalten.
+                <strong>Diese Aktion kann nicht rückgängig gemacht werden.</strong>
+            </p>
+
+            <div id="danger-zone-action">
+                <button class="btn btn-danger"
+                        hx-get="/web/admin/danger-zone/confirm-step"
+                        hx-target="#danger-zone-action"
+                        hx-swap="outerHTML">
+                    Alle Daten löschen und neu starten
+                </button>
+            </div>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>

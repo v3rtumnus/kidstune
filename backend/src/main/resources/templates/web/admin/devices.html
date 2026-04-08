@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Geräte</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Alle Geräte</h1>
+        <span class="badge bg-secondary" th:text="${rows.size()} + ' gesamt'"></span>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div th:if="${rows.isEmpty()}" class="text-muted text-center py-5">Keine Geräte vorhanden.</div>
+            <div class="table-responsive" th:unless="${rows.isEmpty()}">
+                <table class="table table-hover mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Gerätename</th>
+                            <th>Typ</th>
+                            <th class="d-none d-sm-table-cell">Profil</th>
+                            <th class="d-none d-md-table-cell">Zuletzt gesehen</th>
+                            <th class="d-none d-md-table-cell">Erstellt</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row : ${rows}"
+                            th:id="'device-row-' + ${row.device().id()}">
+                            <td class="align-middle"
+                                th:text="${row.device().deviceName() != null ? row.device().deviceName() : '(unbekannt)'}"></td>
+                            <td class="align-middle">
+                                <span class="badge"
+                                      th:classappend="${row.device().deviceType().name() == 'KIDS'} ? 'bg-primary' : 'bg-secondary'"
+                                      th:text="${row.device().deviceType()}"></span>
+                            </td>
+                            <td class="align-middle d-none d-sm-table-cell"
+                                th:text="${row.profileName() != null ? row.profileName() : '–'}"></td>
+                            <td class="align-middle d-none d-md-table-cell text-muted"
+                                th:text="${row.device().lastSeenAt() != null ? #temporals.format(row.device().lastSeenAt(), 'dd.MM.yyyy HH:mm') : '–'}"></td>
+                            <td class="align-middle d-none d-md-table-cell text-muted"
+                                th:text="${#temporals.format(row.device().createdAt(), 'dd.MM.yyyy')}"></td>
+                            <td class="align-middle text-end">
+                                <button class="btn btn-sm btn-outline-danger"
+                                        th:attr="hx-post=@{/web/admin/devices/{id}/delete(id=${row.device().id()})},
+                                                 hx-target='#device-row-' + ${row.device().id()},
+                                                 hx-swap='outerHTML',
+                                                 hx-confirm='Gerät wirklich entfernen? Das Gerät wird damit entkoppelt.'">
+                                    &times;
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>

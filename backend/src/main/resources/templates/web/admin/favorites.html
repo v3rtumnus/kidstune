@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Favoriten</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Alle Favoriten</h1>
+        <span class="badge bg-secondary" th:text="${page.totalElements} + ' gesamt'"></span>
+    </div>
+
+    <!-- Filter -->
+    <form th:action="@{/web/admin/favorites}" method="get" class="mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-12 col-sm-5 col-md-4">
+                <select name="profileId" class="form-select form-select-sm">
+                    <option value="" th:selected="${selectedProfileId == null}">Alle Profile</option>
+                    <option th:each="p : ${allProfiles}"
+                            th:value="${p.id}"
+                            th:text="${p.name}"
+                            th:selected="${selectedProfileId == p.id}"></option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Filtern</button>
+                <a th:href="@{/web/admin/favorites}" class="btn btn-sm btn-outline-secondary ms-1">Zurücksetzen</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-0">
+            <div th:if="${rows.isEmpty()}" class="text-muted text-center py-5">Keine Favoriten gefunden.</div>
+            <div class="table-responsive" th:unless="${rows.isEmpty()}">
+                <table class="table table-hover mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Titel</th>
+                            <th class="d-none d-sm-table-cell">Künstler</th>
+                            <th>Profil</th>
+                            <th class="d-none d-md-table-cell">Hinzugefügt</th>
+                            <th class="d-none d-md-table-cell">Spotify</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row : ${rows}"
+                            th:id="'fav-row-' + ${row.favorite().id()}">
+                            <td class="align-middle">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img th:if="${row.favorite().trackImageUrl() != null}"
+                                         th:src="${row.favorite().trackImageUrl()}"
+                                         alt="" width="28" height="28"
+                                         class="rounded flex-shrink-0" style="object-fit:cover">
+                                    <span class="text-truncate" style="max-width:180px"
+                                          th:text="${row.favorite().trackTitle()}"></span>
+                                </div>
+                            </td>
+                            <td class="align-middle d-none d-sm-table-cell text-muted"
+                                th:text="${row.favorite().artistName()}"></td>
+                            <td class="align-middle" th:text="${row.profileName()}"></td>
+                            <td class="align-middle d-none d-md-table-cell text-muted"
+                                th:text="${#temporals.format(row.favorite().addedAt(), 'dd.MM.yyyy HH:mm')}"></td>
+                            <td class="align-middle d-none d-md-table-cell">
+                                <span th:if="${row.spotifyLinked()}"
+                                      class="badge bg-success">Verknüpft</span>
+                                <span th:unless="${row.spotifyLinked()}"
+                                      class="text-muted small">–</span>
+                            </td>
+                            <td class="align-middle text-end">
+                                <button class="btn btn-sm btn-outline-danger"
+                                        th:attr="hx-post=@{/web/admin/favorites/{id}/delete(id=${row.favorite().id()})},
+                                                 hx-target='#fav-row-' + ${row.favorite().id()},
+                                                 hx-swap='outerHTML',
+                                                 hx-confirm='Favorit wirklich löschen?'">
+                                    &times;
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div th:if="${page.totalPages > 1}">
+        <div th:replace="~{web/admin/fragments/pagination :: pagination(${page}, ${paginationBase})}"></div>
+    </div>
+
+</th:block>
+</body>
+</html>

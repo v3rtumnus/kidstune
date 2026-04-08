@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Profile</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Alle Profile</h1>
+        <span class="badge bg-secondary" th:text="${page.totalElements} + ' gesamt'"></span>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-0">
+            <div th:if="${rows.isEmpty()}" class="text-muted text-center py-5">Keine Profile vorhanden.</div>
+            <div class="table-responsive" th:unless="${rows.isEmpty()}">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Avatar</th>
+                            <th>Name</th>
+                            <th class="d-none d-sm-table-cell">Altersgruppe</th>
+                            <th class="text-end d-none d-md-table-cell">Inhalte</th>
+                            <th class="d-none d-lg-table-cell">Familien-ID</th>
+                            <th class="d-none d-md-table-cell">Erstellt</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row : ${rows}"
+                            th:id="'profile-row-' + ${row.profile().id()}">
+                            <td class="align-middle">
+                                <span class="fs-4"
+                                      th:style="'color:' + ${row.cssColor()}"
+                                      th:text="${row.emoji()}"></span>
+                            </td>
+                            <td class="align-middle fw-medium" th:text="${row.profile().name()}"></td>
+                            <td class="align-middle d-none d-sm-table-cell">
+                                <span class="badge bg-secondary"
+                                      th:text="${row.profile().ageGroup()}"></span>
+                            </td>
+                            <td class="align-middle text-end d-none d-md-table-cell">
+                                <span class="badge bg-primary" th:text="${row.contentCount()}"></span>
+                            </td>
+                            <td class="align-middle d-none d-lg-table-cell font-monospace small text-muted"
+                                th:text="${#strings.substring(row.profile().familyId(), 0, 8) + '…'}"></td>
+                            <td class="align-middle d-none d-md-table-cell text-muted small"
+                                th:text="${#temporals.format(row.profile().createdAt(), 'dd.MM.yyyy')}"></td>
+                            <td class="align-middle text-end">
+                                <a th:href="@{/web/admin/profiles/{id}/edit(id=${row.profile().id()})}"
+                                   class="btn btn-sm btn-outline-secondary me-1">Bearbeiten</a>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        th:attr="hx-post=@{/web/admin/profiles/{id}/delete(id=${row.profile().id()})},
+                                                 hx-target='#profile-row-' + ${row.profile().id()},
+                                                 hx-swap='outerHTML',
+                                                 hx-confirm='Profil wirklich löschen? Alle zugehörigen Inhalte, Favoriten und Anfragen werden ebenfalls gelöscht.'">
+                                    &times;
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div th:if="${page.totalPages > 1}">
+        <div th:replace="~{web/admin/fragments/pagination :: pagination(${page}, ${paginationBase})}"></div>
+    </div>
+
+</th:block>
+</body>
+</html>

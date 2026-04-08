@@ -3,6 +3,7 @@ package at.kidstune.web;
 import at.kidstune.content.*;
 import at.kidstune.content.dto.AddContentRequest;
 import at.kidstune.content.dto.BulkAddContentRequest;
+import at.kidstune.favorites.FavoriteRepository;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
 import at.kidstune.spotify.SpotifySearchService;
@@ -31,15 +32,18 @@ public class ContentWebController {
     private final ContentRepository    contentRepository;
     private final ProfileRepository    profileRepository;
     private final SpotifySearchService searchService;
+    private final FavoriteRepository   favoriteRepository;
 
     public ContentWebController(ContentService contentService,
                                 ContentRepository contentRepository,
                                 ProfileRepository profileRepository,
-                                SpotifySearchService searchService) {
+                                SpotifySearchService searchService,
+                                FavoriteRepository favoriteRepository) {
         this.contentService     = contentService;
         this.contentRepository  = contentRepository;
         this.profileRepository  = profileRepository;
         this.searchService      = searchService;
+        this.favoriteRepository = favoriteRepository;
     }
 
     // ── GET /web/profiles/{profileId}/content ─────────────────────────────────
@@ -50,8 +54,21 @@ public class ContentWebController {
             @RequestParam(value = "type",   required = false)   String type,
             @RequestParam(value = "scope",  required = false)   String scope,
             @RequestParam(value = "search", required = false)   String search,
+            @RequestParam(value = "tab",    defaultValue = "content") String tab,
             Model model,
             @AuthenticationPrincipal String familyId) {
+
+        if ("favorites".equals(tab)) {
+            return Mono.fromCallable(() -> {
+                ChildProfile profile = getProfileForFamily(profileId, familyId);
+                model.addAttribute("profile",    profile);
+                model.addAttribute("profileId",  profileId);
+                model.addAttribute("familyId",   familyId);
+                model.addAttribute("activeTab",  "favorites");
+                model.addAttribute("favorites",  favoriteRepository.findByProfileId(profileId));
+                return "web/content/index";
+            }).subscribeOn(Schedulers.boundedElastic());
+        }
 
         ContentType  typeFilter  = parseEnum(ContentType.class,  type);
         ContentScope scopeFilter = parseEnum(ContentScope.class, scope);
@@ -64,6 +81,7 @@ public class ContentWebController {
             model.addAttribute("typeFilter",  type);
             model.addAttribute("scopeFilter", scope);
             model.addAttribute("searchQuery", search);
+            model.addAttribute("activeTab",   "content");
             return profile;
         })
         .subscribeOn(Schedulers.boundedElastic())
@@ -186,6 +204,28 @@ public class ContentWebController {
                     log.warn("Content delete failed for profile {}: {}", profileId, e.getMessage());
                     return Mono.just("web/fragments/empty :: empty");
                 });
+    }
+
+    // ── POST /web/profiles/{profileId}/content/favorites/{id}/delete (HTMX) ──
+
+    @PostMapping("/favorites/{id}/delete")
+    public Mono<String> deleteFavorite(
+            @PathVariable("profileId") String profileId,
+            @PathVariable("id")        String id,
+            @AuthenticationPrincipal String familyId) {
+
+        return Mono.fromCallable(() -> {
+            // Validate profile ownership before deleting
+            getProfileForFamily(profileId, familyId);
+            favoriteRepository.findById(id).ifPresent(fav -> {
+                if (fav.getProfileId().equals(profileId)) {
+                    favoriteRepository.delete(fav);
+                }
+            });
+            return null;
+        })
+        .subscribeOn(Schedulers.boundedElastic())
+        .thenReturn("web/fragments/empty :: empty");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

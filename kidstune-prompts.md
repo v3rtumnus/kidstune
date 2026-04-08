@@ -2107,7 +2107,7 @@ VERIFICATION:
 
 ## Phase 8 – Admin Data Tables & Polish (Weeks 11-12)
 
-### Prompt 8.1 – Web Dashboard Admin Data Tables ⬅️
+### Prompt 8.1 – Web Dashboard Admin Data Tables ✅
 
 ```
 CONTEXT: Phase 8 of KidsTune. All web dashboard parent features exist (phases 2.4-2.6, 6.2). We add an admin section
@@ -2206,7 +2206,7 @@ VERIFICATION:
 
 ## Phase 8 (continued) – Polish, Hardening & Documentation
 
-### Prompt 8.2 – Kids App Animations
+### Prompt 8.2 – Kids App Animations ⬅️
 
 ```
 CONTEXT: Phase 8 of KidsTune. All features work. We add polish animations to make the
@@ -2407,7 +2407,53 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 8.7 – Documentation
+### Prompt 8.7 – Backend Test Slicing
+
+```
+CONTEXT: Phase 8 of KidsTune. All 17 integration test classes currently use
+@SpringBootTest(webEnvironment = RANDOM_PORT), which starts the full Spring context
+(JPA + Liquibase + WebFlux + Security + Netty) for every single class. This makes the
+backend test suite run for 20-30 minutes even with a shared MariaDB Testcontainer.
+
+GOAL: Slice tests into the appropriate Spring Boot test slice so that only tests that
+genuinely need the full context use @SpringBootTest. When this task is done:
+
+- @DataJpaTest classes for repository-only tests (ContentRepository, FavoriteRepository,
+  ProfileRepository, etc.): replaces full context with JPA-only slice + in-memory H2 or
+  Testcontainer MariaDB — no web server, no Spotify client, no Netty.
+  Candidates: ContentIntTest, FavoritesIntTest, ProfileIntTest (if they only test DB layer)
+
+- @WebFluxTest classes for controller tests where the service/repository is mocked:
+  uses MockMvc/WebTestClient + @MockitoBean for the service layer, no real DB.
+  Candidates: SseIntTest, PushNotificationIntTest, any tests that only verify HTTP
+  request/response mapping without hitting real DB
+
+- @SpringBootTest (full) kept only for true end-to-end integration flows:
+  Candidates: KidstuneApplicationIntTest (context loads + migrations), SpotifyOAuthIntTest,
+  SyncIntTest, ContentRequestIntTest, DevicePairingIntTest, JwtAuthIntTest,
+  ApproveTokenIntTest, ContentImportIntTest, ContentResolverIntTest,
+  SpotifyImportIntTest, SpotifyProxyIntTest, SpotifySuggestionsIntTest
+
+- AbstractIntTest base class stays for the shared @Container MariaDB used by all
+  @SpringBootTest full tests. @DataJpaTest tests that need MariaDB (not H2) extend a
+  separate AbstractDataJpaTest with its own @DataJpaTest annotation and the shared container.
+
+- Target: total backend test suite runtime under 3 minutes.
+
+CONSTRAINTS:
+- Do NOT change any test assertions or test business logic
+- Tests that mock Spotify via MockWebServer keep their @DynamicPropertySource for the URL
+- AbstractIntTest stays as base for full @SpringBootTest tests
+- If a test cannot be sliced without refactoring the class under test, leave it as-is and
+  document why in a comment
+
+VERIFICATION:
+- ./gradlew test → all tests pass
+- Total test runtime is under 3 minutes
+- No tests were deleted, only their Spring context slice changed
+```
+
+### Prompt 8.8 – Documentation
 
 ```
 CONTEXT: Phase 8 of KidsTune. Everything works. We write comprehensive documentation.

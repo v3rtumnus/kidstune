@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Familien</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Familien</h1>
+        <span class="badge bg-secondary" th:text="${families.size()} + ' gesamt'"></span>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div th:if="${families.isEmpty()}" class="text-muted text-center py-5">Keine Familien vorhanden.</div>
+            <div class="table-responsive" th:unless="${families.isEmpty()}">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>E-Mail</th>
+                            <th>Spotify-ID</th>
+                            <th class="text-end">Profile</th>
+                            <th class="d-none d-md-table-cell">Erstellt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row : ${families}">
+                            <td class="font-monospace small text-muted"
+                                th:text="${#strings.substring(row.family().id(), 0, 8) + '…'}"></td>
+                            <td th:text="${row.family().email()}"></td>
+                            <td class="font-monospace small text-muted"
+                                th:text="${row.maskedSpotifyId() != null ? row.maskedSpotifyId() : '–'}"></td>
+                            <td class="text-end">
+                                <span class="badge bg-primary" th:text="${row.profileCount()}"></span>
+                            </td>
+                            <td class="d-none d-md-table-cell text-muted small"
+                                th:text="${#temporals.format(row.family().createdAt(), 'dd.MM.yyyy HH:mm')}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>

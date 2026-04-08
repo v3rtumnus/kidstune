@@ -1,5 +1,7 @@
 package at.kidstune.requests;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -20,6 +22,8 @@ public interface ContentRequestRepository extends JpaRepository<ContentRequest, 
             List<String> profileIds, List<ContentRequestStatus> statuses);
 
     List<ContentRequest> findByProfileIdIn(List<String> profileIds);
+
+    Page<ContentRequest> findByStatus(ContentRequestStatus status, Pageable pageable);
 
     long countByProfileIdAndStatus(String profileId, ContentRequestStatus status);
 

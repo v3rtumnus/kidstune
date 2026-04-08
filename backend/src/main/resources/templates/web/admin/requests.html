@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Inhaltsanfragen</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Inhaltsanfragen</h1>
+        <span class="badge bg-secondary" th:text="${page.totalElements} + ' gesamt'"></span>
+    </div>
+
+    <!-- Status filter -->
+    <form th:action="@{/web/admin/requests}" method="get" class="mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-12 col-sm-5 col-md-3">
+                <select name="status" class="form-select form-select-sm">
+                    <option value="" th:selected="${selectedStatus == null}">Alle Status</option>
+                    <option th:each="s : ${statuses}"
+                            th:value="${s}"
+                            th:text="${s}"
+                            th:selected="${selectedStatus == s.name()}"></option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Filtern</button>
+                <a th:href="@{/web/admin/requests}" class="btn btn-sm btn-outline-secondary ms-1">Zurücksetzen</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-0">
+            <div th:if="${rows.isEmpty()}" class="text-muted text-center py-5">Keine Anfragen gefunden.</div>
+            <div class="table-responsive" th:unless="${rows.isEmpty()}">
+                <table class="table table-hover mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Titel</th>
+                            <th class="d-none d-sm-table-cell">Profil</th>
+                            <th>Status</th>
+                            <th class="d-none d-md-table-cell">Angefragt</th>
+                            <th class="d-none d-lg-table-cell">Bearbeitet</th>
+                            <th class="d-none d-lg-table-cell">Notiz</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row : ${rows}"
+                            th:id="'req-row-' + ${row.request().id()}">
+                            <td class="align-middle">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img th:if="${row.request().imageUrl() != null}"
+                                         th:src="${row.request().imageUrl()}"
+                                         alt="" width="28" height="28"
+                                         class="rounded flex-shrink-0" style="object-fit:cover">
+                                    <span class="text-truncate" style="max-width:160px"
+                                          th:text="${row.request().title()}"></span>
+                                </div>
+                            </td>
+                            <td class="align-middle d-none d-sm-table-cell"
+                                th:text="${row.profileName()}"></td>
+                            <td class="align-middle">
+                                <span class="badge"
+                                      th:classappend="${row.request().status().name() == 'PENDING'} ? 'bg-warning text-dark' :
+                                                      (${row.request().status().name() == 'APPROVED'} ? 'bg-success' :
+                                                      (${row.request().status().name() == 'REJECTED'} ? 'bg-danger' : 'bg-secondary'))"
+                                      th:text="${row.request().status()}"></span>
+                            </td>
+                            <td class="align-middle d-none d-md-table-cell text-muted"
+                                th:text="${#temporals.format(row.request().requestedAt(), 'dd.MM.yyyy HH:mm')}"></td>
+                            <td class="align-middle d-none d-lg-table-cell text-muted"
+                                th:text="${row.request().resolvedAt() != null ? #temporals.format(row.request().resolvedAt(), 'dd.MM.yyyy HH:mm') : '–'}"></td>
+                            <td class="align-middle d-none d-lg-table-cell text-muted"
+                                th:text="${row.request().parentNote()}"></td>
+                            <td class="align-middle text-end text-nowrap">
+                                <button th:if="${row.request().status().name() == 'PENDING'}"
+                                        class="btn btn-sm btn-outline-secondary me-1"
+                                        th:attr="hx-post=@{/web/admin/requests/{id}/expire(id=${row.request().id()})},
+                                                 hx-target='#req-row-' + ${row.request().id()},
+                                                 hx-swap='outerHTML',
+                                                 hx-confirm='Anfrage als abgelaufen markieren?'">
+                                    Ablaufen lassen
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        th:attr="hx-post=@{/web/admin/requests/{id}/delete(id=${row.request().id()})},
+                                                 hx-target='#req-row-' + ${row.request().id()},
+                                                 hx-swap='outerHTML',
+                                                 hx-confirm='Anfrage wirklich löschen?'">
+                                    &times;
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div th:if="${page.totalPages > 1}">
+        <div th:replace="~{web/admin/fragments/pagination :: pagination(${page}, ${paginationBase})}"></div>
+    </div>
+
+</th:block>
+</body>
+</html>

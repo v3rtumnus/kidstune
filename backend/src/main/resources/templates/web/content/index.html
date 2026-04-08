@@ -14,100 +14,172 @@
             <a th:href="@{/web/profiles}" class="btn btn-sm btn-outline-secondary me-3">&larr;</a>
             <h1 class="h3 mb-0" th:text="${profile.name + ' – Inhalte'}">Inhalte</h1>
         </div>
-        <a th:href="@{/web/profiles/{pid}/content/add(pid=${profileId})}" class="btn btn-primary">
+        <a th:href="@{/web/profiles/{pid}/content/add(pid=${profileId})}"
+           class="btn btn-primary"
+           th:if="${activeTab != 'favorites'}">
             + Inhalt hinzuf&uuml;gen
         </a>
     </div>
 
-    <!-- Filter bar -->
-    <form th:action="@{/web/profiles/{pid}/content(pid=${profileId})}" method="get" class="mb-4">
-        <div class="row g-2 align-items-end">
-            <div class="col-12 col-sm-4 col-md-3">
-                <select name="type" class="form-select form-select-sm">
-                    <option value="" th:selected="${typeFilter == null}">Alle Typen</option>
-                    <option value="MUSIC"     th:selected="${typeFilter == 'MUSIC'}">Musik</option>
-                    <option value="AUDIOBOOK" th:selected="${typeFilter == 'AUDIOBOOK'}">H&ouml;rbuch</option>
-                </select>
-            </div>
-            <div class="col-12 col-sm-4 col-md-3">
-                <select name="scope" class="form-select form-select-sm">
-                    <option value="" th:selected="${scopeFilter == null}">Alle Bereiche</option>
-                    <option value="TRACK"    th:selected="${scopeFilter == 'TRACK'}">Titel</option>
-                    <option value="ALBUM"    th:selected="${scopeFilter == 'ALBUM'}">Album</option>
-                    <option value="PLAYLIST" th:selected="${scopeFilter == 'PLAYLIST'}">Playlist</option>
-                    <option value="ARTIST"   th:selected="${scopeFilter == 'ARTIST'}">K&uuml;nstler</option>
-                </select>
-            </div>
-            <div class="col-12 col-sm-4 col-md-4">
-                <input type="text" name="search" class="form-control form-control-sm"
-                       placeholder="Suchen..." th:value="${searchQuery}">
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-sm btn-outline-primary">Filtern</button>
-                <a th:href="@{/web/profiles/{pid}/content(pid=${profileId})}"
-                   class="btn btn-sm btn-outline-secondary ms-1">Zur&uuml;cksetzen</a>
-            </div>
-        </div>
-    </form>
+    <!-- Tab navigation -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link"
+               th:classappend="${activeTab != 'favorites'} ? 'active'"
+               th:href="@{/web/profiles/{pid}/content(pid=${profileId})}">Inhalte</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link"
+               th:classappend="${activeTab == 'favorites'} ? 'active'"
+               th:href="@{/web/profiles/{pid}/content(pid=${profileId}, tab=favorites)}">Favoriten</a>
+        </li>
+    </ul>
 
-    <!-- Content table -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-            <div th:if="${contentItems.isEmpty()}" class="text-muted text-center py-5">
-                Keine Inhalte gefunden.
-                <a th:href="@{/web/profiles/{pid}/content/add(pid=${profileId})}">Jetzt hinzuf&uuml;gen</a>
-            </div>
-            <div class="table-responsive" th:unless="${contentItems.isEmpty()}">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Titel</th>
-                            <th class="d-none d-sm-table-cell">K&uuml;nstler</th>
-                            <th>Bereich</th>
-                            <th class="d-none d-md-table-cell">Typ</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="item : ${contentItems}"
-                            th:id="'content-row-' + ${item.id()}">
-                            <td>
-                                <div class="d-flex align-items-center gap-2">
-                                    <img th:if="${item.imageUrl() != null}"
-                                         th:src="${item.imageUrl()}"
-                                         alt="" width="36" height="36"
-                                         class="rounded flex-shrink-0"
-                                         style="object-fit:cover">
-                                    <span class="text-truncate" style="max-width:200px"
-                                          th:text="${item.title()}"></span>
-                                </div>
-                            </td>
-                            <td class="d-none d-sm-table-cell text-muted small align-middle"
-                                th:text="${item.artistName()}"></td>
-                            <td class="align-middle">
-                                <span class="badge bg-secondary" th:text="${item.scope()}"></span>
-                            </td>
-                            <td class="d-none d-md-table-cell align-middle">
-                                <span class="badge"
-                                      th:classappend="${item.contentType().name() == 'MUSIC'} ? 'bg-primary' : 'bg-success'"
-                                      th:text="${item.contentType()}"></span>
-                            </td>
-                            <td class="align-middle text-end">
-                                <button class="btn btn-sm btn-outline-danger"
-                                        th:attr="
-                                          hx-post=@{/web/profiles/{pid}/content/{id}/delete(pid=${profileId},id=${item.id()})},
-                                          hx-target='#content-row-' + ${item.id()},
-                                          hx-swap='outerHTML',
-                                          hx-confirm='Inhalt wirklich entfernen?'">
-                                    &times;
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+    <!-- ── Favorites tab ──────────────────────────────────────────────────── -->
+    <th:block th:if="${activeTab == 'favorites'}">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div th:if="${favorites.isEmpty()}" class="text-muted text-center py-5">
+                    Noch keine Favoriten vorhanden.
+                </div>
+                <div class="table-responsive" th:unless="${favorites.isEmpty()}">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Titel</th>
+                                <th class="d-none d-sm-table-cell">K&uuml;nstler</th>
+                                <th class="d-none d-md-table-cell">Hinzugef&uuml;gt</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="fav : ${favorites}"
+                                th:id="'fav-row-' + ${fav.id()}">
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <img th:if="${fav.trackImageUrl() != null}"
+                                             th:src="${fav.trackImageUrl()}"
+                                             alt="" width="36" height="36"
+                                             class="rounded flex-shrink-0"
+                                             style="object-fit:cover">
+                                        <span class="text-truncate" style="max-width:200px"
+                                              th:text="${fav.trackTitle()}"></span>
+                                    </div>
+                                </td>
+                                <td class="d-none d-sm-table-cell text-muted small align-middle"
+                                    th:text="${fav.artistName()}"></td>
+                                <td class="d-none d-md-table-cell align-middle text-muted small"
+                                    th:text="${#temporals.format(fav.addedAt(), 'dd.MM.yyyy HH:mm')}"></td>
+                                <td class="align-middle text-end">
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            th:attr="hx-post=@{/web/profiles/{pid}/content/favorites/{id}/delete(pid=${profileId},id=${fav.id()})},
+                                                     hx-target='#fav-row-' + ${fav.id()},
+                                                     hx-swap='outerHTML',
+                                                     hx-confirm='Favorit wirklich entfernen?'">
+                                        &times;
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
+    </th:block>
+
+    <!-- ── Content tab ────────────────────────────────────────────────────── -->
+    <th:block th:unless="${activeTab == 'favorites'}">
+
+        <!-- Filter bar -->
+        <form th:action="@{/web/profiles/{pid}/content(pid=${profileId})}" method="get" class="mb-4">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-sm-4 col-md-3">
+                    <select name="type" class="form-select form-select-sm">
+                        <option value="" th:selected="${typeFilter == null}">Alle Typen</option>
+                        <option value="MUSIC"     th:selected="${typeFilter == 'MUSIC'}">Musik</option>
+                        <option value="AUDIOBOOK" th:selected="${typeFilter == 'AUDIOBOOK'}">H&ouml;rbuch</option>
+                    </select>
+                </div>
+                <div class="col-12 col-sm-4 col-md-3">
+                    <select name="scope" class="form-select form-select-sm">
+                        <option value="" th:selected="${scopeFilter == null}">Alle Bereiche</option>
+                        <option value="TRACK"    th:selected="${scopeFilter == 'TRACK'}">Titel</option>
+                        <option value="ALBUM"    th:selected="${scopeFilter == 'ALBUM'}">Album</option>
+                        <option value="PLAYLIST" th:selected="${scopeFilter == 'PLAYLIST'}">Playlist</option>
+                        <option value="ARTIST"   th:selected="${scopeFilter == 'ARTIST'}">K&uuml;nstler</option>
+                    </select>
+                </div>
+                <div class="col-12 col-sm-4 col-md-4">
+                    <input type="text" name="search" class="form-control form-control-sm"
+                           placeholder="Suchen..." th:value="${searchQuery}">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Filtern</button>
+                    <a th:href="@{/web/profiles/{pid}/content(pid=${profileId})}"
+                       class="btn btn-sm btn-outline-secondary ms-1">Zur&uuml;cksetzen</a>
+                </div>
+            </div>
+        </form>
+
+        <!-- Content table -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div th:if="${contentItems == null or contentItems.isEmpty()}" class="text-muted text-center py-5">
+                    Keine Inhalte gefunden.
+                    <a th:href="@{/web/profiles/{pid}/content/add(pid=${profileId})}">Jetzt hinzuf&uuml;gen</a>
+                </div>
+                <div class="table-responsive" th:unless="${contentItems == null or contentItems.isEmpty()}">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Titel</th>
+                                <th class="d-none d-sm-table-cell">K&uuml;nstler</th>
+                                <th>Bereich</th>
+                                <th class="d-none d-md-table-cell">Typ</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="item : ${contentItems}"
+                                th:id="'content-row-' + ${item.id()}">
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <img th:if="${item.imageUrl() != null}"
+                                             th:src="${item.imageUrl()}"
+                                             alt="" width="36" height="36"
+                                             class="rounded flex-shrink-0"
+                                             style="object-fit:cover">
+                                        <span class="text-truncate" style="max-width:200px"
+                                              th:text="${item.title()}"></span>
+                                    </div>
+                                </td>
+                                <td class="d-none d-sm-table-cell text-muted small align-middle"
+                                    th:text="${item.artistName()}"></td>
+                                <td class="align-middle">
+                                    <span class="badge bg-secondary" th:text="${item.scope()}"></span>
+                                </td>
+                                <td class="d-none d-md-table-cell align-middle">
+                                    <span class="badge"
+                                          th:classappend="${item.contentType().name() == 'MUSIC'} ? 'bg-primary' : 'bg-success'"
+                                          th:text="${item.contentType()}"></span>
+                                </td>
+                                <td class="align-middle text-end">
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            th:attr="hx-post=@{/web/profiles/{pid}/content/{id}/delete(pid=${profileId},id=${item.id()})},
+                                                     hx-target='#content-row-' + ${item.id()},
+                                                     hx-swap='outerHTML',
+                                                     hx-confirm='Inhalt wirklich entfernen?'">
+                                        &times;
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </th:block>
 
 </th:block>
 </body>

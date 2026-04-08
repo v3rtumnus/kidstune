@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Inhalte</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Alle Inhalte</h1>
+        <span class="badge bg-secondary" th:text="${page.totalElements} + ' gesamt'"></span>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-0">
+            <div th:if="${rows.isEmpty()}" class="text-muted text-center py-5">Keine Inhalte vorhanden.</div>
+            <div class="table-responsive" th:unless="${rows.isEmpty()}">
+                <table class="table table-hover mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>
+                                <a th:href="@{/web/admin/content(sort='title',dir=${sortField == 'title' and sortDir == 'asc' ? 'desc' : 'asc'})}"
+                                   class="text-decoration-none text-dark">
+                                    Titel
+                                    <span th:if="${sortField == 'title'}"
+                                          th:text="${sortDir == 'asc' ? '▲' : '▼'}"></span>
+                                </a>
+                            </th>
+                            <th class="d-none d-sm-table-cell">
+                                <a th:href="@{/web/admin/content(sort='artistName',dir=${sortField == 'artistName' and sortDir == 'asc' ? 'desc' : 'asc'})}"
+                                   class="text-decoration-none text-dark">
+                                    Künstler
+                                    <span th:if="${sortField == 'artistName'}"
+                                          th:text="${sortDir == 'asc' ? '▲' : '▼'}"></span>
+                                </a>
+                            </th>
+                            <th>
+                                <a th:href="@{/web/admin/content(sort='scope',dir=${sortField == 'scope' and sortDir == 'asc' ? 'desc' : 'asc'})}"
+                                   class="text-decoration-none text-dark">
+                                    Bereich
+                                    <span th:if="${sortField == 'scope'}"
+                                          th:text="${sortDir == 'asc' ? '▲' : '▼'}"></span>
+                                </a>
+                            </th>
+                            <th class="d-none d-md-table-cell">
+                                <a th:href="@{/web/admin/content(sort='contentType',dir=${sortField == 'contentType' and sortDir == 'asc' ? 'desc' : 'asc'})}"
+                                   class="text-decoration-none text-dark">
+                                    Typ
+                                    <span th:if="${sortField == 'contentType'}"
+                                          th:text="${sortDir == 'asc' ? '▲' : '▼'}"></span>
+                                </a>
+                            </th>
+                            <th class="d-none d-lg-table-cell">Profil</th>
+                            <th class="d-none d-xl-table-cell font-monospace">Spotify-URI</th>
+                            <th class="d-none d-md-table-cell">
+                                <a th:href="@{/web/admin/content(sort='createdAt',dir=${sortField == 'createdAt' and sortDir == 'asc' ? 'desc' : 'asc'})}"
+                                   class="text-decoration-none text-dark">
+                                    Erstellt
+                                    <span th:if="${sortField == 'createdAt'}"
+                                          th:text="${sortDir == 'asc' ? '▲' : '▼'}"></span>
+                                </a>
+                            </th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row : ${rows}"
+                            th:id="'content-row-' + ${row.content().id()}">
+                            <td class="align-middle">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img th:if="${row.content().imageUrl() != null}"
+                                         th:src="${row.content().imageUrl()}"
+                                         alt="" width="28" height="28"
+                                         class="rounded flex-shrink-0" style="object-fit:cover">
+                                    <span class="text-truncate" style="max-width:180px"
+                                          th:text="${row.content().title()}"></span>
+                                </div>
+                            </td>
+                            <td class="align-middle d-none d-sm-table-cell text-muted"
+                                th:text="${row.content().artistName()}"></td>
+                            <td class="align-middle">
+                                <span class="badge bg-secondary"
+                                      th:text="${row.content().scope()}"></span>
+                            </td>
+                            <td class="align-middle d-none d-md-table-cell">
+                                <span class="badge"
+                                      th:classappend="${row.content().contentType().name() == 'MUSIC'} ? 'bg-primary' : 'bg-success'"
+                                      th:text="${row.content().contentType()}"></span>
+                            </td>
+                            <td class="align-middle d-none d-lg-table-cell text-muted"
+                                th:text="${row.profileName()}"></td>
+                            <td class="align-middle d-none d-xl-table-cell font-monospace text-muted"
+                                style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"
+                                th:title="${row.content().spotifyUri()}"
+                                th:text="${#strings.abbreviate(row.content().spotifyUri(), 24)}"></td>
+                            <td class="align-middle d-none d-md-table-cell text-muted"
+                                th:text="${#temporals.format(row.content().createdAt(), 'dd.MM.yyyy')}"></td>
+                            <td class="align-middle text-end text-nowrap">
+                                <a th:href="@{/web/admin/content/{id}/edit(id=${row.content().id()})}"
+                                   class="btn btn-sm btn-outline-secondary me-1">Bearbeiten</a>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        th:attr="hx-post=@{/web/admin/content/{id}/delete(id=${row.content().id()})},
+                                                 hx-target='#content-row-' + ${row.content().id()},
+                                                 hx-swap='outerHTML',
+                                                 hx-confirm='Inhalt wirklich löschen? Aufgelöste Alben und Titel werden ebenfalls entfernt.'">
+                                    &times;
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div th:if="${page.totalPages > 1}">
+        <div th:replace="~{web/admin/fragments/pagination :: pagination(${page}, ${paginationBase})}"></div>
+    </div>
+
+</th:block>
+</body>
+</html>

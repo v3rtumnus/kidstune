@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="albums" class="p-2 bg-light border-top">
+    <div th:if="${albums.isEmpty()}" class="text-muted small px-3 py-2">Keine aufgelösten Alben.</div>
+    <table class="table table-sm mb-0 small" th:unless="${albums.isEmpty()}">
+        <thead>
+            <tr class="text-muted">
+                <th class="ps-4">Album</th>
+                <th class="d-none d-sm-table-cell">Veröffentlicht</th>
+                <th class="text-end">Titel</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="album : ${albums}">
+                <td class="ps-4">
+                    <div class="d-flex align-items-center gap-2">
+                        <img th:if="${album.imageUrl != null}"
+                             th:src="${album.imageUrl}"
+                             alt="" width="24" height="24"
+                             class="rounded flex-shrink-0" style="object-fit:cover">
+                        <span th:text="${album.title}"></span>
+                    </div>
+                </td>
+                <td class="d-none d-sm-table-cell text-muted"
+                    th:text="${album.releaseDate}"></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-link p-0 text-decoration-none"
+                            th:attr="hx-get=@{/web/admin/resolved/albums/{id}/tracks(id=${album.id})},
+                                     hx-target='#tracks-for-' + ${album.id},
+                                     hx-swap='innerHTML'">
+                        <span th:text="${trackCounts.getOrDefault(album.id, 0)}"></span> Titel ▾
+                    </button>
+                </td>
+                <td></td>
+            </tr>
+            <!-- Expandable track rows -->
+            <tr th:each="album : ${albums}" class="table-white">
+                <td colspan="4" class="p-0 ps-4">
+                    <div th:id="'tracks-for-' + ${album.id}"></div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

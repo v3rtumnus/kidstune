@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Aufgelöste Inhalte</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Aufgelöste Inhalte</h1>
+        <span class="badge bg-secondary" th:text="${rows.size()} + ' Einträge'"></span>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div th:if="${rows.isEmpty()}" class="text-muted text-center py-5">Keine Einträge vorhanden.</div>
+            <div class="table-responsive" th:unless="${rows.isEmpty()}">
+                <table class="table table-hover mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Titel</th>
+                            <th class="d-none d-sm-table-cell">Profil</th>
+                            <th class="d-none d-md-table-cell">Bereich</th>
+                            <th class="text-end">Alben</th>
+                            <th class="d-none d-md-table-cell">Aufgelöst am</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row : ${rows}"
+                            th:id="'resolved-row-' + ${row.content().id()}">
+                            <td class="align-middle">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img th:if="${row.content().imageUrl() != null}"
+                                         th:src="${row.content().imageUrl()}"
+                                         alt="" width="28" height="28"
+                                         class="rounded flex-shrink-0" style="object-fit:cover">
+                                    <span class="text-truncate" style="max-width:200px"
+                                          th:text="${row.content().title()}"></span>
+                                </div>
+                            </td>
+                            <td class="align-middle d-none d-sm-table-cell text-muted"
+                                th:text="${row.profileName()}"></td>
+                            <td class="align-middle d-none d-md-table-cell">
+                                <span class="badge bg-secondary"
+                                      th:text="${row.content().scope()}"></span>
+                            </td>
+                            <td class="align-middle text-end">
+                                <button class="btn btn-sm btn-outline-primary"
+                                        th:attr="hx-get=@{/web/admin/resolved/{id}/albums(id=${row.content().id()})},
+                                                 hx-target='#albums-for-' + ${row.content().id()},
+                                                 hx-swap='innerHTML'">
+                                    <span th:text="${row.albumCount()}"></span> Alben ▾
+                                </button>
+                            </td>
+                            <td class="align-middle d-none d-md-table-cell text-muted"
+                                th:text="${row.content().resolvedAt() != null ? #temporals.format(row.content().resolvedAt(), 'dd.MM.yyyy HH:mm') : '–'}"></td>
+                            <td class="align-middle text-end">
+                                <button class="btn btn-sm btn-outline-warning"
+                                        th:id="'re-resolve-btn-' + ${row.content().id()}"
+                                        th:attr="hx-post=@{/web/admin/resolved/{id}/re-resolve(id=${row.content().id()})},
+                                                 hx-target='#re-resolve-msg-' + ${row.content().id()},
+                                                 hx-swap='innerHTML'">
+                                    &#8635; Re-Resolve
+                                </button>
+                                <span th:id="'re-resolve-msg-' + ${row.content().id()}"></span>
+                            </td>
+                        </tr>
+                        <!-- Expandable album rows (loaded via HTMX) -->
+                        <tr th:each="row : ${rows}" class="table-light">
+                            <td colspan="7" class="p-0">
+                                <div th:id="'albums-for-' + ${row.content().id()}"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>

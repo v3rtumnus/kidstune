@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head><title>Admin – Profil bearbeiten</title></head>
+<body>
+<th:block layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <a th:href="@{/web/admin/profiles}" class="btn btn-sm btn-outline-secondary me-3">&larr;</a>
+        <h1 class="h3 mb-0">Profil bearbeiten</h1>
+    </div>
+
+    <div th:if="${nameError}" class="alert alert-danger" th:text="${nameError}"></div>
+
+    <div class="card border-0 shadow-sm" style="max-width:500px">
+        <div class="card-body">
+            <form th:action="@{/web/admin/profiles/{id}(id=${profileId})}" method="post">
+
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Name</label>
+                    <input type="text" name="name" class="form-control"
+                           th:value="${profile.name()}" required maxlength="100">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Avatar-Symbol</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <div th:each="icon : ${avatarIcons}">
+                            <input type="radio" class="btn-check" name="avatarIcon"
+                                   th:id="'icon-' + ${icon}"
+                                   th:value="${icon}"
+                                   th:checked="${profile.avatarIcon() == icon}">
+                            <label class="btn btn-outline-secondary fs-4 px-3"
+                                   th:for="'icon-' + ${icon}"
+                                   th:text="${avatarHelper.emoji(icon)}"></label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Avatar-Farbe</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <div th:each="color : ${avatarColors}">
+                            <input type="radio" class="btn-check" name="avatarColor"
+                                   th:id="'color-' + ${color}"
+                                   th:value="${color}"
+                                   th:checked="${profile.avatarColor() == color}">
+                            <label class="btn btn-outline-secondary"
+                                   th:for="'color-' + ${color}"
+                                   th:style="'border-color:' + ${avatarHelper.cssColor(color)} + '; color:' + ${avatarHelper.cssColor(color)}"
+                                   th:text="${avatarHelper.colorLabel(color)}"></label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-medium">Altersgruppe</label>
+                    <select name="ageGroup" class="form-select">
+                        <option th:each="ag : ${ageGroups}"
+                                th:value="${ag}"
+                                th:text="${ag}"
+                                th:selected="${profile.ageGroup() == ag}"></option>
+                    </select>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Speichern</button>
+                    <a th:href="@{/web/admin/profiles}" class="btn btn-outline-secondary">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</th:block>
+</body>
+</html>

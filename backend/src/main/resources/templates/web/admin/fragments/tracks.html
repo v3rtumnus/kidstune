@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="tracks" class="py-1 ps-5">
+    <div th:if="${tracks.isEmpty()}" class="text-muted small py-1">Keine Titel vorhanden.</div>
+    <table class="table table-sm mb-0 small" th:unless="${tracks.isEmpty()}">
+        <thead>
+            <tr class="text-muted">
+                <th>#</th>
+                <th>Titel</th>
+                <th class="d-none d-sm-table-cell">Künstler</th>
+                <th class="d-none d-md-table-cell text-end">Dauer</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="track : ${tracks}">
+                <td class="text-muted" th:text="${track.trackNumber}"></td>
+                <td th:text="${track.title}"></td>
+                <td class="text-muted d-none d-sm-table-cell" th:text="${track.artistName}"></td>
+                <td class="text-muted d-none d-md-table-cell text-end"
+                    th:text="${track.durationMs != null ? (track.durationMs / 60000) + ':' + #strings.leftPad('' + ((track.durationMs % 60000) / 1000), 2, '0') : '–'}"></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="step" id="danger-zone-action">
+    <p class="text-muted mb-3">
+        Zum Bestätigen <strong>DELETE</strong> in das Feld eingeben und auf "Alles löschen" klicken.
+    </p>
+    <form action="/web/admin/danger-zone/wipe" method="post">
+        <div class="input-group" style="max-width:400px">
+            <input type="text" id="wipeConfirmInput" name="confirmText"
+                   class="form-control border-danger"
+                   placeholder="DELETE" autocomplete="off">
+            <button type="submit" id="wipeConfirmBtn"
+                    class="btn btn-danger" disabled>
+                Alles löschen
+            </button>
+        </div>
+    </form>
+    <script>
+        (function() {
+            const input = document.getElementById('wipeConfirmInput');
+            const btn   = document.getElementById('wipeConfirmBtn');
+            if (input && btn) {
+                input.addEventListener('input', function() {
+                    btn.disabled = this.value !== 'DELETE';
+                });
+                input.focus();
+            }
+        })();
+    </script>
+</div>
+</body>
+</html>
