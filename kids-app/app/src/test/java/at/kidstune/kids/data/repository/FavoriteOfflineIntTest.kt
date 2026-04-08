@@ -8,6 +8,7 @@ import at.kidstune.kids.data.local.entities.LocalTrack
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.data.remote.KidstuneApiClient
 import at.kidstune.kids.data.remote.dto.FavoriteResponseDto
+import at.kidstune.kids.data.repository.DiscoverRepository
 import at.kidstune.kids.sync.OfflineQueue
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -105,7 +106,8 @@ class FavoriteOfflineIntTest {
         val api    = KidstuneApiClient(client, "")
 
         favoriteRepository = FavoriteRepository(db.favoriteDao(), api, prefs)
-        offlineQueue       = OfflineQueue(favoriteRepository)
+        val discoverRepository = mockk<DiscoverRepository>(relaxed = true)
+        offlineQueue       = OfflineQueue(favoriteRepository, discoverRepository)
     }
 
     @After

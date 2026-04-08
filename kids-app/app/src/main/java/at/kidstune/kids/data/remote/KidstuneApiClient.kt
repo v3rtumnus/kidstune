@@ -2,10 +2,14 @@ package at.kidstune.kids.data.remote
 
 import at.kidstune.kids.data.remote.dto.AddFavoriteRequestDto
 import at.kidstune.kids.data.remote.dto.ApiErrorDto
+import at.kidstune.kids.data.remote.dto.ContentRequestResponseDto
+import at.kidstune.kids.data.remote.dto.CreateContentRequestDto
 import at.kidstune.kids.data.remote.dto.DeltaSyncPayloadDto
+import at.kidstune.kids.data.remote.dto.DiscoverItemDto
 import at.kidstune.kids.data.remote.dto.FavoriteResponseDto
 import at.kidstune.kids.data.remote.dto.PairingConfirmRequestDto
 import at.kidstune.kids.data.remote.dto.PairingConfirmResponseDto
+import at.kidstune.kids.data.remote.dto.SearchResultsDto
 import at.kidstune.kids.data.remote.dto.SyncPayloadDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -94,6 +98,47 @@ class KidstuneApiClient @Inject constructor(
             message    = error?.error ?: "HTTP ${response.status.value}"
         )
     }
+
+    /**
+     * Fetches personalised album suggestions for the Discover idle state.
+     * Corresponds to `GET /api/v1/spotify/suggestions?profileId=…`.
+     */
+    suspend fun fetchSuggestions(profileId: String): List<DiscoverItemDto> =
+        httpClient.get("$baseUrl/api/v1/spotify/suggestions") {
+            parameter("profileId", profileId)
+        }.body()
+
+    /**
+     * Searches Spotify via the backend proxy.
+     * Corresponds to `GET /api/v1/spotify/search?q=…&limit=…`.
+     */
+    suspend fun searchContent(q: String, limit: Int = 10): SearchResultsDto =
+        httpClient.get("$baseUrl/api/v1/spotify/search") {
+            parameter("q", q)
+            parameter("limit", limit)
+        }.body()
+
+    /**
+     * Creates a new content request for the given profile.
+     * Corresponds to `POST /api/v1/profiles/{profileId}/content-requests`.
+     */
+    suspend fun createContentRequest(
+        profileId: String,
+        req: CreateContentRequestDto
+    ): ContentRequestResponseDto =
+        httpClient.post("$baseUrl/api/v1/profiles/$profileId/content-requests") {
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }.body()
+
+    /**
+     * Fetches all pending/rejected requests for the given profile.
+     * Corresponds to `GET /api/v1/content-requests?profileId=…`.
+     */
+    suspend fun fetchContentRequests(profileId: String): List<ContentRequestResponseDto> =
+        httpClient.get("$baseUrl/api/v1/content-requests") {
+            parameter("profileId", profileId)
+        }.body()
 }
 
 /** Thrown by [KidstuneApiClient.pair] when the backend rejects a pairing code. */

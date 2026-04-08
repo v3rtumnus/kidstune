@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalContentEntry
+import at.kidstune.kids.data.local.entities.LocalContentRequest
 import at.kidstune.kids.data.local.entities.LocalFavorite
 import at.kidstune.kids.data.local.entities.LocalPlaybackPosition
 import at.kidstune.kids.data.local.entities.LocalTrack
@@ -16,8 +17,9 @@ import at.kidstune.kids.data.local.entities.LocalTrack
         LocalTrack::class,
         LocalFavorite::class,
         LocalPlaybackPosition::class,
+        LocalContentRequest::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -27,4 +29,5 @@ abstract class KidstuneDatabase : RoomDatabase() {
     abstract fun trackDao(): TrackDao
     abstract fun favoriteDao(): FavoriteDao
     abstract fun playbackPositionDao(): PlaybackPositionDao
+    abstract fun contentRequestDao(): ContentRequestDao
 }

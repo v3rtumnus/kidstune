@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import at.kidstune.kids.data.local.AlbumDao
 import at.kidstune.kids.data.local.ContentDao
+import at.kidstune.kids.data.local.ContentRequestDao
 import at.kidstune.kids.data.local.FavoriteDao
 import at.kidstune.kids.data.local.KidstuneDatabase
 import at.kidstune.kids.data.local.PlaybackPositionDao
@@ -30,4 +31,5 @@ object DatabaseModule {
     @Provides fun provideTrackDao(db: KidstuneDatabase): TrackDao                   = db.trackDao()
     @Provides fun provideFavoriteDao(db: KidstuneDatabase): FavoriteDao             = db.favoriteDao()
     @Provides fun providePlaybackPositionDao(db: KidstuneDatabase): PlaybackPositionDao = db.playbackPositionDao()
+    @Provides fun provideContentRequestDao(db: KidstuneDatabase): ContentRequestDao   = db.contentRequestDao()
 }

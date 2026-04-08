@@ -5,5 +5,6 @@ data class DiscoverTile(
     val title: String,
     val artistName: String,
     val imageUrl: String?,
-    val type: ContentType
+    val type: ContentType,
+    val scope: ContentScope = ContentScope.ARTIST,
 )

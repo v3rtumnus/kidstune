@@ -56,6 +56,8 @@ private class FakeContentDao(private val data: List<LocalContentEntry>) : Conten
         data.count { it.profileId == profileId && it.contentType == type }
     override fun countAllFlow(profileId: String): Flow<Int> =
         flowOf(data.count { it.profileId == profileId })
+    override suspend fun getExistingUris(profileId: String): List<String> =
+        data.filter { it.profileId == profileId }.map { it.spotifyUri }
 }
 
 private class FakeAlbumDao(private val data: List<LocalAlbum>) : AlbumDao {

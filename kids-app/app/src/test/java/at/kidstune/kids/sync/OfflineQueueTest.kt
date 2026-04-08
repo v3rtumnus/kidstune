@@ -8,6 +8,7 @@ import at.kidstune.kids.data.local.entities.LocalFavorite
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.data.remote.KidstuneApiClient
 import at.kidstune.kids.data.remote.dto.FavoriteResponseDto
+import at.kidstune.kids.data.repository.DiscoverRepository
 import at.kidstune.kids.data.repository.FavoriteRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -70,7 +71,8 @@ class OfflineQueueTest {
         val client = HttpClient(engine) { install(ContentNegotiation) { json(json) } }
         val api = KidstuneApiClient(client, "")
         favoriteRepository = FavoriteRepository(db.favoriteDao(), api, prefs)
-        offlineQueue = OfflineQueue(favoriteRepository)
+        val discoverRepository = mockk<DiscoverRepository>(relaxed = true)
+        offlineQueue = OfflineQueue(favoriteRepository, discoverRepository)
     }
 
     @After

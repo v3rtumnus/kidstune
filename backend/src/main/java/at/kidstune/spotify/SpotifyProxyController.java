@@ -2,6 +2,7 @@ package at.kidstune.spotify;
 
 import at.kidstune.common.SecurityUtils;
 import at.kidstune.spotify.dto.SearchResultsResponse;
+import at.kidstune.spotify.dto.SpotifyItemDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -9,19 +10,25 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
- * Proxies Spotify search for the Parent App and Kids App Discover feature.
+ * Proxies Spotify search and suggestions for the Kids App Discover feature.
  *
- * Secured with PARENT role (see SecurityConfig).
+ * GET /api/v1/spotify/search  – PARENT role only (secured via SecurityConfig)
+ * GET /api/v1/spotify/suggestions – KIDS or PARENT role (secured via SecurityConfig)
  */
 @RestController
 @RequestMapping("/api/v1/spotify")
 public class SpotifyProxyController {
 
-    private final SpotifySearchService searchService;
+    private final SpotifySearchService      searchService;
+    private final SpotifySuggestionsService suggestionsService;
 
-    public SpotifyProxyController(SpotifySearchService searchService) {
-        this.searchService = searchService;
+    public SpotifyProxyController(SpotifySearchService searchService,
+                                  SpotifySuggestionsService suggestionsService) {
+        this.searchService      = searchService;
+        this.suggestionsService = suggestionsService;
     }
 
     /**
@@ -39,6 +46,22 @@ public class SpotifyProxyController {
 
         return SecurityUtils.getFamilyId()
             .flatMap(familyId -> searchService.search(familyId, query, limit))
+            .map(ResponseEntity::ok);
+    }
+
+    /**
+     * Returns personalised album suggestions for the Discover idle state,
+     * derived from the profile's approved content and favourite tracks.
+     *
+     * <pre>GET /api/v1/spotify/suggestions?profileId={profileId}</pre>
+     *
+     * Accessible by KIDS and PARENT roles. Results are cached 1 hour per profile.
+     */
+    @GetMapping("/suggestions")
+    public Mono<ResponseEntity<List<SpotifyItemDto>>> suggestions(
+            @RequestParam("profileId") String profileId) {
+        return SecurityUtils.getFamilyId()
+            .flatMap(familyId -> suggestionsService.getSuggestions(familyId, profileId))
             .map(ResponseEntity::ok);
     }
 }

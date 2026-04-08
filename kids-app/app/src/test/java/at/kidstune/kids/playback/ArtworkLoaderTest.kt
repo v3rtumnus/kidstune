@@ -3,13 +3,14 @@ package at.kidstune.kids.playback
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
-import coil3.BitmapImage
 import coil3.ImageLoader
+import coil3.asImage
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -114,6 +115,6 @@ class ArtworkLoaderTest {
 
     // image is a plain val, not a suspend function — use every, not coEvery
     private fun successResult(bitmap: Bitmap): SuccessResult = mockk {
-        every { image } returns BitmapImage(bitmap)
+        every { image } returns bitmap.asImage()
     }
 }

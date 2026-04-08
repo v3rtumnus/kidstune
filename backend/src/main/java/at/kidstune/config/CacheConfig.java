@@ -37,7 +37,8 @@ public class CacheConfig {
             build("spotify-playlist-tracks", 6,  TimeUnit.HOURS),
             build("spotify-recently-played", 1,  TimeUnit.HOURS),
             build("spotify-top-artists",     1,  TimeUnit.HOURS),
-            build("spotify-user-playlists",  1,  TimeUnit.HOURS)
+            build("spotify-user-playlists",  1,  TimeUnit.HOURS),
+            build("spotify-suggestions",     6,  TimeUnit.HOURS)
         ));
         return manager;
     }

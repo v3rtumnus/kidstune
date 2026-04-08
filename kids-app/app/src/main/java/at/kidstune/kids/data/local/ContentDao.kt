@@ -35,4 +35,8 @@ interface ContentDao {
     /** Reactive count of all entries for a profile. Emits a new value whenever the table changes. */
     @Query("SELECT COUNT(*) FROM local_content_entry WHERE profile_id = :profileId")
     fun countAllFlow(profileId: String): Flow<Int>
+
+    /** Returns all spotify_uri values for a profile – used for the already-approved filter. */
+    @Query("SELECT spotify_uri FROM local_content_entry WHERE profile_id = :profileId")
+    suspend fun getExistingUris(profileId: String): List<String>
 }

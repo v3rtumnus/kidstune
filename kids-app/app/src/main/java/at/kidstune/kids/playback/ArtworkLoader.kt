@@ -45,14 +45,19 @@ class ArtworkLoader @Inject constructor(
 
         val request = ImageRequest.Builder(context)
             .data(imageUrl)
-            .allowHardware(false)
             .build()
 
         val result = imageLoader.execute(request)
+        // Hardware bitmaps cannot be read by the CPU (needed for MediaMetadata / notifications).
+        // Copy to software-backed ARGB_8888 if Coil returned a hardware bitmap.
         val bitmap = (result as? SuccessResult)
             ?.image
             ?.let { it as? BitmapImage }
             ?.bitmap
+            ?.let { bmp ->
+                if (bmp.config == Bitmap.Config.HARDWARE) bmp.copy(Bitmap.Config.ARGB_8888, false)
+                else bmp
+            }
 
         // Only cache on success. A failed load (network error, 404, etc.) must not
         // poison the cache: the same URL should be retried on the next state update.

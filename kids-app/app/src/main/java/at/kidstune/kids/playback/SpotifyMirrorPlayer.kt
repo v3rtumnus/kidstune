@@ -2,6 +2,7 @@ package at.kidstune.kids.playback
 
 import android.graphics.Bitmap
 import android.os.Looper
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -81,7 +82,7 @@ class SpotifyMirrorPlayer @Inject constructor(
             .setMediaMetadata(metadata)
             .build()
 
-        val durationUs = if (nowPlaying.durationMs > 0) nowPlaying.durationMs * 1_000L else -1L
+        val durationUs = if (nowPlaying.durationMs > 0) nowPlaying.durationMs * 1_000L else C.TIME_UNSET
 
         // Capture snapshot values by value so the PositionSupplier lambda remains
         // correct even if updateState is called again before this State is discarded.

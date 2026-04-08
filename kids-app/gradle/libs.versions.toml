@@ -11,7 +11,7 @@ core-ktx        = "1.15.0"
 lifecycle       = "2.8.7"
 navigation      = "2.8.5"
 # DI
-hilt            = "2.52"
+hilt            = "2.54"
 hilt-navigation = "1.2.0"
 # Room
 room            = "2.6.1"
