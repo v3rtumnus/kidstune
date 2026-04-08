@@ -2,12 +2,8 @@ package at.kidstune.spotify;
 
 import at.kidstune.auth.SpotifyConfig;
 import at.kidstune.auth.SpotifyTokenService;
-import at.kidstune.content.KnownChildrenArtistsService;
 import at.kidstune.favorites.Favorite;
 import at.kidstune.favorites.FavoriteRepository;
-import at.kidstune.profile.AgeGroup;
-import at.kidstune.profile.ChildProfile;
-import at.kidstune.profile.ProfileRepository;
 import at.kidstune.resolver.ResolvedTrack;
 import at.kidstune.resolver.ResolvedTrackRepository;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -35,46 +31,37 @@ public class SpotifyImportService {
     private static final int LIKED_SONGS_PAGE_SIZE = 50;
     private static final int LIKED_SONGS_MAX       = 200;
 
-    private final SpotifyTokenService         tokenService;
-    private final KnownChildrenArtistsService knownArtistsService;
-    private final ProfileRepository           profileRepository;
-    private final FavoriteRepository          favoriteRepository;
-    private final ResolvedTrackRepository     resolvedTrackRepository;
-    private final WebClient                   spotifyApi;
+    private final SpotifyTokenService     tokenService;
+    private final FavoriteRepository      favoriteRepository;
+    private final ResolvedTrackRepository resolvedTrackRepository;
+    private final WebClient               spotifyApi;
 
     @Autowired
     public SpotifyImportService(SpotifyTokenService tokenService,
-                                KnownChildrenArtistsService knownArtistsService,
-                                ProfileRepository profileRepository,
                                 FavoriteRepository favoriteRepository,
                                 ResolvedTrackRepository resolvedTrackRepository,
                                 SpotifyConfig spotifyConfig,
                                 WebClient.Builder webClientBuilder) {
-        this(tokenService, knownArtistsService, profileRepository, favoriteRepository,
+        this(tokenService, favoriteRepository,
                 resolvedTrackRepository, spotifyConfig.getApiBaseUrl(), webClientBuilder);
     }
 
     /** Package-private constructor for tests – allows overriding the Spotify API base URL. */
     SpotifyImportService(SpotifyTokenService tokenService,
-                         KnownChildrenArtistsService knownArtistsService,
-                         ProfileRepository profileRepository,
                          FavoriteRepository favoriteRepository,
                          ResolvedTrackRepository resolvedTrackRepository,
                          String spotifyApiBaseUrl,
                          WebClient.Builder webClientBuilder) {
-        this.tokenService           = tokenService;
-        this.knownArtistsService    = knownArtistsService;
-        this.profileRepository      = profileRepository;
-        this.favoriteRepository     = favoriteRepository;
+        this.tokenService            = tokenService;
+        this.favoriteRepository      = favoriteRepository;
         this.resolvedTrackRepository = resolvedTrackRepository;
-        this.spotifyApi             = webClientBuilder.baseUrl(spotifyApiBaseUrl).build();
+        this.spotifyApi              = webClientBuilder.baseUrl(spotifyApiBaseUrl).build();
     }
 
     // ── getImportSuggestions ──────────────────────────────────────────────────
 
     /**
-     * Fetches the child's Spotify listening history and playlists, then groups
-     * results into age-appropriate children's content, playlists, and other artists.
+     * Fetches the child's Spotify listening history and playlists.
      *
      * @throws ProfileSpotifyNotLinkedException if the profile has no linked Spotify account
      */
@@ -83,19 +70,12 @@ public class SpotifyImportService {
             return Mono.error(new ProfileSpotifyNotLinkedException(profileId));
         }
 
-        return Mono.fromCallable(() ->
-                profileRepository.findById(profileId)
-                        .orElseThrow(() -> new IllegalArgumentException("Profile not found: " + profileId))
-        )
-        .subscribeOn(Schedulers.boundedElastic())
-        .flatMap(profile ->
-            tokenService.getValidProfileAccessToken(profileId)
-                .flatMap(token -> fetchAllSources(token, profileId)
-                    .map(sources -> buildSuggestions(sources, profile.getAgeGroup())))
-        );
+        return tokenService.getValidProfileAccessToken(profileId)
+                .flatMap(token -> fetchAllSources(token)
+                        .map(this::buildSuggestions));
     }
 
-    private Mono<AllSources> fetchAllSources(String token, String profileId) {
+    private Mono<AllSources> fetchAllSources(String token) {
         Mono<List<ApiArtist>> recentArtists = fetchRecentlyPlayedArtists(token);
         Mono<List<ApiArtist>> topMedium     = fetchTopArtists(token, "medium_term");
         Mono<List<ApiArtist>> topLong       = fetchTopArtists(token, "long_term");
@@ -162,8 +142,8 @@ public class SpotifyImportService {
                 });
     }
 
-    private ImportSuggestionsDto buildSuggestions(AllSources sources, AgeGroup ageGroup) {
-        // Merge all artists, top-artists take precedence (have image + uri)
+    private ImportSuggestionsDto buildSuggestions(AllSources sources) {
+        // Merge all artists; top-artists take precedence (have image + uri)
         Map<String, ApiArtist> merged = new LinkedHashMap<>();
         // Insert recently-played first (lower priority)
         for (ApiArtist a : sources.recentArtists()) {
@@ -177,57 +157,26 @@ public class SpotifyImportService {
             if (a.name() != null) merged.put(a.name().toLowerCase(), a);
         }
 
-        List<ImportSuggestionsDto.Item> children  = new ArrayList<>();
-        List<ImportSuggestionsDto.Item> other     = new ArrayList<>();
+        List<ImportSuggestionsDto.Item> artists   = new ArrayList<>();
         List<ImportSuggestionsDto.Item> playlists = new ArrayList<>();
 
         for (ApiArtist artist : merged.values()) {
-            if (knownArtistsService.isKnownChildrenArtist(artist.name())) {
-                boolean preSelected = isPreselectedForAge(artist.name(), ageGroup);
-                children.add(new ImportSuggestionsDto.Item(
-                        artist.uri(),
-                        artist.name(),
-                        extractImage(artist.images()),
-                        preSelected
-                ));
-            } else {
-                other.add(new ImportSuggestionsDto.Item(
-                        artist.uri(),
-                        artist.name(),
-                        extractImage(artist.images()),
-                        false
-                ));
-            }
+            artists.add(new ImportSuggestionsDto.Item(
+                    artist.uri(),
+                    artist.name(),
+                    extractImage(artist.images())
+            ));
         }
 
         for (ApiPlaylist pl : sources.playlists()) {
             playlists.add(new ImportSuggestionsDto.Item(
                     pl.uri(),
                     pl.name(),
-                    extractImage(pl.images()),
-                    false
+                    extractImage(pl.images())
             ));
         }
 
-        return new ImportSuggestionsDto(children, playlists, other);
-    }
-
-    /**
-     * Pre-select an artist if its minimum recommended age is safely below the profile's age group.
-     * For PRESCHOOL (4-6), only min_age ≤ 3 is pre-selected (deselect borderline cases to be safe).
-     * For SCHOOL (7-12), min_age ≤ 6 is pre-selected.
-     * For TODDLER (0-3), min_age ≤ 3 is pre-selected.
-     */
-    boolean isPreselectedForAge(String artistName, AgeGroup ageGroup) {
-        Optional<Integer> minAge = knownArtistsService.getMinAge(artistName);
-        if (minAge.isEmpty()) return false;
-
-        int threshold = switch (ageGroup) {
-            case TODDLER   -> 3;
-            case PRESCHOOL -> 3;   // < lower bound of PRESCHOOL (4), i.e. ≤ 3
-            case SCHOOL    -> 6;   // < lower bound of SCHOOL (7), i.e. ≤ 6
-        };
-        return minAge.get() <= threshold;
+        return new ImportSuggestionsDto(artists, playlists);
     }
 
     // ── importLikedSongsAsFavorites ───────────────────────────────────────────

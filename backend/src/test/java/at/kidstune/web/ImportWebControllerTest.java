@@ -111,15 +111,14 @@ class ImportWebControllerTest {
     }
 
     @Test
-    @DisplayName("loadSuggestions with linked profile returns suggestion groups in model")
+    @DisplayName("loadSuggestions with linked profile returns artists and playlists in model")
     void loadSuggestionsWithLinkedProfileReturnsSuggestions() {
         ChildProfile luna = makeProfile(PROFILE_ID_1, "Luna", AgeGroup.SCHOOL);
         when(profileRepository.findById(PROFILE_ID_1)).thenReturn(Optional.of(luna));
         when(spotifyTokenService.isProfileSpotifyLinked(PROFILE_ID_1)).thenReturn(true);
 
         ImportSuggestionsDto dto = new ImportSuggestionsDto(
-                List.of(new ImportSuggestionsDto.Item("spotify:artist:abc", "Bibi Bloxberg", null, true)),
-                List.of(),
+                List.of(new ImportSuggestionsDto.Item("spotify:artist:abc", "Bibi Bloxberg", null)),
                 List.of()
         );
         when(spotifyImportService.getImportSuggestions(PROFILE_ID_1)).thenReturn(Mono.just(dto));
@@ -131,24 +130,25 @@ class ImportWebControllerTest {
 
         assertThat(model.asMap()).containsKey("suggestions");
         ImportSuggestionsDto result = (ImportSuggestionsDto) model.asMap().get("suggestions");
-        assertThat(result.detectedChildrenContent()).hasSize(1);
-        assertThat(result.detectedChildrenContent().get(0).title()).isEqualTo("Bibi Bloxberg");
+        assertThat(result.artists()).hasSize(1);
+        assertThat(result.artists().get(0).title()).isEqualTo("Bibi Bloxberg");
     }
 
     @Test
-    @DisplayName("loadSuggestions SCHOOL profile: pre-selected item has preSelected=true in result")
-    void loadSuggestionsSCHOOLProfilePreselectedItemHasFlag() {
+    @DisplayName("loadSuggestions returns both artists and playlists in separate lists")
+    void loadSuggestionsReturnsBothArtistsAndPlaylists() {
         ChildProfile luna = makeProfile(PROFILE_ID_1, "Luna", AgeGroup.SCHOOL);
         when(profileRepository.findById(PROFILE_ID_1)).thenReturn(Optional.of(luna));
         when(spotifyTokenService.isProfileSpotifyLinked(PROFILE_ID_1)).thenReturn(true);
 
         ImportSuggestionsDto dto = new ImportSuggestionsDto(
                 List.of(
-                        new ImportSuggestionsDto.Item("spotify:artist:1", "Bibi Bloxberg", null, true),
-                        new ImportSuggestionsDto.Item("spotify:artist:2", "Slipknot", null, false)
+                        new ImportSuggestionsDto.Item("spotify:artist:1", "Bibi Bloxberg", null),
+                        new ImportSuggestionsDto.Item("spotify:artist:2", "Die drei ???", null)
                 ),
-                List.of(),
-                List.of()
+                List.of(
+                        new ImportSuggestionsDto.Item("spotify:playlist:1", "Kinder-Hits", null)
+                )
         );
         when(spotifyImportService.getImportSuggestions(PROFILE_ID_1)).thenReturn(Mono.just(dto));
 
@@ -158,37 +158,8 @@ class ImportWebControllerTest {
                 .verifyComplete();
 
         ImportSuggestionsDto result = (ImportSuggestionsDto) model.asMap().get("suggestions");
-        assertThat(result.detectedChildrenContent().get(0).preSelected()).isTrue();
-        assertThat(result.detectedChildrenContent().get(1).preSelected()).isFalse();
-    }
-
-    @Test
-    @DisplayName("loadSuggestions TODDLER profile: only age-appropriate items are pre-selected")
-    void loadSuggestionsTODDLERProfileOnlyAgeAppropriatePreselected() {
-        ChildProfile baby = makeProfile(PROFILE_ID_2, "Baby Max", AgeGroup.TODDLER);
-        when(profileRepository.findById(PROFILE_ID_2)).thenReturn(Optional.of(baby));
-        when(spotifyTokenService.isProfileSpotifyLinked(PROFILE_ID_2)).thenReturn(true);
-
-        // For TODDLER: preSelected = true means min_age <= 3 in SpotifyImportService logic
-        // We just verify the DTO's preSelected flag is passed through without modification
-        ImportSuggestionsDto dto = new ImportSuggestionsDto(
-                List.of(
-                        new ImportSuggestionsDto.Item("spotify:artist:1", "Die Maus", null, true),
-                        new ImportSuggestionsDto.Item("spotify:artist:2", "Bibi Blocksberg", null, false)
-                ),
-                List.of(),
-                List.of()
-        );
-        when(spotifyImportService.getImportSuggestions(PROFILE_ID_2)).thenReturn(Mono.just(dto));
-
-        Model model = new ExtendedModelMap();
-        StepVerifier.create(controller.loadSuggestions(List.of(PROFILE_ID_2), model, FAMILY_ID))
-                .expectNext("web/fragments/import-suggestions :: suggestions")
-                .verifyComplete();
-
-        ImportSuggestionsDto result = (ImportSuggestionsDto) model.asMap().get("suggestions");
-        assertThat(result.detectedChildrenContent().get(0).preSelected()).isTrue();
-        assertThat(result.detectedChildrenContent().get(1).preSelected()).isFalse();
+        assertThat(result.artists()).hasSize(2);
+        assertThat(result.playlists()).hasSize(1);
     }
 
     // ── POST /web/import (execute import) ────────────────────────────────────

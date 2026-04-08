@@ -1,14 +1,8 @@
 package at.kidstune.spotify;
 
 import at.kidstune.auth.SpotifyTokenService;
-import at.kidstune.content.KnownChildrenArtistsService;
 import at.kidstune.favorites.Favorite;
 import at.kidstune.favorites.FavoriteRepository;
-import at.kidstune.profile.AgeGroup;
-import at.kidstune.profile.AvatarColor;
-import at.kidstune.profile.AvatarIcon;
-import at.kidstune.profile.ChildProfile;
-import at.kidstune.profile.ProfileRepository;
 import at.kidstune.resolver.ResolvedTrack;
 import at.kidstune.resolver.ResolvedTrackRepository;
 import okhttp3.mockwebserver.MockResponse;
@@ -24,7 +18,6 @@ import reactor.test.StepVerifier;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,11 +29,9 @@ class SpotifyImportServiceTest {
     private MockWebServer mockServer;
     private SpotifyImportService service;
 
-    private SpotifyTokenService         tokenService;
-    private KnownChildrenArtistsService knownArtistsService;
-    private ProfileRepository           profileRepository;
-    private FavoriteRepository          favoriteRepository;
-    private ResolvedTrackRepository     resolvedTrackRepository;
+    private SpotifyTokenService     tokenService;
+    private FavoriteRepository      favoriteRepository;
+    private ResolvedTrackRepository resolvedTrackRepository;
 
     private static final String PROFILE_ID   = "profile-test-1";
     private static final String ACCESS_TOKEN = "mock-profile-token";
@@ -51,15 +42,11 @@ class SpotifyImportServiceTest {
         mockServer.start();
 
         tokenService            = mock(SpotifyTokenService.class);
-        knownArtistsService     = mock(KnownChildrenArtistsService.class);
-        profileRepository       = mock(ProfileRepository.class);
         favoriteRepository      = mock(FavoriteRepository.class);
         resolvedTrackRepository = mock(ResolvedTrackRepository.class);
 
         service = new SpotifyImportService(
                 tokenService,
-                knownArtistsService,
-                profileRepository,
                 favoriteRepository,
                 resolvedTrackRepository,
                 mockServer.url("/").toString(),
@@ -70,56 +57,6 @@ class SpotifyImportServiceTest {
     @AfterEach
     void tearDown() throws IOException {
         mockServer.shutdown();
-    }
-
-    // ── isPreselectedForAge ───────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("Bibi & Tina (min_age 3) is pre-selected for PRESCHOOL profile")
-    void ageBased_bibiTina_minAge3_preselectedForPreschool() {
-        when(knownArtistsService.getMinAge("Bibi & Tina")).thenReturn(Optional.of(3));
-
-        assertThat(service.isPreselectedForAge("Bibi & Tina", AgeGroup.PRESCHOOL)).isTrue();
-    }
-
-    @Test
-    @DisplayName("Die drei ??? Kids (min_age 6) is NOT pre-selected for PRESCHOOL (borderline)")
-    void ageBased_dreiKids_minAge6_notPreselectedForPreschool() {
-        when(knownArtistsService.getMinAge("Die drei ??? Kids")).thenReturn(Optional.of(6));
-
-        assertThat(service.isPreselectedForAge("Die drei ??? Kids", AgeGroup.PRESCHOOL)).isFalse();
-    }
-
-    @Test
-    @DisplayName("Die drei ??? (min_age 10) is NOT pre-selected for PRESCHOOL")
-    void ageBased_drei_minAge10_notPreselectedForPreschool() {
-        when(knownArtistsService.getMinAge("Die drei ???")).thenReturn(Optional.of(10));
-
-        assertThat(service.isPreselectedForAge("Die drei ???", AgeGroup.PRESCHOOL)).isFalse();
-    }
-
-    @Test
-    @DisplayName("Unknown artist returns false for any age group")
-    void ageBased_unknownArtist_returnsFalse() {
-        when(knownArtistsService.getMinAge("Unknown")).thenReturn(Optional.empty());
-
-        assertThat(service.isPreselectedForAge("Unknown", AgeGroup.PRESCHOOL)).isFalse();
-    }
-
-    @Test
-    @DisplayName("Die drei ??? Kids (min_age 6) IS pre-selected for SCHOOL profile")
-    void ageBased_dreiKids_minAge6_preselectedForSchool() {
-        when(knownArtistsService.getMinAge("Die drei ??? Kids")).thenReturn(Optional.of(6));
-
-        assertThat(service.isPreselectedForAge("Die drei ??? Kids", AgeGroup.SCHOOL)).isTrue();
-    }
-
-    @Test
-    @DisplayName("Die drei ??? (min_age 10) is NOT pre-selected for SCHOOL profile")
-    void ageBased_drei_minAge10_notPreselectedForSchool() {
-        when(knownArtistsService.getMinAge("Die drei ???")).thenReturn(Optional.of(10));
-
-        assertThat(service.isPreselectedForAge("Die drei ???", AgeGroup.SCHOOL)).isFalse();
     }
 
     // ── getImportSuggestions – unlinked profile ───────────────────────────────

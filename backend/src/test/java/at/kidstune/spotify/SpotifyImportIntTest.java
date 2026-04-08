@@ -93,7 +93,7 @@ class SpotifyImportIntTest {
 
     @Autowired SpotifyImportService spotifyImportService;
     @Autowired FamilyRepository     familyRepository;
-    @Autowired ProfileRepository    profileRepository;
+    @Autowired ProfileRepository    profileRepository; // needed to seed the DB profile row
 
     static final String FAMILY_ID        = UUID.randomUUID().toString();
     static final String PROFILE_ID       = UUID.randomUUID().toString();
@@ -168,15 +168,11 @@ class SpotifyImportIntTest {
     // ── Suggestions are grouped correctly ─────────────────────────────────────
 
     @Test
-    void getImportSuggestions_groups_children_content_and_playlists_correctly() throws Exception {
+    void getImportSuggestions_returns_artists_and_playlists_from_listening_history() throws Exception {
         when(spotifyTokenService.isProfileSpotifyLinked(PROFILE_ID)).thenReturn(true);
         when(spotifyTokenService.getValidProfileAccessToken(PROFILE_ID))
                 .thenReturn(Mono.just(PROFILE_TOKEN));
 
-        // Fixtures: medium has "Bibi & Tina" (known children, min_age 3) and
-        // "Die drei ??? Kids" (known children, min_age 6).
-        // For PRESCHOOL profile, Bibi & Tina should be pre-selected, Die drei ??? Kids not.
-        // Use URL-routing dispatcher so parallel Mono.zip calls get the right fixture.
         installImportDispatcher();
 
         ImportSuggestionsDto result = spotifyImportService.getImportSuggestions(PROFILE_ID)
@@ -184,19 +180,12 @@ class SpotifyImportIntTest {
 
         assertThat(result).isNotNull();
 
-        // "Bibi & Tina" → detectedChildrenContent (pre-selected for PRESCHOOL)
-        assertThat(result.detectedChildrenContent())
-                .anyMatch(item -> item.title().equals("Bibi & Tina") && item.preSelected());
+        // Artists from listening history – all in one flat list
+        assertThat(result.artists())
+                .extracting(ImportSuggestionsDto.Item::title)
+                .contains("Bibi & Tina", "Die drei ??? Kids", "Popular Artist");
 
-        // "Die drei ??? Kids" → detectedChildrenContent but NOT pre-selected
-        assertThat(result.detectedChildrenContent())
-                .anyMatch(item -> item.title().equals("Die drei ??? Kids") && !item.preSelected());
-
-        // "Popular Artist" → otherArtists
-        assertThat(result.otherArtists())
-                .anyMatch(item -> item.title().equals("Popular Artist"));
-
-        // Playlists separate bucket
+        // Playlists in a separate bucket
         assertThat(result.playlists()).hasSize(2);
     }
 
