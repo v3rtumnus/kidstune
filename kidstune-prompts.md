@@ -2244,7 +2244,7 @@ VERIFICATION:
 - Review diffs against previous reference PNGs, confirm intentional changes, commit updated PNGs
 ```
 
-### Prompt 8.3 – Kids App Edge Cases ⬅️
+### Prompt 8.3 – Kids App Edge Cases ✅
 
 ```
 CONTEXT: Phase 8 of KidsTune. We handle all error states in the kids app with friendly,
