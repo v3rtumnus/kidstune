@@ -1,5 +1,6 @@
 package at.kidstune.sse;
 
+import at.kidstune.AbstractIntTest;
 import at.kidstune.content.ContentType;
 import at.kidstune.content.SpotifyApiClient;
 import at.kidstune.family.Family;
@@ -17,14 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -35,24 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class SseIntTest {
-
-    @Container
-    @ServiceConnection
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:11")
-            .withDatabaseName("kidstune")
-            .withUsername("kidstune")
-            .withPassword("kidstune");
-
-    @DynamicPropertySource
-    static void overrideProperties(DynamicPropertyRegistry registry) {
-        registry.add("spotify.client-id",     () -> "test-client-id");
-        registry.add("spotify.client-secret", () -> "test-client-secret");
-        registry.add("kidstune.jwt-secret",   () -> "test-jwt-secret-32-characters-!!");
-        registry.add("kidstune.base-url",     () -> "http://localhost");
-    }
+// webEnvironment = NONE: this test exercises the service layer directly,
+// no WebTestClient or HTTP server is needed.
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+class SseIntTest extends AbstractIntTest {
 
     @MockitoBean SpotifyApiClient spotifyApiClient;
     @MockitoBean JavaMailSender   mailSender;

@@ -1,5 +1,6 @@
 package at.kidstune.spotify;
 
+import at.kidstune.AbstractIntTest;
 import at.kidstune.auth.SpotifyTokenService;
 import at.kidstune.family.Family;
 import at.kidstune.family.FamilyRepository;
@@ -16,15 +17,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -50,15 +47,7 @@ import static org.mockito.Mockito.when;
  * Verifies that all Spotify calls use the PROFILE token (not the family token).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@Testcontainers
-class SpotifyImportIntTest {
-
-    @Container
-    @ServiceConnection
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:11")
-            .withDatabaseName("kidstune")
-            .withUsername("kidstune")
-            .withPassword("kidstune");
+class SpotifyImportIntTest extends AbstractIntTest {
 
     static MockWebServer mockSpotify;
 
@@ -77,15 +66,11 @@ class SpotifyImportIntTest {
     }
 
     @DynamicPropertySource
-    static void overrideProperties(DynamicPropertyRegistry registry) {
+    static void overrideSpotifyUrls(DynamicPropertyRegistry registry) {
         String base = "http://localhost:" + mockSpotify.getPort();
         registry.add("spotify.api-base-url",      () -> base);
         registry.add("spotify.accounts-base-url", () -> base);
-        registry.add("spotify.client-id",         () -> "test-client-id");
-        registry.add("spotify.client-secret",     () -> "test-client-secret");
         registry.add("spotify.redirect-uri",      () -> "http://localhost/callback");
-        registry.add("kidstune.jwt-secret",       () -> "test-jwt-secret-32-characters-!!");
-        registry.add("kidstune.base-url",         () -> "http://localhost");
     }
 
     @MockitoBean

@@ -1,24 +1,20 @@
 package at.kidstune.auth;
 
+import at.kidstune.AbstractIntTest;
 import at.kidstune.family.FamilyRepository;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.IOException;
 import java.net.URI;
@@ -35,17 +31,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *  - MockWebServer for mocking Spotify's /api/token and /v1/me endpoints
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class SpotifyOAuthIntTest {
+class SpotifyOAuthIntTest extends AbstractIntTest {
 
     // ── Infrastructure ────────────────────────────────────────────────────────
-
-    @Container
-    @ServiceConnection
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:11")
-            .withDatabaseName("kidstune")
-            .withUsername("kidstune")
-            .withPassword("kidstune");
 
     // Must be started before @DynamicPropertySource fires (static initializer runs first)
     static MockWebServer mockSpotify;
@@ -69,10 +57,7 @@ class SpotifyOAuthIntTest {
         String base = "http://localhost:" + mockSpotify.getPort();
         registry.add("spotify.accounts-base-url", () -> base);
         registry.add("spotify.api-base-url",      () -> base);
-        registry.add("spotify.client-id",         () -> "test-client-id");
-        registry.add("spotify.client-secret",     () -> "test-client-secret");
         registry.add("spotify.redirect-uri",      () -> "http://localhost/callback");
-        registry.add("kidstune.jwt-secret",       () -> "test-jwt-secret-32-characters-!!");
     }
 
     @LocalServerPort

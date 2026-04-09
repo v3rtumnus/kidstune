@@ -1,5 +1,6 @@
 package at.kidstune.spotify;
 
+import at.kidstune.AbstractIntTest;
 import at.kidstune.auth.DeviceType;
 import at.kidstune.auth.JwtTokenService;
 import at.kidstune.auth.SpotifyTokenService;
@@ -25,16 +26,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
@@ -55,15 +52,7 @@ import static org.mockito.Mockito.when;
  *  - Unauthenticated requests are rejected
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class SpotifySuggestionsIntTest {
-
-    @Container
-    @ServiceConnection
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:11")
-            .withDatabaseName("kidstune")
-            .withUsername("kidstune")
-            .withPassword("kidstune");
+class SpotifySuggestionsIntTest extends AbstractIntTest {
 
     static MockWebServer mockSpotify;
 
@@ -77,15 +66,11 @@ class SpotifySuggestionsIntTest {
     static void tearDown() throws IOException { mockSpotify.shutdown(); }
 
     @DynamicPropertySource
-    static void overrideProperties(DynamicPropertyRegistry registry) {
+    static void overrideSpotifyUrls(DynamicPropertyRegistry registry) {
         String base = "http://localhost:" + mockSpotify.getPort();
         registry.add("spotify.api-base-url",      () -> base);
         registry.add("spotify.accounts-base-url", () -> base);
-        registry.add("spotify.client-id",         () -> "test-client-id");
-        registry.add("spotify.client-secret",     () -> "test-client-secret");
         registry.add("spotify.redirect-uri",      () -> "http://localhost/callback");
-        registry.add("kidstune.jwt-secret",       () -> "test-jwt-secret-32-characters-!!");
-        registry.add("kidstune.base-url",         () -> "http://localhost");
     }
 
     @MockitoBean SpotifyTokenService spotifyTokenService;

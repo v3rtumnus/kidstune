@@ -1,41 +1,20 @@
 package at.kidstune.health;
 
+import at.kidstune.AbstractIntTest;
 import at.kidstune.config.SpotifyCircuitBreaker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Verifies that all custom Actuator endpoints are reachable and return the
  * expected shape of data.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class HealthIndicatorsIntTest {
-
-    @Container
-    @ServiceConnection
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:11")
-            .withDatabaseName("kidstune")
-            .withUsername("kidstune")
-            .withPassword("kidstune");
-
-    @DynamicPropertySource
-    static void overrideProperties(DynamicPropertyRegistry registry) {
-        registry.add("spotify.client-id",     () -> "test-client-id");
-        registry.add("spotify.client-secret", () -> "test-client-secret");
-        registry.add("kidstune.jwt-secret",   () -> "test-jwt-secret-32-characters-!!");
-        registry.add("kidstune.base-url",     () -> "http://localhost");
-    }
+class HealthIndicatorsIntTest extends AbstractIntTest {
 
     @Autowired SpotifyCircuitBreaker circuitBreaker;
 

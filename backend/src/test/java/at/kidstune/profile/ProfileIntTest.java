@@ -1,5 +1,6 @@
 package at.kidstune.profile;
 
+import at.kidstune.AbstractIntTest;
 import at.kidstune.auth.DeviceType;
 import at.kidstune.auth.JwtTokenService;
 import at.kidstune.family.Family;
@@ -11,14 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Map;
 import java.util.UUID;
@@ -26,23 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class ProfileIntTest {
-
-    @Container
-    @ServiceConnection
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:11")
-            .withDatabaseName("kidstune")
-            .withUsername("kidstune")
-            .withPassword("kidstune");
-
-    @DynamicPropertySource
-    static void overrideProperties(DynamicPropertyRegistry registry) {
-        registry.add("spotify.client-id",     () -> "test-client-id");
-        registry.add("spotify.client-secret", () -> "test-client-secret");
-        registry.add("kidstune.jwt-secret",   () -> "test-jwt-secret-32-characters-!!");
-        registry.add("kidstune.base-url",     () -> "http://localhost");
-    }
+class ProfileIntTest extends AbstractIntTest {
 
     static final String FAMILY_ID = UUID.randomUUID().toString();
 

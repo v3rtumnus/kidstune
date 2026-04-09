@@ -1,5 +1,6 @@
 package at.kidstune.content;
 
+import at.kidstune.AbstractIntTest;
 import at.kidstune.auth.DeviceType;
 import at.kidstune.auth.JwtTokenService;
 import at.kidstune.content.dto.AddContentRequest;
@@ -18,15 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.testcontainers.containers.MariaDBContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -37,23 +32,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class ContentIntTest {
-
-    @Container
-    @ServiceConnection
-    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:11")
-            .withDatabaseName("kidstune")
-            .withUsername("kidstune")
-            .withPassword("kidstune");
-
-    @DynamicPropertySource
-    static void overrideProperties(DynamicPropertyRegistry registry) {
-        registry.add("spotify.client-id",     () -> "test-client-id");
-        registry.add("spotify.client-secret", () -> "test-client-secret");
-        registry.add("kidstune.jwt-secret",   () -> "test-jwt-secret-32-characters-!!");
-        registry.add("kidstune.base-url",     () -> "http://localhost");
-    }
+class ContentIntTest extends AbstractIntTest {
 
     @MockitoBean SpotifyApiClient spotifyApiClient;
 

@@ -2372,7 +2372,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 8.6 – Backend Test Slicing
+### Prompt 8.6 – Backend Test Slicing ✅
 
 ```
 CONTEXT: Phase 8 of KidsTune. All 17 integration test classes currently use
