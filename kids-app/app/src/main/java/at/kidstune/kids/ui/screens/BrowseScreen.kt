@@ -291,13 +291,18 @@ private fun EntryTile(
         return
     }
     val badge = scopeBadgeFor(entry.scope.name)
+    val cd = if (!entry.artistName.isNullOrBlank() && entry.artistName != entry.title)
+        "${entry.title} von ${entry.artistName}"
+    else
+        entry.title
     ContentTile(
-        modifier        = modifier,
-        title           = entry.title,
-        imageUrl        = entry.imageUrl,
-        scopeBadgeText  = badge?.first,
-        scopeBadgeColor = badge?.second ?: androidx.compose.ui.graphics.Color.Transparent,
-        onClick         = { onIntent(BrowseIntent.TileTapped(entry)) }
+        modifier           = modifier,
+        title              = entry.title,
+        contentDescription = cd,
+        imageUrl           = entry.imageUrl,
+        scopeBadgeText     = badge?.first,
+        scopeBadgeColor    = badge?.second ?: androidx.compose.ui.graphics.Color.Transparent,
+        onClick            = { onIntent(BrowseIntent.TileTapped(entry)) }
     )
 }
 
@@ -311,11 +316,16 @@ private fun FavoriteTile(
         Spacer(modifier = modifier)
         return
     }
+    val cd = if (!fav.artistName.isNullOrBlank() && fav.artistName != fav.title)
+        "${fav.title} von ${fav.artistName}"
+    else
+        fav.title
     ContentTile(
-        modifier = modifier,
-        title    = fav.title,
-        imageUrl = fav.imageUrl,
-        onClick  = { onIntent(BrowseIntent.FavoriteTapped(fav)) }
+        modifier           = modifier,
+        title              = fav.title,
+        contentDescription = cd,
+        imageUrl           = fav.imageUrl,
+        onClick            = { onIntent(BrowseIntent.FavoriteTapped(fav)) }
     )
 }
 

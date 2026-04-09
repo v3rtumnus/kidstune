@@ -44,6 +44,8 @@ class AccessibilityTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
+    private val touchTargets = TouchTargetRule(composeTestRule)
+
     // ── Content descriptions ───────────────────────────────────────────────
 
     @Test
@@ -95,7 +97,7 @@ class AccessibilityTest {
     }
 
     @Test
-    fun `browse tiles have content descriptions matching their titles`() {
+    fun `browse tiles have content descriptions including artist`() {
         val entries = MockContentProvider.contentEntries
             .filter { it.contentType.name == "MUSIC" }
         composeTestRule.setContent {
@@ -110,13 +112,25 @@ class AccessibilityTest {
             }
         }
 
-        // First page tiles should all have content descriptions
+        // First page tiles should all have content descriptions including artist (where distinct)
         entries.take(4).forEach { entry ->
-            composeTestRule.onNodeWithContentDescription(entry.title).assertIsDisplayed()
+            val expected = if (!entry.artistName.isNullOrBlank() && entry.artistName != entry.title)
+                "${entry.title} von ${entry.artistName}"
+            else
+                entry.title
+            composeTestRule.onNodeWithContentDescription(expected).assertIsDisplayed()
         }
     }
 
-    // ── 72dp minimum touch targets ─────────────────────────────────────────
+    // ── 72dp minimum touch targets – via TouchTargetRule ──────────────────
+
+    @Test
+    fun `home screen all clickable elements meet 72dp minimum touch target`() {
+        composeTestRule.setContent {
+            KidstuneTheme { HomeScreen(state = HomeState()) }
+        }
+        touchTargets.assertAll()
+    }
 
     @Test
     fun `home screen interactive elements meet 72dp minimum touch target`() {
@@ -127,6 +141,14 @@ class AccessibilityTest {
         assertTouchTargets(
             descriptions = listOf("Musik", "Hörbücher", "Lieblingssongs")
         )
+    }
+
+    @Test
+    fun `now playing all clickable elements meet 72dp minimum touch target`() {
+        composeTestRule.setContent {
+            KidstuneTheme { NowPlayingScreen(state = NowPlayingState(isPlaying = true)) }
+        }
+        touchTargets.assertAll()
     }
 
     @Test
@@ -147,6 +169,24 @@ class AccessibilityTest {
     }
 
     @Test
+    fun `browse screen all clickable elements meet 72dp minimum touch target`() {
+        val entries = MockContentProvider.contentEntries
+            .filter { it.contentType.name == "MUSIC" }
+        composeTestRule.setContent {
+            KidstuneTheme {
+                BrowseScreen(
+                    state = BrowseState(
+                        category = BrowseCategory.MUSIC,
+                        entries  = entries,
+                        pages    = entries.chunked(4)
+                    )
+                )
+            }
+        }
+        touchTargets.assertAll()
+    }
+
+    @Test
     fun `browse screen back button meets 72dp minimum touch target`() {
         val entries = MockContentProvider.contentEntries
             .filter { it.contentType.name == "MUSIC" }
@@ -163,6 +203,18 @@ class AccessibilityTest {
         }
 
         assertTouchTargets(descriptions = listOf("Zurück"))
+    }
+
+    @Test
+    fun `profile selection tiles meet 72dp minimum touch target`() {
+        composeTestRule.setContent {
+            KidstuneTheme {
+                ProfileSelectionScreen(
+                    state = ProfileSelectionState(profiles = mockProfiles)
+                )
+            }
+        }
+        touchTargets.assertAll()
     }
 
     // ── Semantic roles ─────────────────────────────────────────────────────

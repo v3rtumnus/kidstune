@@ -69,7 +69,11 @@ class BrowseScreenTest {
         }
 
         sixMusicEntries.take(4).forEach { entry ->
-            composeTestRule.onNodeWithContentDescription(entry.title).assertIsDisplayed()
+            val cd = if (!entry.artistName.isNullOrBlank() && entry.artistName != entry.title)
+                "${entry.title} von ${entry.artistName}"
+            else
+                entry.title
+            composeTestRule.onNodeWithContentDescription(cd).assertIsDisplayed()
         }
     }
 
@@ -125,7 +129,11 @@ class BrowseScreenTest {
         }
 
         val firstEntry = sixMusicEntries.first()
-        composeTestRule.onNodeWithContentDescription(firstEntry.title).performClick()
+        val cd = if (!firstEntry.artistName.isNullOrBlank() && firstEntry.artistName != firstEntry.title)
+            "${firstEntry.title} von ${firstEntry.artistName}"
+        else
+            firstEntry.title
+        composeTestRule.onNodeWithContentDescription(cd).performClick()
 
         assertTrue(
             "Tapping a tile should dispatch TileTapped",

@@ -333,12 +333,13 @@ private fun DiscoverTileCard(
 
     Column(modifier = modifier) {
         ContentTile(
-            title           = tile.title,
-            imageUrl        = tile.imageUrl,
-            scopeBadgeText  = badge?.first,
-            scopeBadgeColor = badge?.second ?: Color.Transparent,
-            badgeText       = if (isNewlyApproved) "NEU" else null,
-            onClick         = {}
+            title              = tile.title,
+            contentDescription = "${tile.title} von ${tile.artistName}",
+            imageUrl           = tile.imageUrl,
+            scopeBadgeText     = badge?.first,
+            scopeBadgeColor    = badge?.second ?: Color.Transparent,
+            badgeText          = if (isNewlyApproved) "NEU" else null,
+            onClick            = {}
         )
         Spacer(Modifier.height(6.dp))
         when {
