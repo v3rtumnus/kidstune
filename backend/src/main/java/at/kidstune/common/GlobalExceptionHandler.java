@@ -1,9 +1,12 @@
 package at.kidstune.common;
 
 import at.kidstune.auth.PairingException;
+import at.kidstune.config.CircuitBreakerOpenException;
+import at.kidstune.config.RateLimitExceededException;
 import at.kidstune.content.ContentException;
 import at.kidstune.device.DeviceException;
 import at.kidstune.profile.ProfileException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -36,6 +39,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleDeviceException(DeviceException ex) {
         return ResponseEntity.status(ex.getStatus())
                 .body(new ApiError(ex.getMessage(), ex.getCode()));
+    }
+
+    /** HTTP 429 with Retry-After header when a per-device or per-profile quota is exceeded. */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiError> handleRateLimit(RateLimitExceededException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(new ApiError(ex.getMessage(), "RATE_LIMIT_EXCEEDED"));
+    }
+
+    /** HTTP 503 when the Spotify circuit breaker is OPEN. */
+    @ExceptionHandler(CircuitBreakerOpenException.class)
+    public ResponseEntity<ApiError> handleCircuitBreaker(CircuitBreakerOpenException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiError(ex.getMessage(), "CIRCUIT_OPEN"));
     }
 
     @ExceptionHandler(WebExchangeBindException.class)

@@ -7,6 +7,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Singleton registry that holds one {@link Sinks.Many} per authenticated family.
@@ -25,15 +26,24 @@ public class SseRegistry {
     private static final Logger log = LoggerFactory.getLogger(SseRegistry.class);
 
     private final ConcurrentHashMap<String, Sinks.Many<Long>> sinks = new ConcurrentHashMap<>();
+    private final AtomicInteger connectedClients = new AtomicInteger(0);
 
     /**
      * Returns a {@link Flux} that emits pending counts for the given family.
      * Multiple concurrent SSE connections for the same family all receive the same events.
+     * Tracks the number of active SSE connections.
      */
     public Flux<Long> register(String familyId) {
+        connectedClients.incrementAndGet();
         Sinks.Many<Long> sink = sinks.computeIfAbsent(familyId,
                 k -> Sinks.many().multicast().directBestEffort());
-        return sink.asFlux();
+        return sink.asFlux()
+            .doFinally(sig -> connectedClients.decrementAndGet());
+    }
+
+    /** Returns the number of currently active SSE connections across all families. */
+    public int getConnectedClientsCount() {
+        return connectedClients.get();
     }
 
     /**

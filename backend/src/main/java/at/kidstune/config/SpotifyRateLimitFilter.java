@@ -9,13 +9,15 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * WebClient filter that handles Spotify's 429 Too Many Requests responses.
  *
- * When Spotify returns 429, reads the {@code Retry-After} header (seconds) and
- * waits before retrying the request once. If the retry also returns 429, the
- * error propagates to the caller.
+ * When Spotify returns 429, reads the {@code Retry-After} header (seconds), adds a
+ * random jitter of 0–500 ms (to avoid thundering-herd when multiple requests are
+ * delayed simultaneously) and retries the request once.  If the retry also returns
+ * 429 the error propagates to the caller.
  *
  * Applied globally via {@link WebClientConfig} – all Spotify WebClient instances
  * pick this up automatically.
@@ -27,6 +29,9 @@ public class SpotifyRateLimitFilter implements ExchangeFilterFunction {
     /** Used when Spotify omits the Retry-After header (documented as "normally" present). */
     private static final long FALLBACK_WAIT_SECONDS = 2L;
 
+    /** Maximum extra jitter added on top of Retry-After to spread retries. */
+    static final long MAX_JITTER_MS = 500L;
+
     @Override
     public Mono<ClientResponse> filter(ClientRequest request, ExchangeFunction next) {
         return next.exchange(request)
@@ -34,14 +39,17 @@ public class SpotifyRateLimitFilter implements ExchangeFilterFunction {
                     if (response.statusCode().value() != 429) {
                         return Mono.just(response);
                     }
+
                     long waitSeconds = parseRetryAfter(
                             response.headers().asHttpHeaders().getFirst("Retry-After"));
+                    long jitterMs    = ThreadLocalRandom.current().nextLong(0, MAX_JITTER_MS + 1);
+                    Duration delay   = Duration.ofSeconds(waitSeconds).plusMillis(jitterMs);
 
-                    log.warn("Spotify rate limit (429) on {} – retrying after {}s",
-                            request.url().getPath(), waitSeconds);
+                    log.warn("Spotify rate limit (429) on {} – retrying after {}ms ({}s + {}ms jitter)",
+                            request.url().getPath(), delay.toMillis(), waitSeconds, jitterMs);
 
                     return response.releaseBody()
-                            .then(Mono.delay(Duration.ofSeconds(waitSeconds)))
+                            .then(Mono.delay(delay))
                             .then(next.exchange(request));
                 });
     }

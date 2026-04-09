@@ -109,8 +109,8 @@ class JwtAuthIntTest {
     // ── 200 – public endpoint without token ──────────────────────────────────
 
     @Test
-    void actuator_health_without_token_returns_200() {
-        client.get().uri("/actuator/health")
+    void actuator_spotify_without_token_returns_200() {
+        client.get().uri("/actuator/spotify")
                 .exchange()
                 .expectStatus().isOk();
     }

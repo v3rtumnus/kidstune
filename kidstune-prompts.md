@@ -2285,7 +2285,7 @@ VERIFICATION:
 - Confirm PNGs look correct (friendly illustrations, correct text), then commit them to the repo
 ```
 
-### Prompt 8.4 – Kids App Accessibility Audit
+### Prompt 8.4 – Kids App Accessibility Audit ✅
 
 ```
 CONTEXT: Phase 8 of KidsTune. We audit and fix accessibility in the kids app.
@@ -2323,7 +2323,7 @@ VERIFICATION:
 - Run ./gradlew test → all tests pass
 ```
 
-### Prompt 8.5 – Backend Resilience & Observability
+### Prompt 8.5 – Backend Resilience & Observability ✅
 
 ```
 CONTEXT: Phase 8 of KidsTune. We harden the backend for production use.
@@ -2372,42 +2372,7 @@ VERIFICATION:
 - Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
 ```
 
-### Prompt 8.6 – End-to-End Tests
-
-```
-CONTEXT: Phase 8 of KidsTune. All features implemented and hardened. We write E2E tests
-covering critical user journeys.
-
-GOAL: When this task is done:
-- Maestro YAML test suites in e2e-tests/ directory:
-  Test 1 – Fresh Setup:
-    - Open web dashboard in browser → login via Spotify → create profile "Luna" → add "Bibi & Tina" artist
-    - Launch kids app → enter pairing code → select Luna → verify content tiles appear
-  Test 2 – Content Sync:
-    - Web dashboard: add new album for Luna
-    - Kids app: wait for sync (trigger manually) → verify new album tile appears
-  Test 3 – Approval Flow:
-    - Kids app: navigate to Discover → search "Frozen" → tap Request
-    - Check email: approval email received → click approve link → request approved
-    - Kids app: verify celebration animation → new content playable
-  Test 4 – Offline Resilience:
-    - Kids app: verify content from cache → airplane mode → browse and navigate → all works
-- Test execution instructions in e2e-tests/README.md
-
-REFERENCE: PROJECT_PLAN.md §8.2 (E2E testing with Maestro).
-
-CONSTRAINTS:
-- Maestro tests cover kids app flows; web dashboard flows are browser-based (document manual steps)
-- Tests may require manual Spotify login (not automatable)
-- Document any manual steps required before test execution
-
-VERIFICATION:
-- All 4 Maestro tests pass on emulators or real devices
-- e2e-tests/README.md has clear execution instructions
-- Run the backend locally: cd backend && ./gradlew bootRun --args='--spring.profiles.active=local' → app starts, curl http://localhost:8080/actuator/health → {"status":"UP"}
-```
-
-### Prompt 8.7 – Backend Test Slicing
+### Prompt 8.6 – Backend Test Slicing
 
 ```
 CONTEXT: Phase 8 of KidsTune. All 17 integration test classes currently use

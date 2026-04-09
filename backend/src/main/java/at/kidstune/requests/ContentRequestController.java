@@ -1,5 +1,6 @@
 package at.kidstune.requests;
 
+import at.kidstune.config.RequestThrottleService;
 import at.kidstune.requests.dto.ApproveRequestBody;
 import at.kidstune.requests.dto.BulkApproveRequest;
 import at.kidstune.requests.dto.BulkRejectRequest;
@@ -25,9 +26,12 @@ import java.util.List;
 public class ContentRequestController {
 
     private final ContentRequestService requestService;
+    private final RequestThrottleService throttle;
 
-    public ContentRequestController(ContentRequestService requestService) {
+    public ContentRequestController(ContentRequestService requestService,
+                                    RequestThrottleService throttle) {
         this.requestService = requestService;
+        this.throttle       = throttle;
     }
 
     // ── POST /api/v1/profiles/{profileId}/content-requests (KIDS + PARENT) ────
@@ -37,6 +41,8 @@ public class ContentRequestController {
             @PathVariable String profileId,
             @RequestBody @Valid CreateContentRequestDto body,
             @AuthenticationPrincipal String familyId) {
+
+        throttle.checkRequestLimit(profileId); // throws RateLimitExceededException if over limit
 
         return requestService.createRequest(
                         profileId,

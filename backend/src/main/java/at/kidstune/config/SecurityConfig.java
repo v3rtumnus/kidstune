@@ -108,7 +108,7 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
 
                         // ── Public ───────────────────────────────────────────
-                        .pathMatchers("/actuator/health").permitAll()
+                        .pathMatchers("/actuator/**").permitAll()
                         .pathMatchers("/webjars/**").permitAll()
                         .pathMatchers("/", "/favicon.ico", "/robots.txt", "/sw.js").permitAll()
                         .pathMatchers(

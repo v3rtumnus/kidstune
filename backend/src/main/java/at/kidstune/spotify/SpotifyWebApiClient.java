@@ -2,6 +2,8 @@ package at.kidstune.spotify;
 
 import at.kidstune.auth.SpotifyConfig;
 import at.kidstune.auth.SpotifyTokenService;
+import at.kidstune.config.CircuitBreakerOpenException;
+import at.kidstune.config.SpotifyCircuitBreaker;
 import at.kidstune.spotify.dto.SpotifyItemDto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -12,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Wraps the Spotify Web API via Spring WebClient.
@@ -30,7 +33,8 @@ import java.util.List;
 public class SpotifyWebApiClient {
 
     private final SpotifyTokenService tokenService;
-    private final WebClient spotifyApi;
+    private final WebClient           spotifyApi;
+    private final SpotifyCircuitBreaker circuitBreaker;
 
     /** Exposed for test cache invalidation (same pattern as SpotifyTokenService.accessTokenCache). */
     final Cache<String, RawSearchData>        searchCache;
@@ -46,10 +50,12 @@ public class SpotifyWebApiClient {
             SpotifyTokenService tokenService,
             SpotifyConfig config,
             WebClient.Builder builder,
-            CacheManager cacheManager) {
+            CacheManager cacheManager,
+            SpotifyCircuitBreaker circuitBreaker) {
 
         this.tokenService        = tokenService;
         this.spotifyApi          = builder.baseUrl(config.getApiBaseUrl()).build();
+        this.circuitBreaker      = circuitBreaker;
         this.searchCache         = nativeCache(cacheManager, "spotify-search");
         this.artistCache         = nativeCache(cacheManager, "spotify-artist");
         this.artistAlbumsCache   = nativeCache(cacheManager, "spotify-artist-albums");
@@ -71,18 +77,19 @@ public class SpotifyWebApiClient {
         RawSearchData cached = searchCache.getIfPresent(query);
         if (cached != null) return Mono.just(cached);
 
-        return tokenService.getValidAccessToken(familyId)
-            .flatMap(token -> spotifyApi.get()
-                .uri(u -> u.path("/v1/search")
-                    .queryParam("q", query)
-                    .queryParam("type", "artist,album,playlist")
-                    .queryParam("limit", limit)
-                    .build())
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiSearchResponse.class))
-            .map(this::mapSearchResponse)
-            .doOnNext(data -> searchCache.put(query, data));
+        return withCircuitBreaker(() ->
+            tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/search")
+                        .queryParam("q", query)
+                        .queryParam("type", "artist,album,playlist")
+                        .queryParam("limit", limit)
+                        .build())
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiSearchResponse.class))
+                .map(this::mapSearchResponse)
+                .doOnNext(data -> searchCache.put(query, data)));
     }
 
     // ── Artist ────────────────────────────────────────────────────────────────
@@ -92,14 +99,15 @@ public class SpotifyWebApiClient {
         SpotifyItemDto cached = artistCache.getIfPresent(artistId);
         if (cached != null) return Mono.just(cached);
 
-        return tokenService.getValidAccessToken(familyId)
-            .flatMap(token -> spotifyApi.get()
-                .uri("/v1/artists/{id}", artistId)
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiArtist.class))
-            .map(a -> new SpotifyItemDto(a.id(), a.name(), extractImage(a.images()), a.uri(), null))
-            .doOnNext(dto -> artistCache.put(artistId, dto));
+        return withCircuitBreaker(() ->
+            tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri("/v1/artists/{id}", artistId)
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiArtist.class))
+                .map(a -> new SpotifyItemDto(a.id(), a.name(), extractImage(a.images()), a.uri(), null))
+                .doOnNext(dto -> artistCache.put(artistId, dto)));
     }
 
     // ── Artist Albums ─────────────────────────────────────────────────────────
@@ -109,20 +117,21 @@ public class SpotifyWebApiClient {
         List<SpotifyItemDto> cached = artistAlbumsCache.getIfPresent(artistId);
         if (cached != null) return Mono.just(cached);
 
-        return tokenService.getValidAccessToken(familyId)
-            .flatMap(token -> spotifyApi.get()
-                .uri(u -> u.path("/v1/artists/{id}/albums")
-                    .queryParam("limit", 50)
-                    .build(artistId))
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiAlbumsPage.class))
-            .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                : page.items().stream()
-                    .map(a -> new SpotifyItemDto(a.id(), a.name(), extractImage(a.images()), a.uri(),
-                        firstArtistName(a.artists())))
-                    .toList())
-            .doOnNext(list -> artistAlbumsCache.put(artistId, list));
+        return withCircuitBreaker(() ->
+            tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/artists/{id}/albums")
+                        .queryParam("limit", 50)
+                        .build(artistId))
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiAlbumsPage.class))
+                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
+                    : page.items().stream()
+                        .map(a -> new SpotifyItemDto(a.id(), a.name(), extractImage(a.images()), a.uri(),
+                            firstArtistName(a.artists())))
+                        .toList())
+                .doOnNext(list -> artistAlbumsCache.put(artistId, list)));
     }
 
     // ── Album Tracks ──────────────────────────────────────────────────────────
@@ -132,20 +141,21 @@ public class SpotifyWebApiClient {
         List<SpotifyItemDto> cached = albumTracksCache.getIfPresent(albumId);
         if (cached != null) return Mono.just(cached);
 
-        return tokenService.getValidAccessToken(familyId)
-            .flatMap(token -> spotifyApi.get()
-                .uri(u -> u.path("/v1/albums/{id}/tracks")
-                    .queryParam("limit", 50)
-                    .build(albumId))
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiTracksPage.class))
-            .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                : page.items().stream()
-                    .map(t -> new SpotifyItemDto(t.id(), t.name(), null, t.uri(),
-                        firstArtistName(t.artists())))
-                    .toList())
-            .doOnNext(list -> albumTracksCache.put(albumId, list));
+        return withCircuitBreaker(() ->
+            tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/albums/{id}/tracks")
+                        .queryParam("limit", 50)
+                        .build(albumId))
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiTracksPage.class))
+                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
+                    : page.items().stream()
+                        .map(t -> new SpotifyItemDto(t.id(), t.name(), null, t.uri(),
+                            firstArtistName(t.artists())))
+                        .toList())
+                .doOnNext(list -> albumTracksCache.put(albumId, list)));
     }
 
     // ── Playlist Tracks ───────────────────────────────────────────────────────
@@ -155,21 +165,22 @@ public class SpotifyWebApiClient {
         List<SpotifyItemDto> cached = playlistTracksCache.getIfPresent(playlistId);
         if (cached != null) return Mono.just(cached);
 
-        return tokenService.getValidAccessToken(familyId)
-            .flatMap(token -> spotifyApi.get()
-                .uri(u -> u.path("/v1/playlists/{id}/tracks")
-                    .queryParam("limit", 50)
-                    .build(playlistId))
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiPlaylistItemsPage.class))
-            .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                : page.items().stream()
-                    .filter(pi -> pi.track() != null)
-                    .map(pi -> new SpotifyItemDto(pi.track().id(), pi.track().name(),
-                        null, pi.track().uri(), firstArtistName(pi.track().artists())))
-                    .toList())
-            .doOnNext(list -> playlistTracksCache.put(playlistId, list));
+        return withCircuitBreaker(() ->
+            tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/playlists/{id}/tracks")
+                        .queryParam("limit", 50)
+                        .build(playlistId))
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiPlaylistItemsPage.class))
+                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
+                    : page.items().stream()
+                        .filter(pi -> pi.track() != null)
+                        .map(pi -> new SpotifyItemDto(pi.track().id(), pi.track().name(),
+                            null, pi.track().uri(), firstArtistName(pi.track().artists())))
+                        .toList())
+                .doOnNext(list -> playlistTracksCache.put(playlistId, list)));
     }
 
     // ── Recently Played ───────────────────────────────────────────────────────
@@ -179,21 +190,22 @@ public class SpotifyWebApiClient {
         List<SpotifyItemDto> cached = recentlyPlayedCache.getIfPresent(familyId);
         if (cached != null) return Mono.just(cached);
 
-        return tokenService.getValidAccessToken(familyId)
-            .flatMap(token -> spotifyApi.get()
-                .uri(u -> u.path("/v1/me/player/recently-played")
-                    .queryParam("limit", limit)
-                    .build())
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiPlayHistoryPage.class))
-            .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                : page.items().stream()
-                    .filter(h -> h.track() != null)
-                    .map(h -> new SpotifyItemDto(h.track().id(), h.track().name(),
-                        null, h.track().uri(), firstArtistName(h.track().artists())))
-                    .toList())
-            .doOnNext(list -> recentlyPlayedCache.put(familyId, list));
+        return withCircuitBreaker(() ->
+            tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/me/player/recently-played")
+                        .queryParam("limit", limit)
+                        .build())
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiPlayHistoryPage.class))
+                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
+                    : page.items().stream()
+                        .filter(h -> h.track() != null)
+                        .map(h -> new SpotifyItemDto(h.track().id(), h.track().name(),
+                            null, h.track().uri(), firstArtistName(h.track().artists())))
+                        .toList())
+                .doOnNext(list -> recentlyPlayedCache.put(familyId, list)));
     }
 
     // ── Top Artists ───────────────────────────────────────────────────────────
@@ -207,20 +219,21 @@ public class SpotifyWebApiClient {
         List<SpotifyItemDto> cached = topArtistsCache.getIfPresent(key);
         if (cached != null) return Mono.just(cached);
 
-        return tokenService.getValidAccessToken(familyId)
-            .flatMap(token -> spotifyApi.get()
-                .uri(u -> u.path("/v1/me/top/artists")
-                    .queryParam("time_range", timeRange)
-                    .queryParam("limit", limit)
-                    .build())
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiArtistsPage.class))
-            .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                : page.items().stream()
-                    .map(a -> new SpotifyItemDto(a.id(), a.name(), extractImage(a.images()), a.uri(), null))
-                    .toList())
-            .doOnNext(list -> topArtistsCache.put(key, list));
+        return withCircuitBreaker(() ->
+            tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/me/top/artists")
+                        .queryParam("time_range", timeRange)
+                        .queryParam("limit", limit)
+                        .build())
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiArtistsPage.class))
+                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
+                    : page.items().stream()
+                        .map(a -> new SpotifyItemDto(a.id(), a.name(), extractImage(a.images()), a.uri(), null))
+                        .toList())
+                .doOnNext(list -> topArtistsCache.put(key, list)));
     }
 
     // ── User Playlists ────────────────────────────────────────────────────────
@@ -230,23 +243,39 @@ public class SpotifyWebApiClient {
         List<SpotifyItemDto> cached = userPlaylistsCache.getIfPresent(familyId);
         if (cached != null) return Mono.just(cached);
 
-        return tokenService.getValidAccessToken(familyId)
-            .flatMap(token -> spotifyApi.get()
-                .uri(u -> u.path("/v1/me/playlists")
-                    .queryParam("limit", limit)
-                    .build())
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiPlaylistsPage.class))
-            .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                : page.items().stream()
-                    .map(p -> new SpotifyItemDto(p.id(), p.name(), extractImage(p.images()), p.uri(),
-                        p.owner() != null ? p.owner().displayName() : null))
-                    .toList())
-            .doOnNext(list -> userPlaylistsCache.put(familyId, list));
+        return withCircuitBreaker(() ->
+            tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/me/playlists")
+                        .queryParam("limit", limit)
+                        .build())
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiPlaylistsPage.class))
+                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
+                    : page.items().stream()
+                        .map(p -> new SpotifyItemDto(p.id(), p.name(), extractImage(p.images()), p.uri(),
+                            p.owner() != null ? p.owner().displayName() : null))
+                        .toList())
+                .doOnNext(list -> userPlaylistsCache.put(familyId, list)));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Wraps a Spotify API call with circuit-breaker logic.
+     * If the circuit is OPEN the call is rejected immediately with
+     * {@link CircuitBreakerOpenException}; otherwise the call proceeds and the
+     * circuit breaker is notified of success or failure.
+     */
+    private <T> Mono<T> withCircuitBreaker(Supplier<Mono<T>> call) {
+        if (!circuitBreaker.allowRequest()) {
+            return Mono.error(new CircuitBreakerOpenException());
+        }
+        return call.get()
+                .doOnNext(ignored -> circuitBreaker.onSuccess())
+                .doOnError(e -> circuitBreaker.onFailure());
+    }
 
     private RawSearchData mapSearchResponse(ApiSearchResponse response) {
         List<RawSpotifyItem> artists = response.artists() == null || response.artists().items() == null

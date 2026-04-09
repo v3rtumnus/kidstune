@@ -1,8 +1,11 @@
 package at.kidstune.spotify;
 
 import at.kidstune.common.SecurityUtils;
+import at.kidstune.config.RequestThrottleService;
 import at.kidstune.spotify.dto.SearchResultsResponse;
 import at.kidstune.spotify.dto.SpotifyItemDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,13 +25,18 @@ import java.util.List;
 @RequestMapping("/api/v1/spotify")
 public class SpotifyProxyController {
 
+    private static final Logger log = LoggerFactory.getLogger(SpotifyProxyController.class);
+
     private final SpotifySearchService      searchService;
     private final SpotifySuggestionsService suggestionsService;
+    private final RequestThrottleService    throttle;
 
     public SpotifyProxyController(SpotifySearchService searchService,
-                                  SpotifySuggestionsService suggestionsService) {
+                                  SpotifySuggestionsService suggestionsService,
+                                  RequestThrottleService throttle) {
         this.searchService      = searchService;
         this.suggestionsService = suggestionsService;
+        this.throttle           = throttle;
     }
 
     /**
@@ -37,15 +45,20 @@ public class SpotifyProxyController {
      * <pre>GET /api/v1/spotify/search?q=Bibi&limit=10</pre>
      *
      * Returns results grouped by type, with explicit content filtered out
-     * and at most 10 items per type.
+     * and at most 10 items per type.  Throttled to {@code 10} requests/minute per device.
      */
     @GetMapping("/search")
     public Mono<ResponseEntity<SearchResultsResponse>> search(
             @RequestParam("q") String query,
             @RequestParam(value = "limit", defaultValue = "10") int limit) {
 
-        return SecurityUtils.getFamilyId()
-            .flatMap(familyId -> searchService.search(familyId, query, limit))
+        return SecurityUtils.getClaims()
+            .flatMap(claims -> {
+                String throttleKey = claims.deviceId() != null ? claims.deviceId() : claims.familyId();
+                throttle.checkSearchLimit(throttleKey); // throws RateLimitExceededException if over limit
+                log.info("Spotify search: query='{}' familyId={}", query, claims.familyId());
+                return searchService.search(claims.familyId(), query, limit);
+            })
             .map(ResponseEntity::ok);
     }
 

@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -49,6 +50,7 @@ public class ContentResolver {
     private final ProfileRepository       profileRepo;
     private final ContentResolverSpotifyClient spotifyClient;
     private final ContentTypeClassifier   classifier;
+    private final AtomicInteger activeJobs = new AtomicInteger(0);
 
     public ContentResolver(ResolvedAlbumRepository albumRepo,
                            ResolvedTrackRepository trackRepo,
@@ -66,13 +68,23 @@ public class ContentResolver {
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
+    /** Returns the number of content resolution jobs currently in progress. */
+    public int getActiveJobCount() {
+        return activeJobs.get();
+    }
+
     /**
      * Triggers resolution in a background thread (called from ContentService after
      * a successful addContent / addContentBulk save).
      */
     @Async
     public void resolveAsync(AllowedContent content) {
-        resolve(content);
+        activeJobs.incrementAndGet();
+        try {
+            resolve(content);
+        } finally {
+            activeJobs.decrementAndGet();
+        }
     }
 
     /**
