@@ -17,7 +17,8 @@ Start every Claude Code session with: **"Read CLAUDE.md and PROJECT_PLAN.md firs
 - ✅ **Prompt 6.2 complete** — Web dashboard import wizard + liked songs import
 - ✅ **Prompt 6.4 complete** — Samsung Kids compatibility: lifecycle fixes, README setup guide
 - ✅ **Prompt 6.5 complete** — MediaSession / media notification ownership: KidstuneMediaService + SpotifyMirrorPlayer + ArtworkLoader; notification tap opens KidsTune not Spotify
-- ⬅️ **NEXT: Phase 7**
+- ✅ **Phase 8 complete** (8.1 – 8.8) — Admin data tables, animations, accessibility, resilience & observability, test slicing, documentation
+- ⬅️ **PROJECT COMPLETE**
 
 ---
 
@@ -2418,7 +2419,7 @@ VERIFICATION:
 - No tests were deleted, only their Spring context slice changed
 ```
 
-### Prompt 8.8 – Documentation
+### Prompt 8.8 – Documentation ✅
 
 ```
 CONTEXT: Phase 8 of KidsTune. Everything works. We write comprehensive documentation.

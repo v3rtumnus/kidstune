@@ -18,16 +18,19 @@ kids-app (Kotlin/Compose) ──REST+WS──→ backend (Spring Boot 4 / Java 2
 - Backend connects to an existing MariaDB instance (not containerized with the app)
 - Kids App stores a **pre-resolved content tree** locally in Room for full offline support
 - Web Dashboard is served by the backend at `/web/**` using Thymeleaf + HTMX + Bootstrap 5
+- **Package root:** `at.kidstune` (backend) and `at.kidstune.kids` (kids-app)
 
 ## Tech Stack
 
 ### Backend (`backend/`)
 - **Spring Boot 4.0.4** / Java 21 / Spring Framework 7
-- **Spring WebFlux** for reactive REST + WebSocket
+- **Spring WebFlux** for reactive REST + WebSocket + SSE
 - **Spring Security 7** with JWT device tokens
 - **MariaDB** via Spring Data JPA (existing instance, not managed by Docker Compose)
 - **Liquibase** for DB migrations (YAML changelog format)
 - **Caffeine** for in-memory Spotify metadata caching
+- **Web Push / VAPID** for browser push notifications (no FCM required)
+- **Spring Mail** for email notifications with one-click approve links
 - **Gradle Kotlin DSL** for build
 
 ### Android App (`kids-app/`)
@@ -67,12 +70,12 @@ The Kids App must work fully offline after initial sync. Every tap (browse → a
 ### Content Requests & Notifications
 Content requests have a lifecycle: `PENDING → APPROVED | REJECTED | EXPIRED`. Max 3 pending requests per profile (enforced by backend with 429). Requests expire after 7 days automatically via backend cron job.
 
-Parent notifications use a **three-layer fallback**:
-- **Layer 1:** Foreground Service with WebSocket (real-time, ~1s)
-- **Layer 2:** WorkManager polling every 15 min (survives app kill + reboot)
-- **Layer 3:** Daily digest at 19:00 via backend cron (catch-all for forgotten requests)
+Parent notifications use **three channels**:
+- **Channel 1:** Email via Spring Mail — sent immediately on request creation; contains a one-click `/web/approve/{token}` link (public, no login needed)
+- **Channel 2:** Web Push via VAPID — pushed to parent's browser/phone if they have subscribed (no FCM, works on any browser with Push API support)
+- **Channel 3:** SSE badge update — real-time `pendingCount` push to any open dashboard tab via `/web/sse/requests`
 
-All layers deduplicate: Layer 2 skips if Layer 1 already delivered. Notifications tagged with `requestId` for Android replacement.
+A daily digest cron at 19:00 sends summary email for all requests pending > 4 hours with `digest_sent_at IS NULL` (catch-all). `approve_token` is a UUID on `ContentRequest`, single-use, expires with the request after 7 days.
 
 ### One-Time Profile Binding
 Each kids' device is permanently bound to one child profile at first launch. No profile switching. Profile can only be reassigned via the Web Dashboard (Devices → Reassign Profile).
@@ -82,44 +85,61 @@ Each kids' device is permanently bound to one child profile at first launch. No 
 ```
 kidstune/
 ├── backend/                        # Spring Boot 4 backend
-│   ├── src/main/java/com/kidstune/
-│   │   ├── config/                 # SecurityConfig, WebSocketConfig, CacheConfig
+│   ├── src/main/java/at/kidstune/
+│   │   ├── config/                 # SecurityConfig, CacheConfig, WebFlux config
 │   │   ├── auth/                   # Spotify OAuth, JWT device tokens, pairing
-│   │   ├── profile/                # ChildProfile CRUD
+│   │   ├── common/                 # Shared utilities, base classes
 │   │   ├── content/                # AllowedContent CRUD, scope resolution, content type heuristic
-│   │   ├── resolver/               # Background job: resolves content → ResolvedAlbum/Track
+│   │   ├── device/                 # PairedDevice CRUD, device token management
+│   │   ├── family/                 # Family registration, settings
 │   │   ├── favorites/              # Favorites CRUD
-│   │   ├── requests/               # Content request workflow + WebSocket notifications
+│   │   ├── health/                 # Custom Actuator health indicators
+│   │   ├── notification/           # Email notifications, daily digest cron
+│   │   ├── profile/                # ChildProfile CRUD
+│   │   ├── push/                   # Web Push / VAPID subscription management
+│   │   ├── requests/               # Content request workflow
+│   │   ├── resolver/               # Background job: resolves content → ResolvedAlbum/Track
 │   │   ├── spotify/                # Spotify Web API client wrapper
+│   │   ├── sse/                    # SSE endpoints for dashboard badge updates
 │   │   ├── sync/                   # Sync endpoints (full + delta with pre-resolved trees)
-│   │   └── ws/                     # WebSocket handlers + connection registry
+│   │   └── web/                    # Thymeleaf web dashboard controllers + admin/
 │   ├── src/main/resources/
 │   │   ├── db/changelog/           # Liquibase YAML changelogs
 │   │   ├── known-artists.yml       # Configurable children's artist list with age ranges
-│   │   └── application.yml
+│   │   └── application.properties
 │   └── src/test/
-│       ├── java/com/kidstune/      # Tests mirror main structure
+│       ├── java/at/kidstune/       # Tests mirror main structure
 │       └── resources/spotify-fixtures/  # Recorded Spotify API JSON responses
 │
 ├── kids-app/                       # Kids-facing Android app
-│   └── app/src/main/java/com/kidstune/kids/
+│   └── app/src/main/java/at/kidstune/kids/
+│       ├── connectivity/           # Network state observer
 │       ├── di/                     # Hilt modules
 │       ├── data/local/             # Room: LocalContentEntry, LocalAlbum, LocalTrack, LocalFavorite
-│       ├── data/remote/            # Ktor API client + WebSocket client
+│       ├── data/local/entities/    # Room entity classes
+│       ├── data/preferences/       # DataStore / SharedPreferences wrappers
+│       ├── data/remote/            # Ktor API client + WebSocket client + DTOs
 │       ├── data/repository/        # Repositories combining local + remote
 │       ├── domain/model/           # ContentTile, NowPlaying, etc.
 │       ├── domain/usecase/         # GetContentTiles, ToggleFavorite, RequestContent
-│       ├── ui/                     # Compose screens: setup, home, browse, player, discover
-│       ├── playback/               # Spotify App Remote SDK wrapper
-│       └── sync/                   # WorkManager sync + offline queue
+│       ├── navigation/             # Compose Navigation graph + type-safe routes
+│       ├── playback/               # Spotify App Remote SDK wrapper, MediaSession
+│       ├── sync/                   # WorkManager sync + offline queue
+│       └── ui/
+│           ├── components/         # Reusable Compose components
+│           ├── screens/            # Screen composables (Home, Browse, Player, Discover, etc.)
+│           ├── theme/              # Material 3 theme, colors, typography
+│           └── viewmodel/          # ViewModels for each screen
 │
 ├── shared/                         # Shared Kotlin module (DTOs, constants)
-│   └── src/main/kotlin/com/kidstune/shared/
+│   └── src/main/kotlin/at/kidstune/shared/
 │       ├── model/                  # DTOs: ContentDto, ProfileDto, SyncPayloadDto, WebSocketMessage
 │       └── constants/              # ApiRoutes, ContentType, ContentScope, RequestStatus
 │
 ├── docker-compose.yml
 ├── Jenkinsfile
+├── README.md
+├── LICENSE
 ├── settings.gradle.kts
 ├── build.gradle.kts
 ├── CLAUDE.md                       # This file
@@ -130,6 +150,7 @@ kidstune/
 
 ### Backend (Java / Spring Boot)
 
+- **Root package:** `at.kidstune` (not `com.kidstune`)
 - **Package structure:** Feature-based packages (`content/`, `profile/`, `auth/`), not layer-based
 - **Naming:**
   - Entities: `AllowedContent`, `ChildProfile` (no `Entity` suffix)
@@ -224,11 +245,15 @@ kidstune/
 
 8. **Dashboard auth is email/password — completely independent of Spotify.** The web dashboard login (`/web/login`) uses `Family.email` + `Family.password_hash` (BCrypt). Spotify tokens are stored separately and used only for Spotify API calls. Two Spotify token levels exist: `Family.spotify_refresh_token` (parent's account, nullable — connected via Settings, used for content search/resolution) and `ChildProfile.spotify_refresh_token` (each child's own account, nullable — connected per-profile, used for import). `SpotifyTokenService` has parallel methods: `getValidAccessToken(familyId)` for parent context, `getValidProfileAccessToken(profileId)` for child import context. The Spotify App Remote SDK on a child's device controls the Spotify app already logged in with the child's own account — no backend token exchange for playback. Never use the family Spotify token for per-child import operations. Never gate dashboard login on Spotify connectivity.
 
-9. **Email-based notifications, not FCM or Android push.** When a content request is created, the backend sends email to all `family.notification_emails` via Spring Mail. Email contains a one-click `/web/approve/{token}` link (public, no login). Daily digest at 19:00. WebSocket browser push updates the dashboard badge in real time. No Android parent app, no Firebase.
+9. **Email + Web Push + SSE — not FCM or Android push.** When a content request is created: (1) Spring Mail sends email to all `family.notification_emails` with a one-click `/web/approve/{token}` link (public, no login); (2) VAPID Web Push sends a notification to subscribed browsers/phones; (3) SSE on `/web/sse/requests` updates the pending badge if the dashboard tab is open. No Android parent app, no Firebase. Daily digest cron at 19:00 sends summary of all open requests.
 
 10. **Jetpack Compose uses Material 3.** Do not import Material 2 (`androidx.compose.material`). Use `androidx.compose.material3` throughout.
 
 11. **Coil 3, not Coil 2.** Import path is `coil3.*`, not `coil.*`. Compose integration is `coil3.compose.AsyncImage`.
+
+12. **Package root is `at.kidstune`, not `com.kidstune`.** All backend Java classes are in `at.kidstune.*`; all kids-app Kotlin classes are in `at.kidstune.kids.*`; shared module is `at.kidstune.shared.*`. Do not create classes under `com.kidstune`.
+
+13. **VAPID keys must be persisted across restarts.** If `KIDSTUNE_VAPID_PUBLIC_KEY` / `KIDSTUNE_VAPID_PRIVATE_KEY` env vars are absent, the backend generates a new key pair on every startup. Browser push subscriptions become invalid after every restart. Generate keys once and set them as env vars (the first startup logs the generated keys for easy copy-paste).
 
 ## Build & Run
 
@@ -278,6 +303,19 @@ SPRING_DATASOURCE_USERNAME=kidstune
 SPRING_DATASOURCE_PASSWORD=<secret>
 SPOTIFY_CLIENT_ID=<from developer.spotify.com>
 SPOTIFY_CLIENT_SECRET=<from developer.spotify.com>
-KIDSTUNE_JWT_SECRET=<random 256-bit key>
+KIDSTUNE_JWT_SECRET=<random 256-bit key, e.g. openssl rand -hex 32>
 KIDSTUNE_BASE_URL=https://kidstune.altenburger.io
+
+# VAPID keys for Web Push — generate once and persist.
+# If omitted, ephemeral keys are generated on startup and logged.
+KIDSTUNE_VAPID_PUBLIC_KEY=<base64url EC public key>
+KIDSTUNE_VAPID_PRIVATE_KEY=<base64url EC private key>
+
+# SMTP for email notifications
+SPRING_MAIL_HOST=smtp.gmail.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=<sender address>
+SPRING_MAIL_PASSWORD=<app password>
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
 ```
