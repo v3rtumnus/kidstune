@@ -17,6 +17,8 @@ public interface PairedDeviceRepository extends JpaRepository<PairedDevice, Stri
 
     Optional<PairedDevice> findByIdAndFamilyId(String id, String familyId);
 
+    Optional<PairedDevice> findByIdAndProfileId(String id, String profileId);
+
     @Modifying
     @Query("UPDATE PairedDevice d SET d.lastSeenAt = :now WHERE d.id = :id")
     int updateLastSeenAt(@Param("id") String id, @Param("now") Instant now);

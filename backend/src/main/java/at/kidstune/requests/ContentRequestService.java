@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -41,6 +42,7 @@ public class ContentRequestService {
     private final ContentResolver          contentResolver;
     private final SseRegistry             sseRegistry;
     private final PushNotificationService  pushNotificationService;
+    private final TransactionTemplate      txTemplate;
 
     public ContentRequestService(ContentRequestRepository requestRepository,
                                   ContentRepository contentRepository,
@@ -48,7 +50,8 @@ public class ContentRequestService {
                                   EmailNotificationService emailNotificationService,
                                   ContentResolver contentResolver,
                                   SseRegistry sseRegistry,
-                                  PushNotificationService pushNotificationService) {
+                                  PushNotificationService pushNotificationService,
+                                  TransactionTemplate txTemplate) {
         this.requestRepository          = requestRepository;
         this.contentRepository          = contentRepository;
         this.profileRepository          = profileRepository;
@@ -56,15 +59,22 @@ public class ContentRequestService {
         this.contentResolver            = contentResolver;
         this.sseRegistry                = sseRegistry;
         this.pushNotificationService    = pushNotificationService;
+        this.txTemplate                 = txTemplate;
     }
 
-    /** Creates a new PENDING request. Enforces max-3 pending per profile. Fires email + push async. */
+    /**
+     * Creates a new PENDING request. Enforces max-3 pending per profile.
+     * Uses a pessimistic write lock on existing pending rows to prevent the
+     * check-then-act race condition under concurrent submissions.
+     * Fires email + push async after the transaction commits.
+     */
     public Mono<ContentRequest> createRequest(String profileId, String spotifyUri,
                                               String title, ContentType contentType,
                                               String imageUrl, String artistName) {
-        return db(() -> {
-            long pending = requestRepository.countByProfileIdAndStatus(profileId, ContentRequestStatus.PENDING);
-            if (pending >= 3) {
+        return dbTx(() -> {
+            // Lock existing pending rows so concurrent inserts are serialized.
+            List<ContentRequest> pending = requestRepository.findPendingForUpdate(profileId);
+            if (pending.size() >= 3) {
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                         "Maximal 3 offene Anfragen pro Profil erlaubt.");
             }
@@ -86,10 +96,14 @@ public class ContentRequestService {
         });
     }
 
-    /** Approves a request by its approve_token (public one-click flow – no auth required). */
+    /**
+     * Approves a request by its approve_token (public one-click flow – no auth required).
+     * Uses a pessimistic write lock so that two simultaneous clicks on the same email link
+     * cannot both proceed past the PENDING check.
+     */
     public Mono<ContentRequest> approveByToken(String approveToken) {
-        return db(() -> {
-            ContentRequest request = requestRepository.findByApproveToken(approveToken)
+        return dbTx(() -> {
+            ContentRequest request = requestRepository.findByApproveTokenForUpdate(approveToken)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                             "Ungültiger oder bereits verwendeter Token."));
             if (request.getStatus() != ContentRequestStatus.PENDING) {
@@ -105,7 +119,7 @@ public class ContentRequestService {
 
     /** Approve a single request: creates AllowedContent for the requesting profile. */
     public Mono<Void> approveRequest(String requestId, String familyId) {
-        return db(() -> {
+        return dbTx(() -> {
             ContentRequest request = getRequestForFamily(requestId, familyId);
             addContentIfMissing(request.getProfileId(), request);
             request.setStatus(ContentRequestStatus.APPROVED);
@@ -118,7 +132,7 @@ public class ContentRequestService {
 
     /** Approve for all profiles in the family: creates AllowedContent for every profile. */
     public Mono<Void> approveForAllProfiles(String requestId, String familyId) {
-        return db(() -> {
+        return dbTx(() -> {
             ContentRequest request = getRequestForFamily(requestId, familyId);
             List<String> profileIds = profileRepository.findByFamilyId(familyId)
                     .stream().map(ChildProfile::getId).toList();
@@ -133,15 +147,19 @@ public class ContentRequestService {
         }).then(Mono.fromRunnable(() -> emitSseCount(familyId)));
     }
 
+    private static final int MAX_NOTE_LENGTH = 500;
+
     /** Reject a request with an optional parent note. */
     public Mono<Void> rejectRequest(String requestId, String familyId, String note) {
-        return db(() -> {
+        return dbTx(() -> {
             ContentRequest request = getRequestForFamily(requestId, familyId);
             request.setStatus(ContentRequestStatus.REJECTED);
             request.setResolvedAt(Instant.now());
             request.setResolvedBy(familyId);
             if (note != null && !note.isBlank()) {
-                request.setParentNote(note.strip());
+                String trimmed = note.strip();
+                request.setParentNote(trimmed.length() > MAX_NOTE_LENGTH
+                        ? trimmed.substring(0, MAX_NOTE_LENGTH) : trimmed);
             }
             requestRepository.save(request);
             return null;
@@ -153,7 +171,7 @@ public class ContentRequestService {
                                                 List<String> approvedByProfileIds,
                                                 ContentType contentTypeOverride,
                                                 String note) {
-        return db(() -> {
+        return dbTx(() -> {
             ContentRequest request = getRequestForFamily(requestId, familyId);
 
             List<String> targetProfileIds;
@@ -178,7 +196,9 @@ public class ContentRequestService {
             request.setResolvedAt(Instant.now());
             request.setResolvedBy(familyId);
             if (note != null && !note.isBlank()) {
-                request.setParentNote(note.strip());
+                String trimmed = note.strip();
+                request.setParentNote(trimmed.length() > MAX_NOTE_LENGTH
+                        ? trimmed.substring(0, MAX_NOTE_LENGTH) : trimmed);
             }
             requestRepository.save(request);
             return null;
@@ -187,7 +207,7 @@ public class ContentRequestService {
 
     /** Bulk-reject a list of request IDs. Skips requests that don't belong to the family. */
     public Mono<Void> bulkReject(List<String> requestIds, String familyId, String note) {
-        return db(() -> {
+        return dbTx(() -> {
             for (String requestId : requestIds) {
                 try {
                     ContentRequest request = getRequestForFamily(requestId, familyId);
@@ -276,7 +296,7 @@ public class ContentRequestService {
 
     /** Bulk-approve a list of request IDs. Skips requests that don't belong to the family. */
     public Mono<Void> bulkApprove(List<String> requestIds, String familyId) {
-        return db(() -> {
+        return dbTx(() -> {
             for (String requestId : requestIds) {
                 try {
                     ContentRequest request = getRequestForFamily(requestId, familyId);
@@ -353,7 +373,31 @@ public class ContentRequestService {
                 .ifPresent(p -> emitSseCount(p.getFamilyId()));
     }
 
+    /** Read-only helper: runs callable on a bounded-elastic thread without a transaction. */
     private <T> Mono<T> db(java.util.concurrent.Callable<T> callable) {
         return Mono.fromCallable(callable).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Transactional write helper: runs callable inside a transaction on a bounded-elastic
+     * thread so the transaction context is active when JPA operations execute.
+     * Using {@code @Transactional} on a Mono-returning method is inert because the
+     * transaction is opened on the calling thread (WebFlux event loop) while the actual
+     * DB work runs on a different thread via subscribeOn.
+     */
+    private <T> Mono<T> dbTx(java.util.concurrent.Callable<T> callable) {
+        return Mono.fromCallable(() ->
+            txTemplate.execute(status -> {
+                try {
+                    return callable.call();
+                } catch (RuntimeException e) {
+                    status.setRollbackOnly();
+                    throw e;
+                } catch (Exception e) {
+                    status.setRollbackOnly();
+                    throw new RuntimeException(e);
+                }
+            })
+        ).subscribeOn(Schedulers.boundedElastic());
     }
 }

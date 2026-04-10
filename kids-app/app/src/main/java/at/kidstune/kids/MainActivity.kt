@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import at.kidstune.kids.data.preferences.DeviceTokenPreferences
 import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.navigation.HomeRoute
@@ -44,6 +46,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        hideSystemBars()
 
         // Connect to Spotify App Remote SDK on startup.
         // The manager handles reconnection automatically on failure.
@@ -72,6 +75,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Re-hide the navigation bar whenever focus returns to this window.
+        // The system UI can briefly reappear after dialogs, permission prompts,
+        // or Samsung Kids management overlays — this suppresses it again.
+        if (hasFocus) hideSystemBars()
+    }
+
     override fun onStart() {
         super.onStart()
         // Re-establish Spotify App Remote connection when Samsung Kids brings this
@@ -91,6 +102,18 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         spotifyRemote.disconnect()
+    }
+
+    /**
+     * Hides the status bar and navigation bar in sticky-immersive mode.
+     * If the user swipes from the edge the bars briefly appear as transient
+     * overlays and then auto-hide — they never permanently reappear.
+     */
+    private fun hideSystemBars() {
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
     @EntryPoint

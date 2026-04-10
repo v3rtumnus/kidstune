@@ -1,8 +1,10 @@
 package at.kidstune.push;
 
+import nl.martijndwars.webpush.PushService;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,6 +58,12 @@ public class VapidConfig {
     public String vapidPrivateKeyString() throws Exception {
         ensureKeys();
         return privateKeyBase64;
+    }
+
+    @Bean
+    public PushService pushService(@Qualifier("vapidPublicKeyString")  String pubKey,
+                                   @Qualifier("vapidPrivateKeyString") String privKey) throws Exception {
+        return new PushService(pubKey, privKey, "mailto:push@kidstune.at");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

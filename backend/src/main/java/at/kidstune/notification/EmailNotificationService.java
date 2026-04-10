@@ -152,10 +152,12 @@ public class EmailNotificationService {
                 List<DigestEntry> entries = requests.stream()
                         .map(r -> {
                             ChildProfile p = profileMap.get(r.getProfileId());
+                            String emoji     = p != null ? avatarHelper.emoji(p.getAvatarIcon()) : "?";
+                            String childName = p != null ? p.getName() : "Unknown";
                             return new DigestEntry(
                                     r,
-                                    p,
-                                    p != null ? avatarHelper.emoji(p.getAvatarIcon()) : "?",
+                                    childName,
+                                    emoji,
                                     baseUrl + "/web/approve/" + r.getApproveToken());
                         })
                         .toList();
@@ -209,18 +211,24 @@ public class EmailNotificationService {
                 .collect(Collectors.groupingBy(r -> profileToFamily.get(r.getProfileId())));
     }
 
-    /** Parses a comma/semicolon/whitespace-separated string of email addresses. */
+    static final int MAX_NOTIFICATION_EMAILS = 10;
+
+    /**
+     * Parses a comma/semicolon/whitespace-separated string of email addresses.
+     * Capped at {@value #MAX_NOTIFICATION_EMAILS} addresses to prevent abuse.
+     */
     static List<String> parseEmails(String raw) {
         if (raw == null || raw.isBlank()) return List.of();
         return Arrays.stream(raw.split("[,;\\s]+"))
                 .map(String::strip)
                 .filter(s -> !s.isEmpty())
+                .limit(MAX_NOTIFICATION_EMAILS)
                 .toList();
     }
 
     public record DigestEntry(
             ContentRequest request,
-            ChildProfile   profile,
+            String         childName,
             String         emoji,
             String         approveUrl
     ) {}

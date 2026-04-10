@@ -30,12 +30,14 @@ data class DiscoverState(
     val isSearching: Boolean = false,
     val rateLimitMessage: String? = null,
     val showCelebration: Boolean = false,
-    val newlyApprovedUris: Set<String> = emptySet(),
+    /** True when the most recent search call failed due to a network or server error. */
+    val searchError: Boolean = false,
+    /** True when suggestions could not be loaded (network unavailable). */
+    val suggestionsError: Boolean = false,
 )
 
 sealed interface DiscoverIntent {
     data class UpdateQuery(val q: String) : DiscoverIntent
-    data object SubmitSearch : DiscoverIntent
     data class RequestContent(val tile: DiscoverTile) : DiscoverIntent
     data class DismissRejected(val id: String) : DiscoverIntent
     data object DismissCelebration : DiscoverIntent
@@ -60,7 +62,10 @@ class DiscoverViewModel @Inject constructor(
     private var searchJob: Job? = null
     private var previousContentCount: Int? = null
 
-    /** URIs that were PENDING when the screen was last refreshed. */
+    /**
+     * URIs that are currently PENDING — replaced on every [observeRequests] emission so
+     * stale entries do not accumulate and trigger spurious celebrations.
+     */
     private val pendingUrisSnapshot = mutableSetOf<String>()
 
     init {
@@ -74,13 +79,12 @@ class DiscoverViewModel @Inject constructor(
 
     fun onIntent(intent: DiscoverIntent) {
         when (intent) {
-            is DiscoverIntent.UpdateQuery    -> handleQueryUpdate(intent.q)
-            is DiscoverIntent.SubmitSearch   -> Unit  // handled by UpdateQuery
-            is DiscoverIntent.RequestContent -> handleRequestContent(intent.tile)
-            is DiscoverIntent.DismissRejected -> handleDismissRejected(intent.id)
+            is DiscoverIntent.UpdateQuery        -> handleQueryUpdate(intent.q)
+            is DiscoverIntent.RequestContent     -> handleRequestContent(intent.tile)
+            is DiscoverIntent.DismissRejected    -> handleDismissRejected(intent.id)
             is DiscoverIntent.DismissCelebration -> _state.update { it.copy(showCelebration = false) }
-            is DiscoverIntent.StartVoiceInput -> Unit  // UI layer launches SpeechRecognizer
-            is DiscoverIntent.VoiceInputResult -> handleQueryUpdate(intent.text)
+            is DiscoverIntent.StartVoiceInput    -> Unit  // UI layer launches SpeechRecognizer
+            is DiscoverIntent.VoiceInputResult   -> handleQueryUpdate(intent.text)
         }
     }
 
@@ -115,9 +119,15 @@ class DiscoverViewModel @Inject constructor(
         val profileId = prefs.boundProfileId ?: return
         lastSearchAt = Instant.now()
         viewModelScope.launch {
-            _state.update { it.copy(isSearching = true) }
-            val results = discoverRepository.search(profileId, q)
-            _state.update { it.copy(searchResults = results, isSearching = false) }
+            _state.update { it.copy(isSearching = true, searchError = false) }
+            val result = discoverRepository.search(profileId, q)
+            _state.update {
+                it.copy(
+                    searchResults = result.getOrDefault(emptyList()),
+                    isSearching   = false,
+                    searchError   = result.isFailure,
+                )
+            }
         }
     }
 
@@ -138,41 +148,41 @@ class DiscoverViewModel @Inject constructor(
     }
 
     private fun handleDismissRejected(id: String) {
-        viewModelScope.launch {
-            discoverRepository.getVisibleRequests(prefs.boundProfileId ?: return@launch)
-            // Just remove from local Room display
-            _state.update {
-                it.copy(pendingRequests = it.pendingRequests.filter { r -> r.id != id })
-            }
-        }
+        _state.update { it.copy(pendingRequests = it.pendingRequests.filter { r -> r.id != id }) }
     }
 
     private fun loadSuggestions(profileId: String) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoadingSuggestions = true) }
-            val suggestions = discoverRepository.fetchSuggestions(profileId)
-            _state.update { it.copy(suggestions = suggestions, isLoadingSuggestions = false) }
+            _state.update { it.copy(isLoadingSuggestions = true, suggestionsError = false) }
+            val result = discoverRepository.fetchSuggestions(profileId)
+            _state.update {
+                it.copy(
+                    suggestions          = result.getOrDefault(emptyList()),
+                    isLoadingSuggestions = false,
+                    suggestionsError     = result.isFailure,
+                )
+            }
         }
     }
 
     private fun observeRequests(profileId: String) {
         viewModelScope.launch {
             discoverRepository.getVisibleRequests(profileId).collect { requests ->
-                // Track pending URIs for celebration detection
-                pendingUrisSnapshot.addAll(
-                    requests.filter { it.status == RequestStatus.PENDING }
-                            .map { it.tile.spotifyUri }
-                )
-
-                val requestedUris = requests
+                val currentPending = requests
                     .filter { it.status == RequestStatus.PENDING }
                     .map { it.tile.spotifyUri }
                     .toSet()
 
+                // Replace the snapshot with the current pending set. Using replace (not
+                // addAll) prevents stale URIs from accumulating and triggering spurious
+                // celebrations on unrelated content-count increases.
+                pendingUrisSnapshot.clear()
+                pendingUrisSnapshot.addAll(currentPending)
+
                 _state.update {
                     it.copy(
                         pendingRequests = requests,
-                        requestedUris   = requestedUris,
+                        requestedUris   = currentPending,
                     )
                 }
             }
@@ -180,8 +190,8 @@ class DiscoverViewModel @Inject constructor(
     }
 
     /**
-     * Watches the Room content count. When it increases and we had pending requests,
-     * some of them were approved → trigger celebration.
+     * Watches the Room content count. When it increases and we have pending requests,
+     * at least one was approved → trigger celebration.
      */
     private fun observeContentCount(profileId: String) {
         viewModelScope.launch {
@@ -190,7 +200,6 @@ class DiscoverViewModel @Inject constructor(
                 .collect { count ->
                     val prev = previousContentCount
                     if (prev != null && count > prev && pendingUrisSnapshot.isNotEmpty()) {
-                        // New content arrived; at least one pending request was approved
                         _state.update { it.copy(showCelebration = true) }
                         pendingUrisSnapshot.clear()
                     }

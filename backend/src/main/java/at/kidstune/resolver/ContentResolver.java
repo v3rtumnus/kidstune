@@ -122,8 +122,14 @@ public class ContentResolver {
      */
     @Scheduled(cron = "0 0 4 * * *")
     public void reResolveArtistsAndPlaylists() {
-        List<AllowedContent> entries = contentRepo.findByScopeIn(
-                List.of(ContentScope.ARTIST, ContentScope.PLAYLIST));
+        List<AllowedContent> entries;
+        try {
+            entries = contentRepo.findByScopeIn(List.of(ContentScope.ARTIST, ContentScope.PLAYLIST));
+        } catch (Exception e) {
+            log.error("Re-resolution aborted: failed to load ARTIST/PLAYLIST entries from DB: {}",
+                      e.getMessage(), e);
+            return;
+        }
 
         log.info("Re-resolution: {} ARTIST/PLAYLIST entries to process", entries.size());
         for (AllowedContent content : entries) {

@@ -37,22 +37,24 @@ class DiscoverRepository @Inject constructor(
 
     /**
      * Fetches personalised suggestions and applies the already-approved filter.
-     * Returns an empty list on network error (safe to call when offline).
+     * Returns a successful Result with an empty list when offline (suggestions are optional).
+     * Returns a failure Result on unexpected network errors so the UI can show feedback.
      */
-    suspend fun fetchSuggestions(profileId: String): List<DiscoverTile> = runCatching {
+    suspend fun fetchSuggestions(profileId: String): Result<List<DiscoverTile>> = runCatching {
         val approvedUris = contentDao.getExistingUris(profileId).toSet()
         apiClient.fetchSuggestions(profileId)
             .filter { it.spotifyUri !in approvedUris }
             .map { it.toDiscoverTile() }
-    }.getOrDefault(emptyList())
+    }
 
     // ── Search ─────────────────────────────────────────────────────────────────
 
     /**
      * Searches Spotify and applies the already-approved filter.
-     * Returns an empty list on network error.
+     * Returns a failure Result on network error so the UI can distinguish
+     * "no results" from "search unavailable".
      */
-    suspend fun search(profileId: String, q: String, limit: Int = 10): List<DiscoverTile> = runCatching {
+    suspend fun search(profileId: String, q: String, limit: Int = 10): Result<List<DiscoverTile>> = runCatching {
         val approvedUris = contentDao.getExistingUris(profileId).toSet()
         val results = apiClient.searchContent(q, limit)
 
@@ -64,7 +66,7 @@ class DiscoverRepository @Inject constructor(
         results.playlists.forEach{ tiles += it.toDiscoverTile(ContentScope.PLAYLIST) }
 
         tiles.filter { it.spotifyUri !in approvedUris }
-    }.getOrDefault(emptyList())
+    }
 
     // ── Content requests ───────────────────────────────────────────────────────
 

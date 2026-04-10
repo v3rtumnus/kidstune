@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -55,11 +56,10 @@ class SpotifyRemoteManager @Inject constructor(
     override val playerStateFlow: StateFlow<SpotifyPlayerStateInternal?> = _playerStateFlow.asStateFlow()
 
     @Volatile private var remote: SpotifyAppRemote? = null
-    @Volatile private var isConnecting = false
+    private val isConnecting = AtomicBoolean(false)
 
     override fun connect() {
-        if (_isConnected.value || isConnecting) return
-        isConnecting = true
+        if (_isConnected.value || !isConnecting.compareAndSet(false, true)) return
         _connectionError.value = null
 
         val params = ConnectionParams.Builder(CLIENT_ID)
@@ -70,14 +70,14 @@ class SpotifyRemoteManager @Inject constructor(
         SpotifyAppRemote.connect(context, params, object : Connector.ConnectionListener {
             override fun onConnected(spotifyAppRemote: SpotifyAppRemote) {
                 remote = spotifyAppRemote
-                isConnecting = false
+                isConnecting.set(false)
                 _isConnected.value = true
                 Log.i(TAG, "Connected to Spotify")
                 subscribeToPlayerState(spotifyAppRemote)
             }
 
             override fun onFailure(throwable: Throwable) {
-                isConnecting = false
+                isConnecting.set(false)
                 _isConnected.value = false
                 _connectionError.value = throwable.toConnectionError()
                 Log.w(TAG, "Connection failed: ${throwable.message}")
@@ -90,7 +90,7 @@ class SpotifyRemoteManager @Inject constructor(
         remote?.let { SpotifyAppRemote.disconnect(it) }
         remote = null
         _isConnected.value = false
-        isConnecting = false
+        isConnecting.set(false)
     }
 
     private fun subscribeToPlayerState(spotifyAppRemote: SpotifyAppRemote) {

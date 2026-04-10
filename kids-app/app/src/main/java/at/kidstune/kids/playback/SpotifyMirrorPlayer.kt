@@ -57,6 +57,7 @@ class SpotifyMirrorPlayer @Inject constructor(
     // Guarded by the main looper — only written from updateState / clearState.
     private var cachedNowPlaying: NowPlayingState? = null
     private var cachedArtworkData: ByteArray? = null
+    private var cachedArtworkTrackUri: String? = null
     private var positionSnapshotMs = 0L
     private var positionSnapshotTimeMs = 0L
 
@@ -155,7 +156,11 @@ class SpotifyMirrorPlayer @Inject constructor(
      */
     fun updateState(nowPlaying: NowPlayingState, artworkBitmap: Bitmap?) {
         cachedNowPlaying = nowPlaying
-        cachedArtworkData = artworkBitmap?.toJpegBytes()
+        // Only re-encode JPEG when the track (and therefore artwork) actually changed.
+        if (nowPlaying.trackUri != cachedArtworkTrackUri) {
+            cachedArtworkData = artworkBitmap?.toJpegBytes()
+            cachedArtworkTrackUri = nowPlaying.trackUri
+        }
         positionSnapshotMs = nowPlaying.positionMs
         positionSnapshotTimeMs = System.currentTimeMillis()
         invalidateState()
@@ -170,6 +175,7 @@ class SpotifyMirrorPlayer @Inject constructor(
     fun clearState() {
         cachedNowPlaying = null
         cachedArtworkData = null
+        cachedArtworkTrackUri = null
         positionSnapshotMs = 0L
         invalidateState()
     }

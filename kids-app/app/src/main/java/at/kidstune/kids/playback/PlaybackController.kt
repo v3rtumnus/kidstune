@@ -207,13 +207,21 @@ class PlaybackController @Inject constructor(
     private fun startFavoritesAdvancement() {
         scope.launch {
             var lastTrackUri: String? = null
+            var wasPlaying = false
             spotifyRemote.playerStateFlow.collect { state ->
                 state ?: return@collect
-                val queue = favoritesQueue ?: return@collect
+                val queue = favoritesQueue ?: run {
+                    wasPlaying = !state.isPaused
+                    lastTrackUri = state.trackUri
+                    return@collect
+                }
 
-                // Detect end-of-track: track paused at position 0 and was previously playing
+                // Detect end-of-track: same URI, now paused at position 0, was previously playing.
+                // The wasPlaying guard prevents false-positive when a user manually pauses
+                // right at the start of a track (positionMs == 0 but track never played).
                 val currentUri = state.trackUri
-                if (state.isPaused && state.positionMs == 0L && currentUri == lastTrackUri) {
+                if (state.isPaused && state.positionMs == 0L
+                        && currentUri == lastTrackUri && wasPlaying) {
                     val nextIndex = currentFavoriteIndex + 1
                     if (nextIndex < queue.size) {
                         currentFavoriteIndex = nextIndex
@@ -227,6 +235,7 @@ class PlaybackController @Inject constructor(
                     // else { currentFavoriteIndex = 0; spotifyRemote.play(queue[0]) }
                 }
                 lastTrackUri = currentUri
+                wasPlaying = !state.isPaused
             }
         }
     }
@@ -247,8 +256,14 @@ class PlaybackController @Inject constructor(
         val trackUri = state.trackUri ?: return
 
         // We need the context URI (album/playlist) stored in Room via the track
-        val localTrack = trackDao.getByUri(trackUri) ?: return
-        val album = albumDao.getById(localTrack.albumId) ?: return
+        val localTrack = trackDao.getByUri(trackUri) ?: run {
+            Log.w(TAG, "persistPosition: no local track for URI $trackUri – skipping")
+            return
+        }
+        val album = albumDao.getById(localTrack.albumId) ?: run {
+            Log.w(TAG, "persistPosition: no album ${localTrack.albumId} for track $trackUri – skipping")
+            return
+        }
         val trackIndex = trackDao.getIndexByUri(trackUri)
 
         playbackPositionDao.upsert(

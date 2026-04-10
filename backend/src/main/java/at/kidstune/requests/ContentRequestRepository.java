@@ -1,8 +1,10 @@
 package at.kidstune.requests;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,7 +29,23 @@ public interface ContentRequestRepository extends JpaRepository<ContentRequest, 
 
     long countByProfileIdAndStatus(String profileId, ContentRequestStatus status);
 
+    /**
+     * Fetches all PENDING requests for a profile with a pessimistic write lock.
+     * Use inside a @Transactional block to serialize concurrent request creation.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM ContentRequest r WHERE r.profileId = :profileId AND r.status = 'PENDING'")
+    List<ContentRequest> findPendingForUpdate(@Param("profileId") String profileId);
+
     Optional<ContentRequest> findByApproveToken(String approveToken);
+
+    /**
+     * Fetches a request by its approve token with a pessimistic write lock.
+     * Ensures only one concurrent caller can claim and clear the token.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM ContentRequest r WHERE r.approveToken = :token")
+    Optional<ContentRequest> findByApproveTokenForUpdate(@Param("token") String token);
 
     @Query("SELECT r FROM ContentRequest r WHERE r.status = 'PENDING' " +
            "AND r.requestedAt < :cutoff AND r.digestSentAt IS NULL")

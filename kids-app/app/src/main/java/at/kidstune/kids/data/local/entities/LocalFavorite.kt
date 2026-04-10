@@ -33,4 +33,9 @@ data class LocalFavorite(
 
     /** false = queued for upload on next sync; true = confirmed by backend */
     val synced: Boolean = false
-)
+) {
+    companion object {
+        /** Deterministic local ID derived from profile + track URI. */
+        fun idFor(profileId: String, spotifyTrackUri: String) = "fav__${profileId}__${spotifyTrackUri}"
+    }
+}

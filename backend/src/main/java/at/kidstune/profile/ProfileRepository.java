@@ -13,4 +13,6 @@ public interface ProfileRepository extends JpaRepository<ChildProfile, String> {
     boolean existsByFamilyIdAndName(String familyId, String name);
 
     boolean existsByFamilyIdAndNameAndIdNot(String familyId, String name, String id);
+
+    boolean existsByIdAndFamilyId(String id, String familyId);
 }

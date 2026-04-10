@@ -1,8 +1,12 @@
 package at.kidstune.favorites;
 
+import at.kidstune.common.OwnershipService;
+import at.kidstune.common.SecurityUtils;
 import at.kidstune.favorites.dto.AddFavoriteRequest;
 import at.kidstune.favorites.dto.FavoriteResponse;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,19 +25,26 @@ import java.util.List;
 @RequestMapping("/api/v1/profiles/{profileId}/favorites")
 public class FavoritesController {
 
-    private final FavoriteService          favoriteService;
+    private static final Logger log = LoggerFactory.getLogger(FavoritesController.class);
+
+    private final FavoriteService           favoriteService;
     private final SpotifyFavoriteSyncService spotifySyncService;
+    private final OwnershipService           ownershipService;
 
     public FavoritesController(FavoriteService favoriteService,
-                                SpotifyFavoriteSyncService spotifySyncService) {
-        this.favoriteService   = favoriteService;
+                                SpotifyFavoriteSyncService spotifySyncService,
+                                OwnershipService ownershipService) {
+        this.favoriteService    = favoriteService;
         this.spotifySyncService = spotifySyncService;
+        this.ownershipService   = ownershipService;
     }
 
     @GetMapping
     public Mono<ResponseEntity<List<FavoriteResponse>>> list(@PathVariable String profileId) {
-        return Mono.fromCallable(() -> favoriteService.listFavorites(profileId))
-                .subscribeOn(Schedulers.boundedElastic())
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId))
+                .then(Mono.fromCallable(() -> favoriteService.listFavorites(profileId))
+                        .subscribeOn(Schedulers.boundedElastic()))
                 .map(ResponseEntity::ok);
     }
 
@@ -42,13 +53,14 @@ public class FavoritesController {
             @PathVariable String profileId,
             @Valid @RequestBody AddFavoriteRequest req) {
 
-        return Mono.fromCallable(() -> favoriteService.addFavorite(profileId, req))
-                .subscribeOn(Schedulers.boundedElastic())
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId))
+                .then(Mono.fromCallable(() -> favoriteService.addFavorite(profileId, req))
+                        .subscribeOn(Schedulers.boundedElastic()))
                 .doOnSuccess(saved ->
-                        // Fire-and-forget Spotify mirror
                         spotifySyncService.mirrorAdd(profileId, req.spotifyTrackUri())
                                 .subscribeOn(Schedulers.boundedElastic())
-                                .subscribe()
+                                .subscribe(null, e -> log.warn("Spotify mirror-add failed for profile {}: {}", profileId, e.getMessage()))
                 )
                 .map(saved -> ResponseEntity.status(HttpStatus.CREATED).body(saved));
     }
@@ -58,12 +70,16 @@ public class FavoritesController {
             @PathVariable String profileId,
             @PathVariable String trackUri) {
 
-        return Mono.fromCallable(() -> { favoriteService.removeFavorite(profileId, trackUri); return trackUri; })
-                .subscribeOn(Schedulers.boundedElastic())
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId))
+                .then(Mono.fromCallable(() -> {
+                            favoriteService.removeFavorite(profileId, trackUri);
+                            return trackUri;
+                        }).subscribeOn(Schedulers.boundedElastic()))
                 .doOnSuccess(uri ->
                         spotifySyncService.mirrorRemove(profileId, uri)
                                 .subscribeOn(Schedulers.boundedElastic())
-                                .subscribe()
+                                .subscribe(null, e -> log.warn("Spotify mirror-remove failed for profile {}: {}", profileId, e.getMessage()))
                 )
                 .thenReturn(ResponseEntity.<Void>noContent().build());
     }

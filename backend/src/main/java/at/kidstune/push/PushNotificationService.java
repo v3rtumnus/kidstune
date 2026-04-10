@@ -3,18 +3,20 @@ package at.kidstune.push;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
 import at.kidstune.requests.ContentRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import org.apache.http.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Sends Web Push notifications to all registered browser subscriptions for a family.
@@ -29,19 +31,19 @@ public class PushNotificationService {
     private final PushSubscriptionRepository subRepository;
     private final ProfileRepository          profileRepository;
     private final PushService                pushService;
+    private final ObjectMapper               objectMapper;
 
     @Value("${kidstune.base-url}")
     private String baseUrl;
 
     public PushNotificationService(PushSubscriptionRepository subRepository,
                                    ProfileRepository profileRepository,
-                                   @Qualifier("vapidPublicKeyString")  String vapidPublicKeyString,
-                                   @Qualifier("vapidPrivateKeyString") String vapidPrivateKeyString)
-            throws Exception {
-        this.subRepository    = subRepository;
+                                   PushService pushService,
+                                   ObjectMapper objectMapper) {
+        this.subRepository     = subRepository;
         this.profileRepository = profileRepository;
-        this.pushService      = new PushService(vapidPublicKeyString, vapidPrivateKeyString,
-                                                "mailto:push@kidstune.at");
+        this.pushService       = pushService;
+        this.objectMapper      = objectMapper;
     }
 
     /**
@@ -91,18 +93,20 @@ public class PushNotificationService {
         }
     }
 
-    private String buildPayload(String childName, String title) {
-        // Build JSON manually to avoid injecting ObjectMapper into this service.
-        String safeChild = escape(childName);
-        String safeTitle = escape(title);
-        String safeUrl   = escape(baseUrl + "/web/requests");
-        return "{\"title\":\"Neuer Musikwunsch\",\"body\":\"" + safeChild
-                + " m\u00F6chte \u201E" + safeTitle + "\u201C\",\"url\":\"" + safeUrl + "\"}";
-    }
-
-    /** Minimal JSON string escaping (backslash and double-quote). */
-    private static String escape(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    String buildPayload(String childName, String title) {
+        String body = (childName != null ? childName : "Ein Kind")
+                + " möchte \u201E" + (title != null ? title : "") + "\u201C";
+        Map<String, String> payload = Map.of(
+                "title", "Neuer Musikwunsch",
+                "body",  body,
+                "url",   baseUrl + "/web/requests"
+        );
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            // Should never happen with a plain Map<String,String>
+            log.error("Failed to serialize push payload", e);
+            return "{\"title\":\"Neuer Musikwunsch\"}";
+        }
     }
 }

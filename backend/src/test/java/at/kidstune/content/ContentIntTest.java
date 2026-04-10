@@ -369,6 +369,63 @@ class ContentIntTest extends AbstractIntTest {
                 .expectStatus().isUnauthorized();
     }
 
+    /**
+     * T1 – Cross-family isolation: a parent may NOT read or write content that belongs
+     * to a profile in a different family.  The endpoint must return 404 (not 403, to
+     * avoid information leakage about whether the profile exists at all).
+     */
+    @Test
+    void get_content_for_other_family_profile_returns_404() {
+        // Arrange – second family + profile
+        String otherFamilyId  = UUID.randomUUID().toString();
+        String otherProfileId = UUID.randomUUID().toString();
+
+        Family otherFamily = new Family();
+        otherFamily.setId(otherFamilyId);
+        otherFamily.setEmail("other-" + otherFamilyId + "@kidstune.test");
+        otherFamily.setPasswordHash("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
+        familyRepository.save(otherFamily);
+
+        ChildProfile otherProfile = new ChildProfile();
+        otherProfile.setId(otherProfileId);
+        otherProfile.setFamilyId(otherFamilyId);
+        otherProfile.setName("OtherKid");
+        otherProfile.setAvatarIcon(AvatarIcon.BUNNY);
+        otherProfile.setAvatarColor(AvatarColor.BLUE);
+        otherProfile.setAgeGroup(AgeGroup.SCHOOL);
+        profileRepository.save(otherProfile);
+
+        // Act – use FAMILY_ID's token to list otherFamily's profile content
+        client.get().uri("/api/v1/profiles/{id}/content", otherProfileId)
+                .header("Authorization", "Bearer " + parentToken)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void post_content_for_other_family_profile_returns_404() {
+        String otherFamilyId  = UUID.randomUUID().toString();
+        String otherProfileId = UUID.randomUUID().toString();
+
+        Family otherFamily = new Family();
+        otherFamily.setId(otherFamilyId);
+        otherFamily.setEmail("other2-" + otherFamilyId + "@kidstune.test");
+        otherFamily.setPasswordHash("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
+        familyRepository.save(otherFamily);
+
+        ChildProfile otherProfile = new ChildProfile();
+        otherProfile.setId(otherProfileId);
+        otherProfile.setFamilyId(otherFamilyId);
+        otherProfile.setName("OtherKid2");
+        otherProfile.setAvatarIcon(AvatarIcon.BUNNY);
+        otherProfile.setAvatarColor(AvatarColor.PINK);
+        otherProfile.setAgeGroup(AgeGroup.SCHOOL);
+        profileRepository.save(otherProfile);
+
+        postContent(otherProfileId, trackRequest("spotify:track:steal", "Steal This"))
+                .expectStatus().isNotFound();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private WebTestClient.ResponseSpec postContent(String profileId, AddContentRequest body) {

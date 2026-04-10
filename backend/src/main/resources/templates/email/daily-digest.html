@@ -43,7 +43,7 @@
                      th:text="${entry.request().title}"></p>
                   <p style="margin:0;color:#6c757d;font-size:13px;">
                     <span th:text="${entry.emoji}"></span>
-                    <span th:text="${entry.profile() != null ? entry.profile().name : ''}"></span>
+                    <span th:text="${entry.childName()}"></span>
                   </p>
                 </td>
                 <td style="vertical-align:middle;text-align:right;white-space:nowrap;padding-left:12px;">

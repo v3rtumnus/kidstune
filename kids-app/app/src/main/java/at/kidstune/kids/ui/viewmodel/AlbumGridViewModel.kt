@@ -20,7 +20,8 @@ import javax.inject.Inject
 data class AlbumGridState(
     val contentEntry: LocalContentEntry? = null,
     val albums: List<LocalAlbum>         = emptyList(),
-    val pages: List<List<LocalAlbum>>    = emptyList()
+    val pages: List<List<LocalAlbum>>    = emptyList(),
+    val navigation: AlbumGridNavigation? = null,
 ) {
     val totalPages: Int get() = pages.size
 }
@@ -52,9 +53,6 @@ class AlbumGridViewModel @Inject constructor(
     private val _state = MutableStateFlow(AlbumGridState())
     val state: StateFlow<AlbumGridState> = _state.asStateFlow()
 
-    private val _navigation = MutableStateFlow<AlbumGridNavigation?>(null)
-    val navigation: StateFlow<AlbumGridNavigation?> = _navigation.asStateFlow()
-
     init {
         viewModelScope.launch {
             val entry = contentRepository.getById(contentEntryId)
@@ -73,7 +71,7 @@ class AlbumGridViewModel @Inject constructor(
     fun onIntent(intent: AlbumGridIntent) {
         when (intent) {
             is AlbumGridIntent.AlbumTapped    -> handleAlbumTapped(intent.albumId)
-            AlbumGridIntent.NavigationHandled -> _navigation.value = null
+            AlbumGridIntent.NavigationHandled -> _state.update { it.copy(navigation = null) }
         }
     }
 
@@ -83,10 +81,10 @@ class AlbumGridViewModel @Inject constructor(
             if (album.contentType == ContentType.MUSIC) {
                 // Music: play immediately from track 1 and go to player
                 playbackController.playAlbumFromStart(album.spotifyAlbumUri)
-                _navigation.value = AlbumGridNavigation.ToNowPlaying
+                _state.update { it.copy(navigation = AlbumGridNavigation.ToNowPlaying) }
             } else {
                 // Audiobook: show chapter list for deliberate chapter selection
-                _navigation.value = AlbumGridNavigation.ToChapterList(albumId)
+                _state.update { it.copy(navigation = AlbumGridNavigation.ToChapterList(albumId)) }
             }
         }
     }

@@ -1,5 +1,6 @@
 package at.kidstune.spotify;
 
+import at.kidstune.common.OwnershipService;
 import at.kidstune.common.SecurityUtils;
 import at.kidstune.config.RequestThrottleService;
 import at.kidstune.spotify.dto.SearchResultsResponse;
@@ -30,13 +31,16 @@ public class SpotifyProxyController {
     private final SpotifySearchService      searchService;
     private final SpotifySuggestionsService suggestionsService;
     private final RequestThrottleService    throttle;
+    private final OwnershipService          ownershipService;
 
     public SpotifyProxyController(SpotifySearchService searchService,
                                   SpotifySuggestionsService suggestionsService,
-                                  RequestThrottleService throttle) {
+                                  RequestThrottleService throttle,
+                                  OwnershipService ownershipService) {
         this.searchService      = searchService;
         this.suggestionsService = suggestionsService;
         this.throttle           = throttle;
+        this.ownershipService   = ownershipService;
     }
 
     /**
@@ -74,7 +78,8 @@ public class SpotifyProxyController {
     public Mono<ResponseEntity<List<SpotifyItemDto>>> suggestions(
             @RequestParam("profileId") String profileId) {
         return SecurityUtils.getFamilyId()
-            .flatMap(familyId -> suggestionsService.getSuggestions(familyId, profileId))
+            .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId)
+                .then(suggestionsService.getSuggestions(familyId, profileId)))
             .map(ResponseEntity::ok);
     }
 }

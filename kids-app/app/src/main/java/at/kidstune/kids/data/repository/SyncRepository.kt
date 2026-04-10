@@ -78,7 +78,7 @@ class SyncRepository @Inject constructor(
             payload.favoritesAdded.forEach { dto ->
                 db.favoriteDao().insert(
                     LocalFavorite(
-                        id              = "fav__${profileId}__${dto.spotifyTrackUri}",
+                        id              = LocalFavorite.idFor(profileId, dto.spotifyTrackUri),
                         profileId       = profileId,
                         spotifyTrackUri = dto.spotifyTrackUri,
                         title           = dto.trackTitle,
@@ -133,7 +133,7 @@ class SyncRepository @Inject constructor(
             payload.favorites.forEach { dto ->
                 db.favoriteDao().insert(
                     LocalFavorite(
-                        id              = "fav__${profileId}__${dto.spotifyTrackUri}",
+                        id              = LocalFavorite.idFor(profileId, dto.spotifyTrackUri),
                         profileId       = profileId,
                         spotifyTrackUri = dto.spotifyTrackUri,
                         title           = dto.trackTitle,

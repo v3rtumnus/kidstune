@@ -1,5 +1,7 @@
 package at.kidstune.content;
 
+import at.kidstune.common.OwnershipService;
+import at.kidstune.common.SecurityUtils;
 import at.kidstune.content.dto.AddContentRequest;
 import at.kidstune.content.dto.BulkAddContentRequest;
 import at.kidstune.content.dto.ContentCheckResponse;
@@ -23,10 +25,12 @@ import java.util.List;
 @RestController
 public class ContentController {
 
-    private final ContentService contentService;
+    private final ContentService    contentService;
+    private final OwnershipService  ownershipService;
 
-    public ContentController(ContentService contentService) {
-        this.contentService = contentService;
+    public ContentController(ContentService contentService, OwnershipService ownershipService) {
+        this.contentService   = contentService;
+        this.ownershipService = ownershipService;
     }
 
     // ── GET /api/v1/profiles/{profileId}/content ──────────────────────────────
@@ -38,7 +42,9 @@ public class ContentController {
             @RequestParam(required = false) ContentScope scope,
             @RequestParam(required = false) String search) {
 
-        return contentService.listContent(profileId, type, scope, search)
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId))
+                .then(contentService.listContent(profileId, type, scope, search))
                 .map(ResponseEntity::ok);
     }
 
@@ -49,7 +55,9 @@ public class ContentController {
             @PathVariable String profileId,
             @RequestBody @Valid AddContentRequest request) {
 
-        return contentService.addContent(profileId, request)
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId))
+                .then(contentService.addContent(profileId, request))
                 .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(r));
     }
 
@@ -59,7 +67,9 @@ public class ContentController {
     public Mono<ResponseEntity<List<ContentResponse>>> addBulk(
             @RequestBody @Valid BulkAddContentRequest request) {
 
-        return contentService.addContentBulk(request)
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireAllProfilesOwnership(request.profileIds(), familyId))
+                .then(contentService.addContentBulk(request))
                 .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(r));
     }
 
@@ -69,7 +79,14 @@ public class ContentController {
     public Mono<ResponseEntity<ImportContentResponse>> importContent(
             @RequestBody @Valid ImportContentRequest request) {
 
-        return contentService.importContent(request)
+        List<String> allProfileIds = request.items().stream()
+                .flatMap(item -> item.profileIds().stream())
+                .distinct()
+                .toList();
+
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireAllProfilesOwnership(allProfileIds, familyId))
+                .then(contentService.importContent(request))
                 .map(r -> ResponseEntity.status(HttpStatus.CREATED).body(r));
     }
 
@@ -80,7 +97,9 @@ public class ContentController {
             @PathVariable String profileId,
             @PathVariable String id) {
 
-        return contentService.removeContent(profileId, id)
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId))
+                .then(contentService.removeContent(profileId, id))
                 .thenReturn(ResponseEntity.<Void>noContent().build());
     }
 
@@ -91,7 +110,9 @@ public class ContentController {
             @PathVariable String profileId,
             @PathVariable String spotifyUri) {
 
-        return contentService.checkContent(profileId, spotifyUri)
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId))
+                .then(contentService.checkContent(profileId, spotifyUri))
                 .map(ResponseEntity::ok);
     }
 }

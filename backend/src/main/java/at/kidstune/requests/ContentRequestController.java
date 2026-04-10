@@ -1,5 +1,7 @@
 package at.kidstune.requests;
 
+import at.kidstune.common.OwnershipService;
+import at.kidstune.common.SecurityUtils;
 import at.kidstune.config.RequestThrottleService;
 import at.kidstune.requests.dto.ApproveRequestBody;
 import at.kidstune.requests.dto.BulkApproveRequest;
@@ -27,11 +29,14 @@ public class ContentRequestController {
 
     private final ContentRequestService requestService;
     private final RequestThrottleService throttle;
+    private final OwnershipService       ownershipService;
 
     public ContentRequestController(ContentRequestService requestService,
-                                    RequestThrottleService throttle) {
-        this.requestService = requestService;
-        this.throttle       = throttle;
+                                    RequestThrottleService throttle,
+                                    OwnershipService ownershipService) {
+        this.requestService  = requestService;
+        this.throttle        = throttle;
+        this.ownershipService = ownershipService;
     }
 
     // ── POST /api/v1/profiles/{profileId}/content-requests (KIDS + PARENT) ────
@@ -39,18 +44,19 @@ public class ContentRequestController {
     @PostMapping("/api/v1/profiles/{profileId}/content-requests")
     public Mono<ResponseEntity<ContentRequestResponse>> createRequest(
             @PathVariable String profileId,
-            @RequestBody @Valid CreateContentRequestDto body,
-            @AuthenticationPrincipal String familyId) {
+            @RequestBody @Valid CreateContentRequestDto body) {
 
         throttle.checkRequestLimit(profileId); // throws RateLimitExceededException if over limit
 
-        return requestService.createRequest(
+        return SecurityUtils.getFamilyId()
+                .flatMap(familyId -> ownershipService.requireProfileOwnership(profileId, familyId))
+                .then(requestService.createRequest(
                         profileId,
                         body.spotifyUri(),
                         body.title(),
                         body.contentType(),
                         body.imageUrl(),
-                        body.artistName())
+                        body.artistName()))
                 .map(r -> ResponseEntity
                         .status(HttpStatus.CREATED)
                         .body(ContentRequestResponse.from(r)));

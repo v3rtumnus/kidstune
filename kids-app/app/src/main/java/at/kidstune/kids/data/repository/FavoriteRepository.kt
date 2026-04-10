@@ -44,7 +44,7 @@ class FavoriteRepository @Inject constructor(
         } else {
             favoriteDao.insert(
                 LocalFavorite(
-                    id              = "fav__${profileId}__${track.spotifyTrackUri}",
+                    id              = LocalFavorite.idFor(profileId, track.spotifyTrackUri),
                     profileId       = profileId,
                     spotifyTrackUri = track.spotifyTrackUri,
                     title           = track.title,

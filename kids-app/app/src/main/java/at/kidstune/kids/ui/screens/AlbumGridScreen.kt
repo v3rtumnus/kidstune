@@ -53,11 +53,10 @@ fun AlbumGridScreen(
     onNavigateToChapterList: (albumId: String) -> Unit = {},
     onNavigateToNowPlaying: () -> Unit = {}
 ) {
-    val state      by viewModel.state.collectAsState()
-    val navigation by viewModel.navigation.collectAsState()
+    val state by viewModel.state.collectAsState()
 
-    LaunchedEffect(navigation) {
-        when (val nav = navigation) {
+    LaunchedEffect(state.navigation) {
+        when (val nav = state.navigation) {
             is AlbumGridNavigation.ToChapterList -> {
                 onNavigateToChapterList(nav.albumId)
                 viewModel.onIntent(AlbumGridIntent.NavigationHandled)

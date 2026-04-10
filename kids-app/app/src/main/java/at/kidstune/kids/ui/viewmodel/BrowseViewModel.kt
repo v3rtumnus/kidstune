@@ -40,7 +40,9 @@ data class BrowseState(
     val pages: List<List<LocalContentEntry>>         = emptyList(),
     val favorites: List<LocalFavorite>               = emptyList(),
     val favoritesPages: List<List<LocalFavorite>>    = emptyList(),
-    val navigation: BrowseNavigation?                = null
+    val navigation: BrowseNavigation?                = null,
+    /** True when a tap-to-play failed because Spotify is not connected. */
+    val playbackError: Boolean                       = false,
 ) {
     val totalPages: Int get() = if (category == BrowseCategory.FAVORITES) favoritesPages.size else pages.size
 }
@@ -51,6 +53,7 @@ sealed interface BrowseIntent {
     data class TileTapped(val entry: LocalContentEntry) : BrowseIntent
     data class FavoriteTapped(val favorite: LocalFavorite) : BrowseIntent
     data object NavigationHandled : BrowseIntent
+    data object DismissPlaybackError : BrowseIntent
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -105,9 +108,10 @@ class BrowseViewModel @Inject constructor(
 
     fun onIntent(intent: BrowseIntent) {
         when (intent) {
-            is BrowseIntent.TileTapped      -> handleTileTapped(intent.entry)
-            is BrowseIntent.FavoriteTapped  -> handleFavoriteTapped(intent.favorite)
-            BrowseIntent.NavigationHandled  -> _state.update { it.copy(navigation = null) }
+            is BrowseIntent.TileTapped        -> handleTileTapped(intent.entry)
+            is BrowseIntent.FavoriteTapped    -> handleFavoriteTapped(intent.favorite)
+            BrowseIntent.NavigationHandled    -> _state.update { it.copy(navigation = null) }
+            BrowseIntent.DismissPlaybackError -> _state.update { it.copy(playbackError = false) }
         }
     }
 
@@ -125,9 +129,13 @@ class BrowseViewModel @Inject constructor(
 
                 ContentScope.TRACK -> {
                     // Single track: play directly as a bare URI (similar to favorites)
-                    try {
+                    val played = runCatching {
                         playbackController.spotifyRemote.play(entry.spotifyUri)
-                    } catch (_: Exception) { }
+                    }
+                    if (played.isFailure) {
+                        _state.update { it.copy(playbackError = true) }
+                        return@launch
+                    }
                     BrowseNavigation.ToNowPlaying
                 }
             }

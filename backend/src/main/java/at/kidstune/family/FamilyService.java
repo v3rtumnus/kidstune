@@ -1,8 +1,10 @@
 package at.kidstune.family;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class FamilyService {
@@ -23,8 +25,14 @@ public class FamilyService {
      * @return the new family's ID
      * @throws DuplicateEmailException if the e-mail is already in use
      */
+    private static final java.util.regex.Pattern EMAIL_PATTERN =
+            java.util.regex.Pattern.compile("^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$");
+
     @Transactional
     public String register(String email, String password) {
+        if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid email address");
+        }
         if (familyRepository.findByEmail(email).isPresent()) {
             throw new DuplicateEmailException();
         }
