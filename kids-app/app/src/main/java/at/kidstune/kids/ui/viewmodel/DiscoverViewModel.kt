@@ -30,6 +30,8 @@ data class DiscoverState(
     val isSearching: Boolean = false,
     val rateLimitMessage: String? = null,
     val showCelebration: Boolean = false,
+    /** URIs approved since the last sync — used to highlight tiles in the Discover grid. */
+    val newlyApprovedUris: Set<String> = emptySet(),
     /** True when the most recent search call failed due to a network or server error. */
     val searchError: Boolean = false,
     /** True when suggestions could not be loaded (network unavailable). */
