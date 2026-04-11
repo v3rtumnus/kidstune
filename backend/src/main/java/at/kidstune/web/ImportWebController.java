@@ -81,9 +81,20 @@ public class ImportWebController {
 
     @PostMapping("/web/import/suggestions")
     public Mono<String> loadSuggestions(
-            @RequestParam(value = "profileIds", required = false) List<String> profileIds,
             Model model,
-            @AuthenticationPrincipal String familyId) {
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
+
+        return exchange.getFormData().flatMap(form -> {
+            List<String> profileIds = form.get("profileIds");
+            return loadSuggestionsInternal(profileIds, model, familyId);
+        });
+    }
+
+    private Mono<String> loadSuggestionsInternal(
+            List<String> profileIds,
+            Model model,
+            String familyId) {
 
         if (profileIds == null || profileIds.isEmpty()) {
             model.addAttribute("noProfilesSelected", true);
@@ -139,10 +150,21 @@ public class ImportWebController {
 
     @PostMapping("/web/import")
     public Mono<Void> executeImport(
-            @RequestParam(value = "itemsJson",     required = false) String itemsJson,
-            @RequestParam(value = "allProfileIds", required = false) List<String> allProfileIds,
             ServerWebExchange exchange,
             @AuthenticationPrincipal String familyId) {
+
+        return exchange.getFormData().flatMap(form -> {
+            String       itemsJson    = form.getFirst("itemsJson");
+            List<String> allProfileIds = form.get("allProfileIds");
+            return executeImportInternal(itemsJson, allProfileIds, exchange, familyId);
+        });
+    }
+
+    private Mono<Void> executeImportInternal(
+            String itemsJson,
+            List<String> allProfileIds,
+            ServerWebExchange exchange,
+            String familyId) {
 
         return Mono.fromCallable(() -> buildImportRequest(itemsJson, familyId))
                 .subscribeOn(Schedulers.boundedElastic())

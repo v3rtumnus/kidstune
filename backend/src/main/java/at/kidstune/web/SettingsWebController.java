@@ -82,24 +82,27 @@ public class SettingsWebController {
 
     @PostMapping
     public Mono<String> saveSettings(
-            @RequestParam("notificationEmails") String notificationEmails,
             Model model,
-            @AuthenticationPrincipal String familyId) {
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
 
-        return Mono.fromCallable(() -> {
-            String trimmed = notificationEmails == null ? "" : notificationEmails.strip();
-            Family family = familyRepository.findById(familyId).orElseThrow();
-            family.setNotificationEmails(trimmed.isEmpty() ? null : trimmed);
-            familyRepository.save(family);
+        return exchange.getFormData().flatMap(form -> {
+            String notificationEmails = form.getFirst("notificationEmails");
+            return Mono.fromCallable(() -> {
+                String trimmed = notificationEmails == null ? "" : notificationEmails.strip();
+                Family family = familyRepository.findById(familyId).orElseThrow();
+                family.setNotificationEmails(trimmed.isEmpty() ? null : trimmed);
+                familyRepository.save(family);
 
-            model.addAttribute("notificationEmails", trimmed);
-            model.addAttribute("familyId", familyId);
-            model.addAttribute("saved", true);
-            model.addAttribute("spotifyConnected", family.getSpotifyUserId() != null);
-            model.addAttribute("spotifyUserId",    family.getSpotifyUserId());
-            model.addAttribute("spotifyJustConnected", false);
-            return "web/settings";
-        }).subscribeOn(Schedulers.boundedElastic());
+                model.addAttribute("notificationEmails", trimmed);
+                model.addAttribute("familyId", familyId);
+                model.addAttribute("saved", true);
+                model.addAttribute("spotifyConnected", family.getSpotifyUserId() != null);
+                model.addAttribute("spotifyUserId",    family.getSpotifyUserId());
+                model.addAttribute("spotifyJustConnected", false);
+                return "web/settings";
+            }).subscribeOn(Schedulers.boundedElastic());
+        });
     }
 
     // ── GET /web/settings/connect-spotify ────────────────────────────────────

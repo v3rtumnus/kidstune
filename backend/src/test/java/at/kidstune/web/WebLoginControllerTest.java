@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.test.StepVerifier;
@@ -58,10 +59,11 @@ class WebLoginControllerTest {
                 .thenReturn("family-001");
 
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/login").build());
+                MockServerHttpRequest.post("/web/login")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("email=user%40example.com&password=secret123"));
 
-        StepVerifier.create(controller.processLogin(
-                        "user@example.com", "secret123", false, exchange))
+        StepVerifier.create(controller.processLogin(exchange))
                 .verifyComplete();
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
@@ -81,10 +83,11 @@ class WebLoginControllerTest {
                 .thenThrow(new InvalidCredentialsException());
 
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/login").build());
+                MockServerHttpRequest.post("/web/login")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("email=bad%40example.com&password=wrong"));
 
-        StepVerifier.create(controller.processLogin(
-                        "bad@example.com", "wrong", false, exchange))
+        StepVerifier.create(controller.processLogin(exchange))
                 .verifyComplete();
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
@@ -100,14 +103,15 @@ class WebLoginControllerTest {
                 .thenReturn("family-002");
 
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/login").build());
+                MockServerHttpRequest.post("/web/login")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("email=user%40example.com&password=pass1234"));
 
         // Simulate entry point having saved the original URL
         exchange.getSession().subscribe(session ->
                 session.getAttributes().put(WebLoginController.SESSION_LOGIN_REDIRECT, "/web/settings"));
 
-        StepVerifier.create(controller.processLogin(
-                        "user@example.com", "pass1234", false, exchange))
+        StepVerifier.create(controller.processLogin(exchange))
                 .verifyComplete();
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
@@ -135,10 +139,11 @@ class WebLoginControllerTest {
         org.springframework.ui.Model model =
                 new org.springframework.ui.ExtendedModelMap();
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/register").build());
+                MockServerHttpRequest.post("/web/register")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("email=a%40b.de&password=password1&confirmPassword=password2"));
 
-        StepVerifier.create(controller.processRegister(
-                        "a@b.de", "password1", "password2", model, exchange))
+        StepVerifier.create(controller.processRegister(model, exchange))
                 .expectNext("web/register")
                 .verifyComplete();
 
@@ -151,10 +156,11 @@ class WebLoginControllerTest {
         org.springframework.ui.Model model =
                 new org.springframework.ui.ExtendedModelMap();
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/register").build());
+                MockServerHttpRequest.post("/web/register")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("email=a%40b.de&password=short&confirmPassword=short"));
 
-        StepVerifier.create(controller.processRegister(
-                        "a@b.de", "short", "short", model, exchange))
+        StepVerifier.create(controller.processRegister(model, exchange))
                 .expectNext("web/register")
                 .verifyComplete();
 

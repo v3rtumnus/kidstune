@@ -11,7 +11,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -55,25 +54,26 @@ public class WebLoginController {
     // ── POST /web/login ──────────────────────────────────────────────────────
 
     @PostMapping("/login")
-    public Mono<Void> processLogin(
-            @RequestParam("email")      String  email,
-            @RequestParam("password")   String  password,
-            @RequestParam(value = "rememberMe", defaultValue = "false") boolean rememberMe,
-            ServerWebExchange exchange) {
+    public Mono<Void> processLogin(ServerWebExchange exchange) {
+        return exchange.getFormData().flatMap(form -> {
+            String  email      = form.getFirst("email");
+            String  password   = form.getFirst("password");
+            boolean rememberMe = "true".equalsIgnoreCase(form.getFirst("rememberMe"));
 
-        return Mono.fromCallable(() -> familyService.authenticate(email, password))
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(familyId -> exchange.getSession().flatMap(session -> {
-                    session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
+            return Mono.fromCallable(() -> familyService.authenticate(email, password))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(familyId -> exchange.getSession().flatMap(session -> {
+                        session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
 
-                    if (rememberMe) {
-                        return issueRememberMeCookie(exchange, familyId);
-                    }
-                    return Mono.empty();
-                }))
-                .then(redirectAfterLogin(exchange))
-                .onErrorResume(InvalidCredentialsException.class, e ->
-                        renderLoginError(exchange, "E-Mail oder Passwort falsch"));
+                        if (rememberMe) {
+                            return issueRememberMeCookie(exchange, familyId);
+                        }
+                        return Mono.empty();
+                    }))
+                    .then(redirectAfterLogin(exchange))
+                    .onErrorResume(InvalidCredentialsException.class, e ->
+                            renderLoginError(exchange, "E-Mail oder Passwort falsch"));
+        });
     }
 
     // ── GET /web/register ────────────────────────────────────────────────────
@@ -87,38 +87,40 @@ public class WebLoginController {
     // ── POST /web/register ───────────────────────────────────────────────────
 
     @PostMapping("/register")
-    public Mono<Object> processRegister(
-            @RequestParam("email")           String email,
-            @RequestParam("password")        String password,
-            @RequestParam("confirmPassword") String confirmPassword,
-            Model model,
-            ServerWebExchange exchange) {
+    public Mono<Object> processRegister(Model model, ServerWebExchange exchange) {
+        return exchange.getFormData().flatMap(form -> {
+            String email           = form.getFirst("email");
+            String password        = form.getFirst("password");
+            String confirmPassword = form.getFirst("confirmPassword");
 
-        // ── Validate input ────────────────────────────────────────────────────
-        String emailError    = validateEmail(email);
-        String passwordError = validatePassword(password, confirmPassword);
+            // ── Validate input ────────────────────────────────────────────────────
+            String emailError    = validateEmail(email);
+            String passwordError = validatePassword(password, confirmPassword);
 
-        if (emailError != null || passwordError != null) {
-            model.addAttribute("email", email);
-            model.addAttribute("emailError", emailError);
-            model.addAttribute("passwordError", passwordError);
-            return Mono.just("web/register");
-        }
+            if (emailError != null || passwordError != null) {
+                model.addAttribute("email", email);
+                model.addAttribute("emailError", emailError);
+                model.addAttribute("passwordError", passwordError);
+                return Mono.just((Object) "web/register");
+            }
 
-        return Mono.fromCallable(() -> familyService.register(email, password))
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(familyId -> exchange.getSession().flatMap(session -> {
-                    session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
-                    exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-                    exchange.getResponse().getHeaders().setLocation(URI.create("/web/dashboard"));
-                    return exchange.getResponse().setComplete();
-                }))
-                .cast(Object.class)
-                .onErrorResume(DuplicateEmailException.class, e -> {
-                    model.addAttribute("email", email);
-                    model.addAttribute("emailError", "E-Mail bereits vergeben");
-                    return Mono.just("web/register");
-                });
+            final String finalEmail    = email;
+            final String finalPassword = password;
+            return Mono.fromCallable(() -> familyService.register(finalEmail, finalPassword))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(familyId -> exchange.getSession().flatMap(session -> {
+                        session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
+                        exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+                        exchange.getResponse().getHeaders().setLocation(URI.create("/web/dashboard"));
+                        return exchange.getResponse().setComplete();
+                    }))
+                    .cast(Object.class)
+                    .onErrorResume(DuplicateEmailException.class, e -> {
+                        model.addAttribute("email", finalEmail);
+                        model.addAttribute("emailError", "E-Mail bereits vergeben");
+                        return Mono.just("web/register");
+                    });
+        });
     }
 
     // ── POST /web/logout ─────────────────────────────────────────────────────

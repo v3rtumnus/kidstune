@@ -76,6 +76,9 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("io.projectreactor:reactor-test")
+
+    // E2E browser tests (Playwright Java)
+    testImplementation("com.microsoft.playwright:playwright:1.46.0")
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

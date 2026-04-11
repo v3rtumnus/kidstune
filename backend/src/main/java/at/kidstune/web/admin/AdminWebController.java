@@ -160,51 +160,55 @@ public class AdminWebController {
     @PostMapping("/profiles/{id}")
     public Mono<String> updateProfile(
             @PathVariable("id") String id,
-            @RequestParam("name") String name,
-            @RequestParam("avatarIcon") AvatarIcon avatarIcon,
-            @RequestParam("avatarColor") AvatarColor avatarColor,
-            @RequestParam("ageGroup") AgeGroup ageGroup,
             Model model,
-            @AuthenticationPrincipal String familyId) {
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
 
-        String trimmedName = name == null ? "" : name.strip();
-        if (trimmedName.isEmpty() || trimmedName.length() > 100) {
+        return exchange.getFormData().flatMap(form -> {
+            String      name        = form.getFirst("name");
+            AvatarIcon  avatarIcon  = parseEnum(AvatarIcon.class,  form.getFirst("avatarIcon"));
+            AvatarColor avatarColor = parseEnum(AvatarColor.class, form.getFirst("avatarColor"));
+            AgeGroup    ageGroup    = parseEnum(AgeGroup.class,    form.getFirst("ageGroup"));
+
+            String trimmedName = name == null ? "" : name.strip();
+            if (trimmedName.isEmpty() || trimmedName.length() > 100) {
+                return Mono.fromCallable(() -> {
+                    ChildProfile profile = profileRepository.findById(id)
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+                    model.addAttribute("profile",      profile);
+                    model.addAttribute("profileId",    id);
+                    model.addAttribute("avatarIcons",  AvatarIcon.values());
+                    model.addAttribute("avatarColors", AvatarColor.values());
+                    model.addAttribute("ageGroups",    AgeGroup.values());
+                    model.addAttribute("avatarHelper", avatarHelper);
+                    model.addAttribute("familyId",     familyId);
+                    model.addAttribute("nameError",    "Name muss zwischen 1 und 100 Zeichen lang sein.");
+                    return "web/admin/profiles-edit";
+                }).subscribeOn(Schedulers.boundedElastic());
+            }
+
             return Mono.fromCallable(() -> {
+                ChildProfile existing = profileRepository.findById(id)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+                return existing.getFamilyId();
+            }).subscribeOn(Schedulers.boundedElastic())
+            .flatMap(profileFamilyId -> profileService.updateProfile(id, profileFamilyId,
+                    new ProfileRequest(trimmedName, avatarIcon, avatarColor, ageGroup)))
+            .thenReturn("redirect:/web/admin/profiles")
+            .onErrorResume(ProfileException.class, ex -> Mono.fromCallable(() -> {
                 ChildProfile profile = profileRepository.findById(id)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-                model.addAttribute("profile", profile);
-                model.addAttribute("profileId", id);
-                model.addAttribute("avatarIcons", AvatarIcon.values());
+                model.addAttribute("profile",      profile);
+                model.addAttribute("profileId",    id);
+                model.addAttribute("avatarIcons",  AvatarIcon.values());
                 model.addAttribute("avatarColors", AvatarColor.values());
-                model.addAttribute("ageGroups", AgeGroup.values());
+                model.addAttribute("ageGroups",    AgeGroup.values());
                 model.addAttribute("avatarHelper", avatarHelper);
-                model.addAttribute("familyId", familyId);
-                model.addAttribute("nameError", "Name muss zwischen 1 und 100 Zeichen lang sein.");
+                model.addAttribute("familyId",     familyId);
+                model.addAttribute("nameError",    ex.getMessage());
                 return "web/admin/profiles-edit";
-            }).subscribeOn(Schedulers.boundedElastic());
-        }
-
-        return Mono.fromCallable(() -> {
-            ChildProfile existing = profileRepository.findById(id)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            return existing.getFamilyId();
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(profileFamilyId -> profileService.updateProfile(id, profileFamilyId,
-                new ProfileRequest(trimmedName, avatarIcon, avatarColor, ageGroup)))
-        .thenReturn("redirect:/web/admin/profiles")
-        .onErrorResume(ProfileException.class, ex -> Mono.fromCallable(() -> {
-            ChildProfile profile = profileRepository.findById(id)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            model.addAttribute("profile", profile);
-            model.addAttribute("profileId", id);
-            model.addAttribute("avatarIcons", AvatarIcon.values());
-            model.addAttribute("avatarColors", AvatarColor.values());
-            model.addAttribute("ageGroups", AgeGroup.values());
-            model.addAttribute("avatarHelper", avatarHelper);
-            model.addAttribute("familyId", familyId);
-            model.addAttribute("nameError", ex.getMessage());
-            return "web/admin/profiles-edit";
-        }).subscribeOn(Schedulers.boundedElastic()));
+            }).subscribeOn(Schedulers.boundedElastic()));
+        });
     }
 
     @PostMapping("/profiles/{id}/delete")
@@ -279,17 +283,20 @@ public class AdminWebController {
     @PostMapping("/content/{id}/edit")
     public Mono<String> updateContent(
             @PathVariable("id") String id,
-            @RequestParam("contentType") ContentType contentType,
-            @RequestParam("scope") ContentScope scope,
-            @AuthenticationPrincipal String familyId) {
-        return Mono.fromCallable(() -> {
-            AllowedContent content = contentRepository.findById(id)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            content.setContentType(contentType);
-            content.setScope(scope);
-            contentRepository.save(content);
-            return "redirect:/web/admin/content";
-        }).subscribeOn(Schedulers.boundedElastic());
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
+        return exchange.getFormData().flatMap(form -> {
+            ContentType  contentType = parseEnum(ContentType.class,  form.getFirst("contentType"));
+            ContentScope scope       = parseEnum(ContentScope.class, form.getFirst("scope"));
+            return Mono.fromCallable(() -> {
+                AllowedContent content = contentRepository.findById(id)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+                content.setContentType(contentType);
+                content.setScope(scope);
+                contentRepository.save(content);
+                return "redirect:/web/admin/content";
+            }).subscribeOn(Schedulers.boundedElastic());
+        });
     }
 
     @PostMapping("/content/{id}/delete")
@@ -545,32 +552,34 @@ public class AdminWebController {
 
     @PostMapping("/danger-zone/wipe")
     public Mono<Void> wipe(
-            @RequestParam(value = "confirmText", defaultValue = "") String confirmText,
             ServerWebExchange exchange,
             Model model) {
 
-        if (!"DELETE".equals(confirmText)) {
-            exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
-            return exchange.getResponse().setComplete();
-        }
-
-        return Mono.fromRunnable(() -> {
-            try {
-                wipeService.wipeAllData();
-            } catch (Exception e) {
-                log.error("Wipe failed", e);
-                throw new RuntimeException("Wipe failed: " + e.getMessage(), e);
+        return exchange.getFormData().flatMap(form -> {
+            String confirmText = form.getFirst("confirmText");
+            if (!"DELETE".equals(confirmText)) {
+                exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
+                return exchange.getResponse().setComplete();
             }
-        })
-        .subscribeOn(Schedulers.boundedElastic())
-        .then(redirect204(exchange, "/web/register"))
-        .onErrorResume(ex -> {
-            exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-            String msg = ex.getMessage() != null ? ex.getMessage() : "Unbekannter Fehler";
-            exchange.getResponse().getHeaders().setLocation(
-                    URI.create("/web/admin/danger-zone?error=" +
-                            java.net.URLEncoder.encode(msg, java.nio.charset.StandardCharsets.UTF_8)));
-            return exchange.getResponse().setComplete();
+
+            return Mono.fromRunnable(() -> {
+                try {
+                    wipeService.wipeAllData();
+                } catch (Exception e) {
+                    log.error("Wipe failed", e);
+                    throw new RuntimeException("Wipe failed: " + e.getMessage(), e);
+                }
+            })
+            .subscribeOn(Schedulers.boundedElastic())
+            .then(redirect204(exchange, "/web/register"))
+            .onErrorResume(ex -> {
+                exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+                String msg = ex.getMessage() != null ? ex.getMessage() : "Unbekannter Fehler";
+                exchange.getResponse().getHeaders().setLocation(
+                        URI.create("/web/admin/danger-zone?error=" +
+                                java.net.URLEncoder.encode(msg, java.nio.charset.StandardCharsets.UTF_8)));
+                return exchange.getResponse().setComplete();
+            });
         });
     }
 
@@ -584,6 +593,12 @@ public class AdminWebController {
     private ContentRequestStatus parseStatus(String s) {
         if (s == null || s.isBlank()) return null;
         try { return ContentRequestStatus.valueOf(s.toUpperCase()); } catch (Exception e) { return null; }
+    }
+
+    private <E extends Enum<E>> E parseEnum(Class<E> type, String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return Enum.valueOf(type, value.toUpperCase()); }
+        catch (IllegalArgumentException e) { return null; }
     }
 
     private Mono<Void> redirect204(ServerWebExchange exchange, String location) {

@@ -144,31 +144,36 @@ public class RequestWebController {
 
     @PostMapping("/{id}/reject")
     public Mono<String> reject(
-            @PathVariable("id")                              String id,
-            @RequestParam(value = "note", required = false)  String note,
+            @PathVariable("id") String id,
             Model model,
-            @AuthenticationPrincipal String familyId) {
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
 
-        return requestService.rejectRequest(id, familyId, note)
-                .thenReturn("web/fragments/empty :: empty");
+        return exchange.getFormData().flatMap(form -> {
+            String note = form.getFirst("note");
+            return requestService.rejectRequest(id, familyId, note)
+                    .thenReturn("web/fragments/empty :: empty");
+        });
     }
 
     // ── POST /web/requests/bulk-approve ──────────────────────────────────────
 
     @PostMapping("/bulk-approve")
     public Mono<Void> bulkApprove(
-            @RequestParam(value = "requestIds", required = false) List<String> requestIds,
             ServerWebExchange exchange,
             @AuthenticationPrincipal String familyId) {
 
-        Mono<Void> action = (requestIds != null && !requestIds.isEmpty())
-                ? requestService.bulkApprove(requestIds, familyId)
-                : Mono.empty();
+        return exchange.getFormData().flatMap(form -> {
+            List<String> requestIds = form.get("requestIds");
+            Mono<Void> action = (requestIds != null && !requestIds.isEmpty())
+                    ? requestService.bulkApprove(requestIds, familyId)
+                    : Mono.empty();
 
-        return action.then(Mono.fromRunnable(() -> {
-            exchange.getResponse().setStatusCode(org.springframework.http.HttpStatus.FOUND);
-            exchange.getResponse().getHeaders().setLocation(URI.create("/web/requests"));
-        })).then(exchange.getResponse().setComplete());
+            return action.then(Mono.fromRunnable(() -> {
+                exchange.getResponse().setStatusCode(org.springframework.http.HttpStatus.FOUND);
+                exchange.getResponse().getHeaders().setLocation(URI.create("/web/requests"));
+            })).then(exchange.getResponse().setComplete());
+        });
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────

@@ -117,73 +117,79 @@ public class ContentWebController {
 
     @PostMapping("/search")
     public Mono<String> search(
-            @PathVariable("profileId")          String profileId,
-            @RequestParam("query")              String query,
+            @PathVariable("profileId") String profileId,
             Model model,
-            @AuthenticationPrincipal String familyId) {
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
 
-        if (query == null || query.isBlank()) {
-            model.addAttribute("results", null);
-            model.addAttribute("query", "");
-            return Mono.just("web/fragments/search-results :: results");
-        }
+        return exchange.getFormData().flatMap(form -> {
+            String query = form.getFirst("query");
+            if (query == null || query.isBlank()) {
+                model.addAttribute("results", null);
+                model.addAttribute("query", "");
+                return Mono.just("web/fragments/search-results :: results");
+            }
 
-        return searchService.search(familyId, query.strip(), 20)
-                .doOnNext(results -> {
-                    model.addAttribute("results",   results);
-                    model.addAttribute("query",     query.strip());
-                    model.addAttribute("profileId", profileId);
-                    model.addAttribute("scopes",    ContentScope.values());
-                })
-                .thenReturn("web/fragments/search-results :: results")
-                .onErrorResume(e -> {
-                    log.warn("Spotify search failed for family {}: {}", familyId, e.getMessage());
-                    model.addAttribute("searchError", "Suche fehlgeschlagen. Bitte stelle sicher, dass dein Spotify-Konto verbunden ist.");
-                    model.addAttribute("profileId",   profileId);
-                    model.addAttribute("scopes",      ContentScope.values());
-                    return Mono.just("web/fragments/search-results :: results");
-                });
+            return searchService.search(familyId, query.strip(), 20)
+                    .doOnNext(results -> {
+                        model.addAttribute("results",   results);
+                        model.addAttribute("query",     query.strip());
+                        model.addAttribute("profileId", profileId);
+                        model.addAttribute("scopes",    ContentScope.values());
+                    })
+                    .thenReturn("web/fragments/search-results :: results")
+                    .onErrorResume(e -> {
+                        log.warn("Spotify search failed for family {}: {}", familyId, e.getMessage());
+                        model.addAttribute("searchError", "Suche fehlgeschlagen. Bitte stelle sicher, dass dein Spotify-Konto verbunden ist.");
+                        model.addAttribute("profileId",   profileId);
+                        model.addAttribute("scopes",      ContentScope.values());
+                        return Mono.just("web/fragments/search-results :: results");
+                    });
+        });
     }
 
     // ── POST /web/profiles/{profileId}/content ────────────────────────────────
 
     @PostMapping
     public Mono<Void> add(
-            @PathVariable("profileId")                                   String profileId,
-            @RequestParam("spotifyUri")                                  String spotifyUri,
-            @RequestParam("scope")                                       ContentScope scope,
-            @RequestParam("title")                                       String title,
-            @RequestParam(value = "imageUrl",    required = false)       String imageUrl,
-            @RequestParam(value = "artistName",  required = false)       String artistName,
-            @RequestParam(value = "contentType", required = false)       ContentType contentType,
-            @RequestParam(value = "siblingIds",  required = false)       List<String> siblingIds,
+            @PathVariable("profileId") String profileId,
             ServerWebExchange exchange,
             @AuthenticationPrincipal String familyId) {
 
-        // Validate profile ownership
-        return Mono.fromCallable(() -> getProfileForFamily(profileId, familyId))
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(profile -> {
-                    AddContentRequest req = new AddContentRequest(
-                            spotifyUri, scope, title, imageUrl, artistName, contentType, null);
+        return exchange.getFormData().flatMap(form -> {
+            String       spotifyUri  = form.getFirst("spotifyUri");
+            ContentScope scope       = parseEnum(ContentScope.class, form.getFirst("scope"));
+            String       title       = form.getFirst("title");
+            String       imageUrl    = form.getFirst("imageUrl");
+            String       artistName  = form.getFirst("artistName");
+            ContentType  contentType = parseEnum(ContentType.class, form.getFirst("contentType"));
+            List<String> siblingIds  = form.get("siblingIds");
 
-                    if (siblingIds != null && !siblingIds.isEmpty()) {
-                        // Add to main profile + siblings
-                        List<String> allProfileIds = new java.util.ArrayList<>();
-                        allProfileIds.add(profileId);
-                        allProfileIds.addAll(siblingIds);
-                        BulkAddContentRequest bulk = new BulkAddContentRequest(
-                                spotifyUri, scope, title, imageUrl, artistName, contentType, null, allProfileIds);
-                        return contentService.addContentBulk(bulk).then();
-                    }
-                    return contentService.addContent(profileId, req).then();
-                })
-                .then(Mono.fromRunnable(() -> {
-                    exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-                    exchange.getResponse().getHeaders().setLocation(
-                            URI.create("/web/profiles/" + profileId + "/content"));
-                }))
-                .then(exchange.getResponse().setComplete());
+            // Validate profile ownership
+            return Mono.fromCallable(() -> getProfileForFamily(profileId, familyId))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(profile -> {
+                        AddContentRequest req = new AddContentRequest(
+                                spotifyUri, scope, title, imageUrl, artistName, contentType, null);
+
+                        if (siblingIds != null && !siblingIds.isEmpty()) {
+                            // Add to main profile + siblings
+                            List<String> allProfileIds = new java.util.ArrayList<>();
+                            allProfileIds.add(profileId);
+                            allProfileIds.addAll(siblingIds);
+                            BulkAddContentRequest bulk = new BulkAddContentRequest(
+                                    spotifyUri, scope, title, imageUrl, artistName, contentType, null, allProfileIds);
+                            return contentService.addContentBulk(bulk).then();
+                        }
+                        return contentService.addContent(profileId, req).then();
+                    })
+                    .then(Mono.fromRunnable(() -> {
+                        exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+                        exchange.getResponse().getHeaders().setLocation(
+                                URI.create("/web/profiles/" + profileId + "/content"));
+                    }))
+                    .then(exchange.getResponse().setComplete());
+        });
     }
 
     // ── POST /web/profiles/{profileId}/content/{id}/delete (HTMX) ────────────

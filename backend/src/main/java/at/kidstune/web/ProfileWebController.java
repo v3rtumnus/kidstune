@@ -112,35 +112,39 @@ public class ProfileWebController {
 
     @PostMapping
     public Mono<String> create(
-            @RequestParam("name")        String name,
-            @RequestParam("avatarIcon")  AvatarIcon avatarIcon,
-            @RequestParam("avatarColor") AvatarColor avatarColor,
-            @RequestParam("ageGroup")    AgeGroup ageGroup,
             Model model,
-            @AuthenticationPrincipal String familyId) {
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
 
-        String trimmedName = name == null ? "" : name.strip();
+        return exchange.getFormData().flatMap(form -> {
+            String      name        = form.getFirst("name");
+            AvatarIcon  avatarIcon  = parseEnum(AvatarIcon.class,  form.getFirst("avatarIcon"));
+            AvatarColor avatarColor = parseEnum(AvatarColor.class, form.getFirst("avatarColor"));
+            AgeGroup    ageGroup    = parseEnum(AgeGroup.class,    form.getFirst("ageGroup"));
 
-        if (trimmedName.isEmpty() || trimmedName.length() > 100) {
-            return Mono.fromCallable(() -> {
-                addFormLookups(model);
-                model.addAttribute("familyId",   familyId);
-                model.addAttribute("profile",    new ProfileFormData(trimmedName, avatarIcon, avatarColor, ageGroup));
-                model.addAttribute("nameError",  "Name muss zwischen 1 und 100 Zeichen lang sein.");
-                return "web/profiles/form";
-            }).subscribeOn(Schedulers.boundedElastic());
-        }
+            String trimmedName = name == null ? "" : name.strip();
 
-        ProfileRequest req = new ProfileRequest(trimmedName, avatarIcon, avatarColor, ageGroup);
-        return profileService.createProfile(familyId, req)
-                .thenReturn("redirect:/web/profiles")
-                .onErrorResume(ProfileException.class, ex -> Mono.fromCallable(() -> {
+            if (trimmedName.isEmpty() || trimmedName.length() > 100) {
+                return Mono.fromCallable(() -> {
                     addFormLookups(model);
-                    model.addAttribute("familyId",  familyId);
-                    model.addAttribute("profile",   new ProfileFormData(trimmedName, avatarIcon, avatarColor, ageGroup));
-                    model.addAttribute("nameError", ex.getMessage());
+                    model.addAttribute("familyId",   familyId);
+                    model.addAttribute("profile",    new ProfileFormData(trimmedName, avatarIcon, avatarColor, ageGroup));
+                    model.addAttribute("nameError",  "Name muss zwischen 1 und 100 Zeichen lang sein.");
                     return "web/profiles/form";
-                }).subscribeOn(Schedulers.boundedElastic()));
+                }).subscribeOn(Schedulers.boundedElastic());
+            }
+
+            ProfileRequest req = new ProfileRequest(trimmedName, avatarIcon, avatarColor, ageGroup);
+            return profileService.createProfile(familyId, req)
+                    .thenReturn("redirect:/web/profiles")
+                    .onErrorResume(ProfileException.class, ex -> Mono.fromCallable(() -> {
+                        addFormLookups(model);
+                        model.addAttribute("familyId",  familyId);
+                        model.addAttribute("profile",   new ProfileFormData(trimmedName, avatarIcon, avatarColor, ageGroup));
+                        model.addAttribute("nameError", ex.getMessage());
+                        return "web/profiles/form";
+                    }).subscribeOn(Schedulers.boundedElastic()));
+        });
     }
 
     // ── GET /web/profiles/{id}/edit ───────────────────────────────────────────
@@ -174,43 +178,47 @@ public class ProfileWebController {
     @PostMapping("/{id}")
     public Mono<String> update(
             @PathVariable("id") String id,
-            @RequestParam("name")        String name,
-            @RequestParam("avatarIcon")  AvatarIcon avatarIcon,
-            @RequestParam("avatarColor") AvatarColor avatarColor,
-            @RequestParam("ageGroup")    AgeGroup ageGroup,
             Model model,
-            @AuthenticationPrincipal String familyId) {
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
 
-        String trimmedName = name == null ? "" : name.strip();
+        return exchange.getFormData().flatMap(form -> {
+            String      name        = form.getFirst("name");
+            AvatarIcon  avatarIcon  = parseEnum(AvatarIcon.class,  form.getFirst("avatarIcon"));
+            AvatarColor avatarColor = parseEnum(AvatarColor.class, form.getFirst("avatarColor"));
+            AgeGroup    ageGroup    = parseEnum(AgeGroup.class,    form.getFirst("ageGroup"));
 
-        if (trimmedName.isEmpty() || trimmedName.length() > 100) {
-            return Mono.fromCallable(() -> {
-                ChildProfile profile = getProfileForFamily(id, familyId);
-                addFormLookups(model);
-                model.addAttribute("familyId",   familyId);
-                model.addAttribute("profileId",  id);
-                model.addAttribute("profile",    new ProfileFormData(trimmedName, avatarIcon, avatarColor, ageGroup));
-                model.addAttribute("nameError",  "Name muss zwischen 1 und 100 Zeichen lang sein.");
-                model.addAttribute("spotifyLinked",  profile.getSpotifyUserId() != null);
-                model.addAttribute("spotifyUserId",  profile.getSpotifyUserId());
-                return "web/profiles/edit";
-            }).subscribeOn(Schedulers.boundedElastic());
-        }
+            String trimmedName = name == null ? "" : name.strip();
 
-        ProfileRequest req = new ProfileRequest(trimmedName, avatarIcon, avatarColor, ageGroup);
-        return profileService.updateProfile(id, familyId, req)
-                .thenReturn("redirect:/web/profiles")
-                .onErrorResume(ProfileException.class, ex -> Mono.fromCallable(() -> {
+            if (trimmedName.isEmpty() || trimmedName.length() > 100) {
+                return Mono.fromCallable(() -> {
                     ChildProfile profile = getProfileForFamily(id, familyId);
                     addFormLookups(model);
-                    model.addAttribute("familyId",   familyId);
-                    model.addAttribute("profileId",  id);
-                    model.addAttribute("profile",    new ProfileFormData(trimmedName, avatarIcon, avatarColor, ageGroup));
-                    model.addAttribute("nameError",  ex.getMessage());
-                    model.addAttribute("spotifyLinked",  profile.getSpotifyUserId() != null);
-                    model.addAttribute("spotifyUserId",  profile.getSpotifyUserId());
+                    model.addAttribute("familyId",      familyId);
+                    model.addAttribute("profileId",     id);
+                    model.addAttribute("profile",       new ProfileFormData(trimmedName, avatarIcon, avatarColor, ageGroup));
+                    model.addAttribute("nameError",     "Name muss zwischen 1 und 100 Zeichen lang sein.");
+                    model.addAttribute("spotifyLinked", profile.getSpotifyUserId() != null);
+                    model.addAttribute("spotifyUserId", profile.getSpotifyUserId());
                     return "web/profiles/edit";
-                }).subscribeOn(Schedulers.boundedElastic()));
+                }).subscribeOn(Schedulers.boundedElastic());
+            }
+
+            ProfileRequest req = new ProfileRequest(trimmedName, avatarIcon, avatarColor, ageGroup);
+            return profileService.updateProfile(id, familyId, req)
+                    .thenReturn("redirect:/web/profiles")
+                    .onErrorResume(ProfileException.class, ex -> Mono.fromCallable(() -> {
+                        ChildProfile profile = getProfileForFamily(id, familyId);
+                        addFormLookups(model);
+                        model.addAttribute("familyId",      familyId);
+                        model.addAttribute("profileId",     id);
+                        model.addAttribute("profile",       new ProfileFormData(trimmedName, avatarIcon, avatarColor, ageGroup));
+                        model.addAttribute("nameError",     ex.getMessage());
+                        model.addAttribute("spotifyLinked", profile.getSpotifyUserId() != null);
+                        model.addAttribute("spotifyUserId", profile.getSpotifyUserId());
+                        return "web/profiles/edit";
+                    }).subscribeOn(Schedulers.boundedElastic()));
+        });
     }
 
     // ── POST /web/profiles/{id}/delete ────────────────────────────────────────
@@ -367,6 +375,12 @@ public class ProfileWebController {
 
     private String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private <E extends Enum<E>> E parseEnum(Class<E> type, String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return Enum.valueOf(type, value.toUpperCase()); }
+        catch (IllegalArgumentException e) { return null; }
     }
 
     // ── View model records ────────────────────────────────────────────────────
