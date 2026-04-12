@@ -58,6 +58,20 @@ pipeline {
                 }
             }
         }
+        stage('Playwright E2E') {
+            when { expression { env.BACKEND_CHANGED || params.FORCE_BACKEND } }
+            steps {
+                dir('backend') {
+                    sh './gradlew playwrightInstall'
+                    sh './gradlew e2eTest'
+                }
+            }
+            post {
+                always {
+                    junit 'backend/build/test-results/e2eTest/*.xml'
+                }
+            }
+        }
         stage('Kids App') {
             when { expression { env.KIDS_CHANGED || params.FORCE_KIDS_APP } }
             steps {

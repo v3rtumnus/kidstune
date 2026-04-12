@@ -11,6 +11,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -108,13 +109,10 @@ public class WebLoginController {
             final String finalPassword = password;
             return Mono.fromCallable(() -> familyService.register(finalEmail, finalPassword))
                     .subscribeOn(Schedulers.boundedElastic())
-                    .flatMap(familyId -> exchange.getSession().flatMap(session -> {
+                    .flatMap(familyId -> exchange.getSession().map(session -> {
                         session.getAttributes().put(WebSessionSecurityContextRepository.SESSION_FAMILY_ID, familyId);
-                        exchange.getResponse().setStatusCode(HttpStatus.FOUND);
-                        exchange.getResponse().getHeaders().setLocation(URI.create("/web/dashboard"));
-                        return exchange.getResponse().setComplete();
+                        return (Object) "redirect:/web/dashboard";
                     }))
-                    .cast(Object.class)
                     .onErrorResume(DuplicateEmailException.class, e -> {
                         model.addAttribute("email", finalEmail);
                         model.addAttribute("emailError", "E-Mail bereits vergeben");

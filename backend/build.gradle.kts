@@ -93,3 +93,33 @@ tasks.withType<Test> {
         jvmArgs("-Dtc.host=npipe:////./pipe/dockerDesktopLinuxEngine")
     }
 }
+
+// Exclude E2E tests from the default `test` task to keep CI unit/integration runs fast.
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("e2e")
+    }
+}
+
+// Dedicated task: ./gradlew e2eTest
+tasks.register<Test>("e2eTest") {
+    description = "Run Playwright E2E browser tests"
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("e2e") }
+    mustRunAfter(tasks.test)
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+        jvmArgs("-Dtc.host=npipe:////./pipe/dockerDesktopLinuxEngine")
+    }
+}
+
+// One-time browser install: ./gradlew playwrightInstall
+// Browsers are cached in ~/.cache/ms-playwright so only needs to run once per machine/agent.
+tasks.register<JavaExec>("playwrightInstall") {
+    description = "Download Playwright Chromium binaries"
+    group = "build setup"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+    args = listOf("install", "chromium", "--with-deps")
+}

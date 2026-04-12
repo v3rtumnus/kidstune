@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionTemplate;
 import reactor.test.StepVerifier;
 
 import java.util.List;
@@ -21,7 +22,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ProfileServiceTest {
 
-    @Mock ProfileRepository profileRepository;
+    @Mock ProfileRepository    profileRepository;
+    @Mock TransactionTemplate  txTemplate;
 
     ProfileService profileService;
 
@@ -31,7 +33,7 @@ class ProfileServiceTest {
 
     @BeforeEach
     void setUp() {
-        profileService = new ProfileService(profileRepository);
+        profileService = new ProfileService(profileRepository, txTemplate);
     }
 
     // ── createProfile ─────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.ui.ExtendedModelMap;
@@ -24,6 +25,8 @@ import org.springframework.ui.Model;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
@@ -85,8 +88,13 @@ class ImportWebControllerTest {
     @Test
     @DisplayName("loadSuggestions with no profileIds selected returns noProfilesSelected flag")
     void loadSuggestionsWithNoProfilesReturnsFlag() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/import/suggestions")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body(""));
+
         Model model = new ExtendedModelMap();
-        StepVerifier.create(controller.loadSuggestions(null, model, FAMILY_ID))
+        StepVerifier.create(controller.loadSuggestions(model, FAMILY_ID, exchange))
                 .expectNext("web/fragments/import-suggestions :: suggestions")
                 .verifyComplete();
 
@@ -101,8 +109,13 @@ class ImportWebControllerTest {
         when(profileRepository.findById(PROFILE_ID_1)).thenReturn(Optional.of(luna));
         when(spotifyTokenService.isProfileSpotifyLinked(PROFILE_ID_1)).thenReturn(false);
 
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/import/suggestions")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("profileIds=" + PROFILE_ID_1));
+
         Model model = new ExtendedModelMap();
-        StepVerifier.create(controller.loadSuggestions(List.of(PROFILE_ID_1), model, FAMILY_ID))
+        StepVerifier.create(controller.loadSuggestions(model, FAMILY_ID, exchange))
                 .expectNext("web/fragments/import-suggestions :: suggestions")
                 .verifyComplete();
 
@@ -123,8 +136,13 @@ class ImportWebControllerTest {
         );
         when(spotifyImportService.getImportSuggestions(PROFILE_ID_1)).thenReturn(Mono.just(dto));
 
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/import/suggestions")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("profileIds=" + PROFILE_ID_1));
+
         Model model = new ExtendedModelMap();
-        StepVerifier.create(controller.loadSuggestions(List.of(PROFILE_ID_1), model, FAMILY_ID))
+        StepVerifier.create(controller.loadSuggestions(model, FAMILY_ID, exchange))
                 .expectNext("web/fragments/import-suggestions :: suggestions")
                 .verifyComplete();
 
@@ -152,8 +170,13 @@ class ImportWebControllerTest {
         );
         when(spotifyImportService.getImportSuggestions(PROFILE_ID_1)).thenReturn(Mono.just(dto));
 
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/web/import/suggestions")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("profileIds=" + PROFILE_ID_1));
+
         Model model = new ExtendedModelMap();
-        StepVerifier.create(controller.loadSuggestions(List.of(PROFILE_ID_1), model, FAMILY_ID))
+        StepVerifier.create(controller.loadSuggestions(model, FAMILY_ID, exchange))
                 .expectNext("web/fragments/import-suggestions :: suggestions")
                 .verifyComplete();
 
@@ -183,10 +206,12 @@ class ImportWebControllerTest {
                 .thenReturn(Mono.just(5));
 
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/import").build());
+                MockServerHttpRequest.post("/web/import")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("itemsJson=" + URLEncoder.encode(itemsJson, StandardCharsets.UTF_8)
+                                + "&allProfileIds=" + PROFILE_ID_1));
 
-        StepVerifier.create(controller.executeImport(
-                itemsJson, List.of(PROFILE_ID_1), exchange, FAMILY_ID))
+        StepVerifier.create(controller.executeImport(exchange, FAMILY_ID))
                 .verifyComplete();
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
@@ -212,10 +237,12 @@ class ImportWebControllerTest {
                         List.of(new ImportContentResponse.ProfileSummary(PROFILE_ID_2, "Max", 1)))));
 
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/import").build());
+                MockServerHttpRequest.post("/web/import")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("itemsJson=" + URLEncoder.encode(itemsJson, StandardCharsets.UTF_8)
+                                + "&allProfileIds=" + PROFILE_ID_2));
 
-        StepVerifier.create(controller.executeImport(
-                itemsJson, List.of(PROFILE_ID_2), exchange, FAMILY_ID))
+        StepVerifier.create(controller.executeImport(exchange, FAMILY_ID))
                 .verifyComplete();
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(FOUND);
@@ -241,10 +268,12 @@ class ImportWebControllerTest {
                 .thenReturn(Mono.just(3));
 
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/import").build());
+                MockServerHttpRequest.post("/web/import")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("itemsJson=" + URLEncoder.encode(itemsJson, StandardCharsets.UTF_8)
+                                + "&allProfileIds=" + PROFILE_ID_1));
 
-        StepVerifier.create(controller.executeImport(
-                itemsJson, List.of(PROFILE_ID_1), exchange, FAMILY_ID))
+        StepVerifier.create(controller.executeImport(exchange, FAMILY_ID))
                 .verifyComplete();
 
         exchange.getSession().subscribe(session -> {
@@ -271,10 +300,11 @@ class ImportWebControllerTest {
                 .thenReturn(Mono.just(7));
 
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/import").build());
+                MockServerHttpRequest.post("/web/import")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("itemsJson=%5B%5D&allProfileIds=" + PROFILE_ID_1));
 
-        StepVerifier.create(controller.executeImport(
-                "[]", List.of(PROFILE_ID_1), exchange, FAMILY_ID))
+        StepVerifier.create(controller.executeImport(exchange, FAMILY_ID))
                 .verifyComplete();
 
         verify(spotifyImportService).importLikedSongsAsFavorites(PROFILE_ID_1);
@@ -300,10 +330,12 @@ class ImportWebControllerTest {
         ));
 
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/web/import").build());
+                MockServerHttpRequest.post("/web/import")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body("itemsJson=" + URLEncoder.encode(itemsJson, StandardCharsets.UTF_8)
+                                + "&allProfileIds=" + PROFILE_ID_1));
 
-        StepVerifier.create(controller.executeImport(
-                itemsJson, List.of(PROFILE_ID_1), exchange, FAMILY_ID))
+        StepVerifier.create(controller.executeImport(exchange, FAMILY_ID))
                 .verifyComplete();
 
         // Import still redirects successfully despite liked-songs error

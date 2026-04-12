@@ -3,8 +3,8 @@ package at.kidstune.push;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
 import at.kidstune.requests.ContentRequest;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.exc.JacksonIOException;
+import tools.jackson.databind.ObjectMapper;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import org.apache.http.HttpResponse;
@@ -103,7 +103,7 @@ public class PushNotificationService {
         );
         try {
             return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonIOException e) {
             // Should never happen with a plain Map<String,String>
             log.error("Failed to serialize push payload", e);
             return "{\"title\":\"Neuer Musikwunsch\"}";
