@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,14 +27,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,6 +56,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -186,7 +196,14 @@ fun DiscoverScreen(
                         requestedUris  = state.requestedUris,
                         newlyApproved  = state.newlyApprovedUris,
                         isLimitReached = isLimitReached,
-                        onRequest      = { onIntent(DiscoverIntent.RequestContent(it)) }
+                        pinAvailable   = state.pinAvailable,
+                        onRequest      = { tile ->
+                            if (state.pinAvailable) {
+                                onIntent(DiscoverIntent.OpenApprovalChoice(tile))
+                            } else {
+                                onIntent(DiscoverIntent.RequestContent(tile))
+                            }
+                        }
                     )
                 }
 
@@ -224,6 +241,44 @@ fun DiscoverScreen(
                     onDismiss = { onIntent(DiscoverIntent.DismissCelebration) }
                 )
             }
+        }
+
+        // ── Approval-choice overlay ─────────────────────────────────────��─────
+        AnimatedVisibility(
+            visible  = state.showApprovalChoice,
+            enter    = fadeIn() + scaleIn(initialScale = 0.92f),
+            exit     = fadeOut() + scaleOut(targetScale = 0.92f),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            ApprovalChoiceOverlay(
+                tile     = state.pinFlowTile,
+                onSendRequest = { onIntent(DiscoverIntent.SendRequestFromChoice) },
+                onAskParent   = { onIntent(DiscoverIntent.OpenPinPad) },
+                onCancel      = { onIntent(DiscoverIntent.PinCancel) },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // ── PIN-pad overlay ───────────────────────────────────────────────────
+        AnimatedVisibility(
+            visible  = state.showPinPad,
+            enter    = fadeIn() + scaleIn(initialScale = 0.92f),
+            exit     = fadeOut() + scaleOut(targetScale = 0.92f),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            PinPadOverlay(
+                tile               = state.pinFlowTile,
+                digits             = state.pinDigits,
+                isError            = state.pinError,
+                isTooManyAttempts  = state.pinTooManyAttempts,
+                isSubmitting       = state.pinSubmitting,
+                onDigit            = { onIntent(DiscoverIntent.PinDigit(it)) },
+                onBackspace        = { onIntent(DiscoverIntent.PinBackspace) },
+                onCancel           = { onIntent(DiscoverIntent.PinCancel) },
+                onTimeout          = { onIntent(DiscoverIntent.PinTimeout) },
+                onRetryAsRequest   = { onIntent(DiscoverIntent.RetryAsRequest) },
+                modifier           = Modifier.fillMaxSize()
+            )
         }
     }
 }
@@ -298,6 +353,7 @@ private fun DiscoverTileRow(
     requestedUris: Set<String>,
     newlyApproved: Set<String>,
     isLimitReached: Boolean,
+    pinAvailable: Boolean,
     onRequest: (DiscoverTile) -> Unit
 ) {
     Row(
@@ -308,12 +364,13 @@ private fun DiscoverTileRow(
     ) {
         tiles.forEach { tile ->
             DiscoverTileCard(
-                tile           = tile,
-                isRequested    = tile.spotifyUri in requestedUris,
-                isLimitReached = isLimitReached,
+                tile            = tile,
+                isRequested     = tile.spotifyUri in requestedUris,
+                isLimitReached  = isLimitReached,
                 isNewlyApproved = tile.spotifyUri in newlyApproved,
-                onRequest      = { onRequest(tile) },
-                modifier       = Modifier.weight(1f)
+                pinAvailable    = pinAvailable,
+                onRequest       = { onRequest(tile) },
+                modifier        = Modifier.weight(1f)
             )
         }
         if (tiles.size == 1) Spacer(modifier = Modifier.weight(1f))
@@ -327,6 +384,7 @@ private fun DiscoverTileCard(
     isRequested: Boolean,
     isLimitReached: Boolean,
     isNewlyApproved: Boolean,
+    pinAvailable: Boolean,
     onRequest: () -> Unit
 ) {
     val badge = scopeBadgeFor(tile.scope)
@@ -366,6 +424,19 @@ private fun DiscoverTileCard(
                         text  = "Du hast schon 3 Wünsche offen – warte bis Mama/Papa geantwortet hat!",
                         style = MaterialTheme.typography.labelSmall
                     )
+                }
+            }
+            pinAvailable -> {
+                Button(
+                    onClick  = onRequest,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .kidsTouchTarget()
+                        .semantics { contentDescription = "Freigabe: ${tile.title}" }
+                ) {
+                    Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("🙏 Ich will das!")
                 }
             }
             else -> {
@@ -465,6 +536,287 @@ private fun CelebrationOverlay(
     }
 }
 
+// ── Approval-choice overlay ───────────────────────────────────────────────
+
+@Composable
+private fun ApprovalChoiceOverlay(
+    modifier: Modifier = Modifier,
+    tile: DiscoverTile?,
+    onSendRequest: () -> Unit,
+    onAskParent: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Box(
+        modifier = modifier.background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(modifier = Modifier.padding(24.dp)) {
+            Column(
+                modifier            = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text("🎵", fontSize = 36.sp)
+                tile?.let {
+                    Text(
+                        text      = it.title,
+                        style     = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Text(
+                    text      = "Wie soll das hinzugefügt werden?",
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                // Option 1: normal request
+                FilledTonalButton(
+                    onClick  = onSendRequest,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .kidsTouchTarget()
+                ) {
+                    Icon(Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text("Anfrage senden", fontWeight = FontWeight.Bold)
+                        Text(
+                            text  = "Mama/Papa bekommt eine Nachricht",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+
+                // Option 2: PIN approval
+                Button(
+                    onClick  = onAskParent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .kidsTouchTarget()
+                ) {
+                    Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text("Elternteil fragen", fontWeight = FontWeight.Bold)
+                        Text(
+                            text  = "Gib das Handy an Mama oder Papa",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+
+                OutlinedButton(
+                    onClick  = onCancel,
+                    modifier = Modifier.kidsTouchTarget()
+                ) {
+                    Text("Abbrechen")
+                }
+            }
+        }
+    }
+}
+
+// ── PIN-pad overlay ───────────────────────────────────────────────────────
+
+@Composable
+private fun PinPadOverlay(
+    modifier: Modifier = Modifier,
+    tile: DiscoverTile?,
+    digits: String,
+    isError: Boolean,
+    isTooManyAttempts: Boolean,
+    isSubmitting: Boolean,
+    onDigit: (Char) -> Unit,
+    onBackspace: () -> Unit,
+    onCancel: () -> Unit,
+    onTimeout: () -> Unit,
+    onRetryAsRequest: () -> Unit,
+) {
+    // 30-second inactivity timeout
+    LaunchedEffect(Unit) {
+        delay(30_000)
+        onTimeout()
+    }
+
+    Box(
+        modifier         = modifier.background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier            = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Text("👨‍👩‍👧", fontSize = 48.sp)
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text      = "Gib das Handy an Mama oder Papa!",
+                    style     = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(4.dp))
+                tile?.let {
+                    Text(
+                        text      = "Freigabe für: ${it.title}",
+                        style     = MaterialTheme.typography.bodyMedium,
+                        color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // Dot indicators
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                repeat(4) { index ->
+                    val filled = index < digits.length
+                    val color  = when {
+                        isError  -> MaterialTheme.colorScheme.error
+                        filled   -> MaterialTheme.colorScheme.primary
+                        else     -> MaterialTheme.colorScheme.outlineVariant
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .background(color, shape = MaterialTheme.shapes.extraLarge)
+                    )
+                }
+            }
+
+            // Error / lockout feedback
+            when {
+                isTooManyAttempts -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text      = "Zu viele Fehlversuche.\nBitte in 10 Minuten erneut versuchen.",
+                            color     = MaterialTheme.colorScheme.error,
+                            style     = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Button(
+                            onClick  = onRetryAsRequest,
+                            modifier = Modifier.fillMaxWidth().kidsTouchTarget(),
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Icon(Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Stattdessen Anfrage senden")
+                        }
+                    }
+                }
+                isError -> Text(
+                    text  = "Falscher Code – bitte erneut versuchen.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            // Numpad
+            if (!isTooManyAttempts) {
+                if (isSubmitting) {
+                    CircularProgressIndicator()
+                } else {
+                    NumPad(
+                        onDigit     = onDigit,
+                        onBackspace = onBackspace,
+                        enabled     = !isSubmitting
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick  = onCancel,
+                modifier = Modifier.kidsTouchTarget()
+            ) {
+                Icon(
+                    imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    modifier           = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("Zurück")
+            }
+        }
+    }
+}
+
+@Composable
+private fun NumPad(
+    modifier: Modifier = Modifier,
+    onDigit: (Char) -> Unit,
+    onBackspace: () -> Unit,
+    enabled: Boolean = true
+) {
+    val rows = listOf(
+        listOf('1', '2', '3'),
+        listOf('4', '5', '6'),
+        listOf('7', '8', '9'),
+    )
+
+    Column(
+        modifier            = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { digit ->
+                    NumPadKey(
+                        label   = digit.toString(),
+                        onClick = { onDigit(digit) },
+                        enabled = enabled
+                    )
+                }
+            }
+        }
+        // Bottom row: empty slot + 0 + backspace
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(Modifier.size(96.dp))
+            NumPadKey(label = "0", onClick = { onDigit('0') }, enabled = enabled)
+            IconButton(
+                onClick  = onBackspace,
+                enabled  = enabled,
+                modifier = Modifier.size(96.dp)
+            ) {
+                Icon(
+                    imageVector        = Icons.Filled.Backspace,
+                    contentDescription = "Löschen",
+                    modifier           = Modifier.size(32.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NumPadKey(
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean
+) {
+    FilledTonalButton(
+        onClick  = onClick,
+        enabled  = enabled,
+        modifier = Modifier.size(96.dp)
+    ) {
+        Text(
+            text      = label,
+            fontSize  = 28.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
 /** Maps a [ContentScope] to the badge label and color used in [ContentTile]. */
 fun scopeBadgeFor(scope: ContentScope): Pair<String, Color>? =
     at.kidstune.kids.ui.components.scopeBadgeFor(scope.name)
@@ -538,6 +890,67 @@ private fun DiscoverCelebrationPreview() {
             state = DiscoverState(
                 suggestions     = MockDiscoverData.mockSuggestions,
                 showCelebration = true,
+            )
+        )
+    }
+}
+
+@Preview(name = "Discover – Approval Choice", showBackground = true, showSystemUi = true)
+@Composable
+private fun DiscoverApprovalChoicePreview() {
+    KidstuneTheme {
+        DiscoverScreen(
+            state = DiscoverState(
+                suggestions        = MockDiscoverData.mockSuggestions,
+                pinAvailable       = true,
+                showApprovalChoice = true,
+                pinFlowTile        = MockDiscoverData.mockSuggestions.firstOrNull(),
+            )
+        )
+    }
+}
+
+@Preview(name = "Discover – PIN Pad", showBackground = true, showSystemUi = true)
+@Composable
+private fun DiscoverPinPadPreview() {
+    KidstuneTheme {
+        DiscoverScreen(
+            state = DiscoverState(
+                suggestions  = MockDiscoverData.mockSuggestions,
+                pinAvailable = true,
+                showPinPad   = true,
+                pinFlowTile  = MockDiscoverData.mockSuggestions.firstOrNull(),
+                pinDigits    = "12",
+            )
+        )
+    }
+}
+
+@Preview(name = "Discover – PIN Error", showBackground = true, showSystemUi = true)
+@Composable
+private fun DiscoverPinErrorPreview() {
+    KidstuneTheme {
+        DiscoverScreen(
+            state = DiscoverState(
+                pinAvailable = true,
+                showPinPad   = true,
+                pinFlowTile  = MockDiscoverData.mockSuggestions.firstOrNull(),
+                pinError     = true,
+            )
+        )
+    }
+}
+
+@Preview(name = "Discover – PIN Lockout", showBackground = true, showSystemUi = true)
+@Composable
+private fun DiscoverPinLockoutPreview() {
+    KidstuneTheme {
+        DiscoverScreen(
+            state = DiscoverState(
+                pinAvailable       = true,
+                showPinPad         = true,
+                pinFlowTile        = MockDiscoverData.mockSuggestions.firstOrNull(),
+                pinTooManyAttempts = true,
             )
         )
     }

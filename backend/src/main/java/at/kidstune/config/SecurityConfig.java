@@ -121,12 +121,15 @@ public class SecurityConfig {
                         .pathMatchers("/api/v1/sync/**").hasRole(KIDS_ROLE)
                         .pathMatchers("/api/v1/profiles/*/favorites/**").hasAnyRole(KIDS_ROLE, PARENT_ROLE)
                         .pathMatchers(HttpMethod.POST, "/api/v1/profiles/*/content-requests").hasAnyRole(KIDS_ROLE, PARENT_ROLE)
+                        // PIN quick-approval accessible by KIDS device (must precede the /profiles/** catch-all)
+                        .pathMatchers(HttpMethod.POST, "/api/v1/profiles/*/content/pin-approve").hasAnyRole(KIDS_ROLE, PARENT_ROLE)
 
                         // ── PARENT-only ──────────────────────────────────────
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/pair").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/devices/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/profiles/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/content/**").hasRole(PARENT_ROLE)
+
                         // suggestions accessible by KIDS device (must precede the /spotify/** catch-all)
                         .pathMatchers(HttpMethod.GET, "/api/v1/spotify/suggestions").hasAnyRole(KIDS_ROLE, PARENT_ROLE)
                         .pathMatchers("/api/v1/spotify/**").hasRole(PARENT_ROLE)

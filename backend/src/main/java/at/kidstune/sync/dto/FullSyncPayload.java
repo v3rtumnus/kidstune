@@ -7,5 +7,6 @@ public record FullSyncPayload(
         SyncProfileDto profile,
         List<SyncFavoriteDto> favorites,
         List<SyncContentEntryDto> content,
+        boolean pinAvailable,
         Instant syncTimestamp
 ) {}

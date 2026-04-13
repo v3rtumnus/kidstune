@@ -7,6 +7,7 @@ import at.kidstune.kids.data.remote.KidstuneApiClient
 import at.kidstune.kids.data.remote.dto.ContentRequestResponseDto
 import at.kidstune.kids.data.remote.dto.CreateContentRequestDto
 import at.kidstune.kids.data.remote.dto.DiscoverItemDto
+import at.kidstune.kids.data.remote.dto.PinApproveRequestDto
 import at.kidstune.kids.domain.model.ContentScope
 import at.kidstune.kids.domain.model.ContentType
 import at.kidstune.kids.domain.model.DiscoverTile
@@ -146,6 +147,29 @@ class DiscoverRepository @Inject constructor(
             requestDao.deleteApprovedAndExpired(profileId)
         }
     }
+
+    // ── PIN approval ───────────────────────────────────────────────────────────
+
+    /**
+     * Attempts to approve [tile] immediately by sending the parent's PIN to the backend.
+     *
+     * @return [Result.success] on HTTP 204; [Result.failure] wrapping [PinApproveException]
+     *   on HTTP 403 (wrong PIN) or HTTP 429 (too many attempts).
+     */
+    suspend fun pinApproveContent(profileId: String, tile: DiscoverTile, pin: String): Result<Unit> =
+        runCatching {
+            apiClient.pinApproveContent(
+                profileId,
+                PinApproveRequestDto(
+                    spotifyUri = tile.spotifyUri,
+                    scope      = tile.scope.name,
+                    title      = tile.title,
+                    imageUrl   = tile.imageUrl,
+                    artistName = tile.artistName.ifEmpty { null },
+                    pin        = pin,
+                )
+            )
+        }
 
     /** Reactive stream of visible requests (PENDING_UPLOAD + PENDING + REJECTED). */
     fun getVisibleRequests(profileId: String): Flow<List<PendingRequest>> =

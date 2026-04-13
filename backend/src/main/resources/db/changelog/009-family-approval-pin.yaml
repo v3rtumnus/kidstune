@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-family-approval-pin
+      author: kidstune
+      changes:
+        - addColumn:
+            tableName: family
+            columns:
+              - column:
+                  name: approval_pin_hash
+                  type: VARCHAR(255)

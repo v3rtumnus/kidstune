@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.kidstune.kids.data.local.ContentDao
 import at.kidstune.kids.data.preferences.ProfilePreferences
+import at.kidstune.kids.data.remote.PinApproveException
 import at.kidstune.kids.data.repository.DiscoverRepository
 import at.kidstune.kids.domain.model.DiscoverTile
 import at.kidstune.kids.domain.model.PendingRequest
@@ -36,6 +37,25 @@ data class DiscoverState(
     val searchError: Boolean = false,
     /** True when suggestions could not be loaded (network unavailable). */
     val suggestionsError: Boolean = false,
+
+    // ── PIN quick-approval flow ───────────────────────────────────────────────
+
+    /** True when the family has configured a quick-approval PIN. */
+    val pinAvailable: Boolean = false,
+    /** The tile currently being acted on in the approval / PIN flow. */
+    val pinFlowTile: DiscoverTile? = null,
+    /** Show the "Anfragen" vs. "Elternteil fragen" choice overlay. */
+    val showApprovalChoice: Boolean = false,
+    /** Show the numeric PIN entry overlay. */
+    val showPinPad: Boolean = false,
+    /** Digits entered so far (max 4). */
+    val pinDigits: String = "",
+    /** True after a wrong PIN — cleared automatically on next digit. */
+    val pinError: Boolean = false,
+    /** True after the backend returns 429 (too many attempts). */
+    val pinTooManyAttempts: Boolean = false,
+    /** True while waiting for the backend to respond to a PIN attempt. */
+    val pinSubmitting: Boolean = false,
 )
 
 sealed interface DiscoverIntent {
@@ -45,6 +65,24 @@ sealed interface DiscoverIntent {
     data object DismissCelebration : DiscoverIntent
     data object StartVoiceInput : DiscoverIntent
     data class VoiceInputResult(val text: String) : DiscoverIntent
+
+    // ── PIN approval intents ──────────────────────────────────────────────────
+    /** Open the choice overlay for [tile] (sent when pinAvailable = true). */
+    data class OpenApprovalChoice(val tile: DiscoverTile) : DiscoverIntent
+    /** From the choice overlay: proceed with a normal async request. */
+    data object SendRequestFromChoice : DiscoverIntent
+    /** From the choice overlay: open the PIN pad. */
+    data object OpenPinPad : DiscoverIntent
+    /** A numpad digit was tapped. Auto-submits when the 4th digit is entered. */
+    data class PinDigit(val digit: Char) : DiscoverIntent
+    /** Delete the last digit. */
+    data object PinBackspace : DiscoverIntent
+    /** User cancelled the PIN flow (back button or explicit cancel). */
+    data object PinCancel : DiscoverIntent
+    /** 30-second inactivity timeout on the PIN pad. */
+    data object PinTimeout : DiscoverIntent
+    /** After 3 failed attempts: fall back to the normal request flow. */
+    data object RetryAsRequest : DiscoverIntent
 }
 
 /** Minimum gap between two consecutive search calls (rate-limiting). */
@@ -72,6 +110,7 @@ class DiscoverViewModel @Inject constructor(
 
     init {
         val profileId = prefs.boundProfileId
+        _state.update { it.copy(pinAvailable = prefs.pinAvailable) }
         if (profileId != null) {
             loadSuggestions(profileId)
             observeRequests(profileId)
@@ -87,6 +126,49 @@ class DiscoverViewModel @Inject constructor(
             is DiscoverIntent.DismissCelebration -> _state.update { it.copy(showCelebration = false) }
             is DiscoverIntent.StartVoiceInput    -> Unit  // UI layer launches SpeechRecognizer
             is DiscoverIntent.VoiceInputResult   -> handleQueryUpdate(intent.text)
+
+            is DiscoverIntent.OpenApprovalChoice -> _state.update { it.copy(
+                pinFlowTile       = intent.tile,
+                showApprovalChoice = true,
+            )}
+            is DiscoverIntent.SendRequestFromChoice -> {
+                val tile = _state.value.pinFlowTile ?: return
+                _state.update { it.copy(showApprovalChoice = false, pinFlowTile = null) }
+                handleRequestContent(tile)
+            }
+            is DiscoverIntent.OpenPinPad -> _state.update { it.copy(
+                showApprovalChoice  = false,
+                showPinPad          = true,
+                pinDigits           = "",
+                pinError            = false,
+                pinTooManyAttempts  = false,
+            )}
+            is DiscoverIntent.PinDigit    -> handlePinDigit(intent.digit)
+            is DiscoverIntent.PinBackspace -> _state.update { it.copy(
+                pinDigits = _state.value.pinDigits.dropLast(1),
+                pinError  = false,
+            )}
+            is DiscoverIntent.PinCancel,
+            is DiscoverIntent.PinTimeout  -> _state.update { it.copy(
+                showPinPad         = false,
+                showApprovalChoice = false,
+                pinFlowTile        = null,
+                pinDigits          = "",
+                pinError           = false,
+                pinSubmitting      = false,
+                pinTooManyAttempts = false,
+            )}
+            is DiscoverIntent.RetryAsRequest -> {
+                val tile = _state.value.pinFlowTile ?: return
+                _state.update { it.copy(
+                    showPinPad         = false,
+                    showApprovalChoice = false,
+                    pinFlowTile        = null,
+                    pinDigits          = "",
+                    pinTooManyAttempts = false,
+                )}
+                handleRequestContent(tile)
+            }
         }
     }
 
@@ -151,6 +233,59 @@ class DiscoverViewModel @Inject constructor(
 
     private fun handleDismissRejected(id: String) {
         _state.update { it.copy(pendingRequests = it.pendingRequests.filter { r -> r.id != id }) }
+    }
+
+    private fun handlePinDigit(digit: Char) {
+        val current = _state.value.pinDigits
+        if (current.length >= 4 || _state.value.pinSubmitting) return
+        val newDigits = current + digit
+        _state.update { it.copy(pinDigits = newDigits, pinError = false) }
+        if (newDigits.length == 4) {
+            submitPin(newDigits)
+        }
+    }
+
+    private fun submitPin(pin: String) {
+        val tile      = _state.value.pinFlowTile ?: return
+        val profileId = prefs.boundProfileId ?: return
+        _state.update { it.copy(pinSubmitting = true) }
+
+        viewModelScope.launch {
+            val result = discoverRepository.pinApproveContent(profileId, tile, pin)
+            if (result.isSuccess) {
+                _state.update {
+                    it.copy(
+                        showPinPad         = false,
+                        showApprovalChoice = false,
+                        pinFlowTile        = null,
+                        pinDigits          = "",
+                        pinError           = false,
+                        pinSubmitting      = false,
+                        showCelebration    = true,
+                        // Remove from tile lists — the approved content will arrive via next sync
+                        suggestions        = it.suggestions.filter { t -> t.spotifyUri != tile.spotifyUri },
+                        searchResults      = it.searchResults.filter { t -> t.spotifyUri != tile.spotifyUri },
+                        newlyApprovedUris  = it.newlyApprovedUris + tile.spotifyUri,
+                    )
+                }
+            } else {
+                val ex              = result.exceptionOrNull()
+                val tooManyAttempts = ex is PinApproveException && ex.tooManyAttempts
+                if (tooManyAttempts) {
+                    _state.update { it.copy(
+                        pinTooManyAttempts = true,
+                        pinSubmitting      = false,
+                        pinDigits          = "",
+                    )}
+                } else {
+                    _state.update { it.copy(
+                        pinError      = true,
+                        pinSubmitting = false,
+                        pinDigits     = "",
+                    )}
+                }
+            }
+        }
     }
 
     private fun loadSuggestions(profileId: String) {

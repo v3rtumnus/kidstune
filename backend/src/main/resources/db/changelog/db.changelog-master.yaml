@@ -23,3 +23,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/008-push-subscriptions.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/009-family-approval-pin.yaml
+      relativeToChangelogFile: false

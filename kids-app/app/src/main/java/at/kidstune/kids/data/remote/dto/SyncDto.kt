@@ -12,6 +12,7 @@ data class SyncPayloadDto(
     val profile: SyncProfileDto,
     val favorites: List<SyncFavoriteDto> = emptyList(),
     val content: List<SyncContentEntryDto> = emptyList(),
+    val pinAvailable: Boolean = false,
     val syncTimestamp: String = ""
 )
 

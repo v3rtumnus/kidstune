@@ -38,6 +38,10 @@ public class Family {
     @Column(name = "notification_emails", columnDefinition = "TEXT")
     private String notificationEmails;
 
+    /** BCrypt hash of the 4-digit quick-approval PIN – nullable; absent means feature is off. */
+    @Column(name = "approval_pin_hash", length = 255)
+    private String approvalPinHash;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -78,6 +82,9 @@ public class Family {
 
     public String getNotificationEmails() { return notificationEmails; }
     public void setNotificationEmails(String notificationEmails) { this.notificationEmails = notificationEmails; }
+
+    public String getApprovalPinHash() { return approvalPinHash; }
+    public void setApprovalPinHash(String approvalPinHash) { this.approvalPinHash = approvalPinHash; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

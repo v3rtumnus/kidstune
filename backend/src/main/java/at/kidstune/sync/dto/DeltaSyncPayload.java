@@ -9,5 +9,6 @@ public record DeltaSyncPayload(
         List<String> removed,
         List<SyncFavoriteDto> favoritesAdded,
         List<String> favoritesRemoved,
+        boolean pinAvailable,
         Instant syncTimestamp
 ) {}

@@ -4,6 +4,7 @@ import at.kidstune.auth.SpotifyConfig;
 import at.kidstune.auth.SpotifyTokenService;
 import at.kidstune.family.Family;
 import at.kidstune.family.FamilyRepository;
+import at.kidstune.family.FamilyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -46,13 +47,16 @@ public class SettingsWebController {
     private static final String PKCE_PREFIX = "settings_pkce_";
 
     private final FamilyRepository  familyRepository;
+    private final FamilyService     familyService;
     private final SpotifyTokenService spotifyTokenService;
     private final SpotifyConfig      spotifyConfig;
 
     public SettingsWebController(FamilyRepository familyRepository,
+                                 FamilyService familyService,
                                  SpotifyTokenService spotifyTokenService,
                                  SpotifyConfig spotifyConfig) {
         this.familyRepository    = familyRepository;
+        this.familyService       = familyService;
         this.spotifyTokenService = spotifyTokenService;
         this.spotifyConfig       = spotifyConfig;
     }
@@ -62,6 +66,7 @@ public class SettingsWebController {
     @GetMapping
     public Mono<String> settingsPage(
             @RequestParam(value = "spotify", required = false) String spotifyStatus,
+            @RequestParam(value = "pin", required = false) String pinStatus,
             Model model,
             @AuthenticationPrincipal String familyId) {
 
@@ -71,9 +76,14 @@ public class SettingsWebController {
                     family.getNotificationEmails() != null ? family.getNotificationEmails() : "");
             model.addAttribute("familyId", familyId);
             model.addAttribute("saved", false);
-            model.addAttribute("spotifyConnected",   family.getSpotifyUserId() != null);
-            model.addAttribute("spotifyUserId",      family.getSpotifyUserId());
+            model.addAttribute("spotifyConnected",     family.getSpotifyUserId() != null);
+            model.addAttribute("spotifyUserId",        family.getSpotifyUserId());
             model.addAttribute("spotifyJustConnected", "connected".equals(spotifyStatus));
+            model.addAttribute("spotifyError",         "error".equals(spotifyStatus));
+            model.addAttribute("pinConfigured",        family.getApprovalPinHash() != null);
+            model.addAttribute("pinSaved",             "saved".equals(pinStatus));
+            model.addAttribute("pinCleared",           "cleared".equals(pinStatus));
+            model.addAttribute("pinError",             (String) null);
             return "web/settings";
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -95,14 +105,79 @@ public class SettingsWebController {
                 familyRepository.save(family);
 
                 model.addAttribute("notificationEmails", trimmed);
-                model.addAttribute("familyId", familyId);
-                model.addAttribute("saved", true);
-                model.addAttribute("spotifyConnected", family.getSpotifyUserId() != null);
-                model.addAttribute("spotifyUserId",    family.getSpotifyUserId());
+                model.addAttribute("familyId",           familyId);
+                model.addAttribute("saved",              true);
+                model.addAttribute("spotifyConnected",   family.getSpotifyUserId() != null);
+                model.addAttribute("spotifyUserId",      family.getSpotifyUserId());
                 model.addAttribute("spotifyJustConnected", false);
+                model.addAttribute("pinConfigured",      family.getApprovalPinHash() != null);
+                model.addAttribute("pinSaved",           false);
+                model.addAttribute("pinCleared",         false);
+                model.addAttribute("pinError",           (String) null);
                 return "web/settings";
             }).subscribeOn(Schedulers.boundedElastic());
         });
+    }
+
+    // ── POST /web/settings/set-pin ───────────────────────────────────────────
+
+    @PostMapping("/set-pin")
+    public Mono<String> setPin(
+            Model model,
+            @AuthenticationPrincipal String familyId,
+            ServerWebExchange exchange) {
+
+        return exchange.getFormData().flatMap(form -> {
+            String newPin     = form.getFirst("newPin");
+            String confirmPin = form.getFirst("confirmPin");
+
+            return Mono.fromCallable(() -> {
+                // Validate before touching DB
+                String pinError = null;
+                boolean pinSaved = false;
+
+                if (newPin == null || !newPin.matches("\\d{4}")) {
+                    pinError = "Der PIN muss genau 4 Ziffern enthalten.";
+                } else if (!newPin.equals(confirmPin)) {
+                    pinError = "Die PINs stimmen nicht überein.";
+                } else {
+                    familyService.setPin(familyId, newPin);
+                    pinSaved = true;
+                }
+
+                // Re-fetch after possible update
+                Family family = familyRepository.findById(familyId).orElseThrow();
+
+                model.addAttribute("notificationEmails",
+                        family.getNotificationEmails() != null ? family.getNotificationEmails() : "");
+                model.addAttribute("familyId",           familyId);
+                model.addAttribute("saved",              false);
+                model.addAttribute("spotifyConnected",   family.getSpotifyUserId() != null);
+                model.addAttribute("spotifyUserId",      family.getSpotifyUserId());
+                model.addAttribute("spotifyJustConnected", false);
+                model.addAttribute("pinConfigured",      family.getApprovalPinHash() != null);
+                model.addAttribute("pinSaved",           pinSaved);
+                model.addAttribute("pinCleared",         false);
+                model.addAttribute("pinError",           pinError);
+                return "web/settings";
+            }).subscribeOn(Schedulers.boundedElastic());
+        });
+    }
+
+    // ── POST /web/settings/clear-pin ─────────────────────────────────────────
+
+    @PostMapping("/clear-pin")
+    public Mono<Void> clearPin(
+            ServerWebExchange exchange,
+            @AuthenticationPrincipal String familyId) {
+
+        return Mono.fromRunnable(() -> familyService.clearPin(familyId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then(Mono.fromRunnable(() -> {
+                    exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+                    exchange.getResponse().getHeaders().setLocation(URI.create("/web/settings?pin=cleared"));
+                }))
+                .then(exchange.getResponse().setComplete());
     }
 
     // ── GET /web/settings/connect-spotify ────────────────────────────────────

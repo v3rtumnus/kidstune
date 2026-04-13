@@ -18,6 +18,8 @@ data class DeltaSyncPayloadDto(
     val favoritesAdded: List<SyncFavoriteDto> = emptyList(),
     /** Track URIs of favorites removed on the server since last sync. */
     val favoritesRemoved: List<String> = emptyList(),
+    /** True when the family has a quick-approval PIN configured. */
+    val pinAvailable: Boolean = false,
     /** ISO-8601 timestamp to store as the new lastSyncTimestamp. */
     val syncTimestamp: String = ""
 )

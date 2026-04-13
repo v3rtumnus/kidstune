@@ -2,6 +2,7 @@ package at.kidstune.sync;
 
 import at.kidstune.content.AllowedContent;
 import at.kidstune.content.ContentRepository;
+import at.kidstune.family.FamilyRepository;
 import at.kidstune.favorites.Favorite;
 import at.kidstune.favorites.FavoriteRepository;
 import at.kidstune.profile.ChildProfile;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
 public class SyncService {
 
     private final ProfileRepository      profileRepo;
+    private final FamilyRepository       familyRepo;
     private final ContentRepository      contentRepo;
     private final ResolvedAlbumRepository albumRepo;
     private final ResolvedTrackRepository trackRepo;
@@ -45,12 +47,14 @@ public class SyncService {
     private final DeletionLogRepository  deletionLogRepo;
 
     public SyncService(ProfileRepository profileRepo,
+                       FamilyRepository familyRepo,
                        ContentRepository contentRepo,
                        ResolvedAlbumRepository albumRepo,
                        ResolvedTrackRepository trackRepo,
                        FavoriteRepository favoriteRepo,
                        DeletionLogRepository deletionLogRepo) {
         this.profileRepo    = profileRepo;
+        this.familyRepo     = familyRepo;
         this.contentRepo    = contentRepo;
         this.albumRepo      = albumRepo;
         this.trackRepo      = trackRepo;
@@ -75,7 +79,11 @@ public class SyncService {
         List<SyncFavoriteDto> favorites = favoriteRepo.findByProfileId(profileId)
                 .stream().map(SyncFavoriteDto::from).toList();
 
-        return new FullSyncPayload(SyncProfileDto.from(profile), favorites, content, Instant.now());
+        boolean pinAvailable = familyRepo.findById(profile.getFamilyId())
+                .map(f -> f.getApprovalPinHash() != null)
+                .orElse(false);
+
+        return new FullSyncPayload(SyncProfileDto.from(profile), favorites, content, pinAvailable, Instant.now());
     }
 
     // ── Delta sync ─────────────────────────────────────────────────────────────
@@ -86,9 +94,8 @@ public class SyncService {
     }
 
     private DeltaSyncPayload buildDeltaSync(String profileId, Instant since) {
-        if (!profileRepo.existsById(profileId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
-        }
+        ChildProfile profile = profileRepo.findById(profileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found"));
 
         // ── Added: entries created after `since` ───────────────────────────────
         List<AllowedContent> addedEntries = contentRepo.findByProfileIdAndCreatedAtAfter(profileId, since);
@@ -140,7 +147,11 @@ public class SyncService {
                 .map(DeletionLog::getSpotifyUri)
                 .toList();
 
-        return new DeltaSyncPayload(added, updated, removed, favoritesAdded, favoritesRemoved, Instant.now());
+        boolean pinAvailable = familyRepo.findById(profile.getFamilyId())
+                .map(f -> f.getApprovalPinHash() != null)
+                .orElse(false);
+
+        return new DeltaSyncPayload(added, updated, removed, favoritesAdded, favoritesRemoved, pinAvailable, Instant.now());
     }
 
     // ── Tree builder (shared by full + delta) ──────────────────────────────────

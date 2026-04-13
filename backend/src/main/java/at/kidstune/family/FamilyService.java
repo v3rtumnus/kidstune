@@ -59,4 +59,40 @@ public class FamilyService {
         }
         return family.getId();
     }
+
+    // ── Quick-approval PIN ────────────────────────────────────────────────────
+
+    /** Returns {@code true} when the family has configured a quick-approval PIN. */
+    public boolean pinAvailable(String familyId) {
+        return familyRepository.findById(familyId)
+                .map(f -> f.getApprovalPinHash() != null)
+                .orElse(false);
+    }
+
+    /**
+     * Verifies a plaintext PIN against the stored BCrypt hash.
+     * Returns {@code false} when no PIN is set or the PIN is wrong.
+     */
+    public boolean verifyPin(String familyId, String pin) {
+        return familyRepository.findById(familyId)
+                .map(f -> f.getApprovalPinHash() != null
+                          && passwordEncoder.matches(pin, f.getApprovalPinHash()))
+                .orElse(false);
+    }
+
+    /** Sets or replaces the quick-approval PIN for a family. */
+    @Transactional
+    public void setPin(String familyId, String pin) {
+        Family family = familyRepository.findById(familyId).orElseThrow();
+        family.setApprovalPinHash(passwordEncoder.encode(pin));
+        familyRepository.save(family);
+    }
+
+    /** Removes the quick-approval PIN, disabling the feature for this family. */
+    @Transactional
+    public void clearPin(String familyId) {
+        Family family = familyRepository.findById(familyId).orElseThrow();
+        family.setApprovalPinHash(null);
+        familyRepository.save(family);
+    }
 }

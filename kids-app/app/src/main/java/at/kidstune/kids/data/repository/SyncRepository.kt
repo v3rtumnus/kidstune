@@ -7,6 +7,7 @@ import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.data.local.entities.LocalFavorite
 import at.kidstune.kids.data.local.entities.LocalTrack
+import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.data.remote.KidstuneApiClient
 import at.kidstune.kids.data.remote.dto.SyncContentEntryDto
 import at.kidstune.kids.domain.model.ContentScope
@@ -34,7 +35,8 @@ import kotlinx.coroutines.flow.asStateFlow
 class SyncRepository @Inject constructor(
     private val apiClient: KidstuneApiClient,
     private val db: KidstuneDatabase,
-    private val favoriteRepository: FavoriteRepository
+    private val favoriteRepository: FavoriteRepository,
+    private val profilePreferences: ProfilePreferences,
 ) {
 
     private val _storageFullError = MutableStateFlow(false)
@@ -54,6 +56,7 @@ class SyncRepository @Inject constructor(
      */
     suspend fun deltaSync(profileId: String, since: String): Result<Unit> = runCatching {
         val payload = apiClient.fetchDeltaSync(profileId, since)
+        profilePreferences.pinAvailable = payload.pinAvailable
 
         db.withTransaction {
             val syncedAt = Instant.now()
@@ -114,6 +117,7 @@ class SyncRepository @Inject constructor(
      */
     suspend fun fullSync(profileId: String): Result<Unit> = runCatching {
         val payload = apiClient.fetchFullSync(profileId)
+        profilePreferences.pinAvailable = payload.pinAvailable
 
         db.withTransaction {
             // ── 1. Replace content entries ─────────────────────────────────────

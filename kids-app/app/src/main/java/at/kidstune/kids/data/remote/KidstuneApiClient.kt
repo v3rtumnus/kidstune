@@ -9,6 +9,7 @@ import at.kidstune.kids.data.remote.dto.DiscoverItemDto
 import at.kidstune.kids.data.remote.dto.FavoriteResponseDto
 import at.kidstune.kids.data.remote.dto.PairingConfirmRequestDto
 import at.kidstune.kids.data.remote.dto.PairingConfirmResponseDto
+import at.kidstune.kids.data.remote.dto.PinApproveRequestDto
 import at.kidstune.kids.data.remote.dto.SearchResultsDto
 import at.kidstune.kids.data.remote.dto.SyncPayloadDto
 import io.ktor.client.HttpClient
@@ -139,6 +140,26 @@ class KidstuneApiClient @Inject constructor(
         httpClient.get("$baseUrl/api/v1/content-requests") {
             parameter("profileId", profileId)
         }.body()
+
+    /**
+     * Requests immediate PIN-based approval for content on the child's device.
+     * Corresponds to `POST /api/v1/profiles/{profileId}/content/pin-approve`.
+     *
+     * @throws PinApproveException with [PinApproveException.tooManyAttempts] = true on HTTP 429
+     * @throws PinApproveException with [PinApproveException.tooManyAttempts] = false on HTTP 403
+     */
+    suspend fun pinApproveContent(profileId: String, req: PinApproveRequestDto) {
+        val response = httpClient.post("$baseUrl/api/v1/profiles/$profileId/content/pin-approve") {
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }
+        if (!response.status.isSuccess()) {
+            throw PinApproveException(
+                httpStatus      = response.status.value,
+                tooManyAttempts = response.status.value == 429
+            )
+        }
+    }
 }
 
 /** Thrown by [KidstuneApiClient.pair] when the backend rejects a pairing code. */
@@ -147,3 +168,9 @@ class PairingApiException(
     val apiCode: String?,
     message: String
 ) : Exception(message)
+
+/** Thrown by [KidstuneApiClient.pinApproveContent] on a failed PIN attempt. */
+class PinApproveException(
+    val httpStatus: Int,
+    val tooManyAttempts: Boolean
+) : Exception(if (tooManyAttempts) "Zu viele Fehlversuche" else "Ungültiger PIN")

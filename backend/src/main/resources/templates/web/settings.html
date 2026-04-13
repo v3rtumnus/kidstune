@@ -54,6 +54,78 @@
             </div>
         </div>
 
+        <!-- Quick-approval PIN -->
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex align-items-center gap-2">
+                    <h5 class="mb-0">Schnell-Freigabe PIN</h5>
+                    <span class="badge bg-success" th:if="${pinConfigured}">Aktiv</span>
+                    <span class="badge bg-secondary" th:unless="${pinConfigured}">Nicht eingerichtet</span>
+                </div>
+                <div class="card-body">
+
+                    <div class="alert alert-success small" role="alert" th:if="${pinSaved}">
+                        PIN erfolgreich gespeichert. Kinder k&ouml;nnen jetzt Inhalte sofort freigeben lassen.
+                    </div>
+                    <div class="alert alert-info small" role="alert" th:if="${pinCleared}">
+                        PIN entfernt. Die Schnell-Freigabe ist deaktiviert.
+                    </div>
+                    <div class="alert alert-danger small" role="alert" th:if="${pinError != null}">
+                        <span th:text="${pinError}"></span>
+                    </div>
+
+                    <p class="text-muted small mb-3">
+                        Mit einem 4-stelligen PIN k&ouml;nnen Eltern Inhalte sofort auf dem Ger&auml;t des
+                        Kindes freigeben &ndash; ohne Anfrage und E-Mail. Das Kind tippt auf
+                        &bdquo;Elternteil fragen&ldquo;, gibt das Handy weiter, und du gibst den PIN ein.
+                    </p>
+
+                    <form th:action="@{/web/settings/set-pin}" method="post">
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label for="newPin" class="form-label fw-semibold">
+                                    <span th:text="${pinConfigured} ? 'Neuer PIN' : 'PIN festlegen'"></span>
+                                </label>
+                                <input type="password"
+                                       class="form-control"
+                                       id="newPin"
+                                       name="newPin"
+                                       maxlength="4"
+                                       pattern="\d{4}"
+                                       inputmode="numeric"
+                                       placeholder="4 Ziffern"
+                                       autocomplete="new-password">
+                            </div>
+                            <div class="col-6">
+                                <label for="confirmPin" class="form-label fw-semibold">PIN best&auml;tigen</label>
+                                <input type="password"
+                                       class="form-control"
+                                       id="confirmPin"
+                                       name="confirmPin"
+                                       maxlength="4"
+                                       pattern="\d{4}"
+                                       inputmode="numeric"
+                                       placeholder="4 Ziffern"
+                                       autocomplete="new-password">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <span th:text="${pinConfigured} ? 'PIN &auml;ndern' : 'PIN speichern'"></span>
+                        </button>
+                    </form>
+                    <form th:action="@{/web/settings/clear-pin}" method="post" class="mt-2"
+                          th:if="${pinConfigured}">
+                        <button type="submit"
+                                class="btn btn-outline-danger btn-sm"
+                                onclick="return confirm('PIN wirklich entfernen? Die Schnell-Freigabe wird deaktiviert.')">
+                            PIN entfernen
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+
         <!-- Spotify account -->
         <div class="col-12 col-md-8 col-lg-6">
             <div class="card border-0 shadow-sm">
@@ -66,7 +138,7 @@
                         Spotify-Konto erfolgreich verbunden.
                     </div>
                     <div class="alert alert-danger small" role="alert"
-                         th:if="${#request.getParameter('spotify') == 'error'}">
+                         th:if="${spotifyError}">
                         Verbindung mit Spotify fehlgeschlagen. Bitte versuche es erneut.
                     </div>
 
