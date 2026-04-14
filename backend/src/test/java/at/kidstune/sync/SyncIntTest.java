@@ -81,8 +81,8 @@ class SyncIntTest extends AbstractIntTest {
                 .responseTimeout(java.time.Duration.ofSeconds(10))
                 .build();
 
-        kidsToken   = jwtTokenService.createDeviceToken(FAMILY_ID, "kids-device",   DeviceType.KIDS);
-        parentToken = jwtTokenService.createDeviceToken(FAMILY_ID, "parent-device", DeviceType.PARENT);
+        kidsToken   = jwtTokenService.createDeviceToken(FAMILY_ID, "sync-kids-device",   DeviceType.KIDS);
+        parentToken = jwtTokenService.createDeviceToken(FAMILY_ID, "sync-parent-device", DeviceType.PARENT);
 
         if (!familyRepo.existsById(FAMILY_ID)) {
             Family f = new Family();
@@ -116,16 +116,18 @@ class SyncIntTest extends AbstractIntTest {
         when(spotifyApiClient.getTrackUrisInPlaylist(anyString()))
                 .thenReturn(Mono.just(List.of()));
 
-        // Register the test kids device so LastSeenFilter allows it through
-        if (!pairedDeviceRepo.existsById("kids-device")) {
-            PairedDevice d = new PairedDevice();
-            d.setId("kids-device");
-            d.setFamilyId(FAMILY_ID);
-            d.setDeviceName("Test Kids Device");
-            d.setDeviceType(DeviceType.KIDS);
-            d.setDeviceTokenHash("test-hash-kids-device-sync");
-            pairedDeviceRepo.save(d);
-        }
+        // Ensure the device exists with the correct profileId for this JVM run.
+        // Delete-then-insert (rather than upsert) so @PrePersist sets created_at.
+        // Using a class-unique device ID avoids collisions with other test classes.
+        pairedDeviceRepo.deleteById("sync-kids-device");
+        PairedDevice d = new PairedDevice();
+        d.setId("sync-kids-device");
+        d.setFamilyId(FAMILY_ID);
+        d.setDeviceName("Test Kids Device");
+        d.setDeviceType(DeviceType.KIDS);
+        d.setDeviceTokenHash("test-hash-sync-kids-device");
+        d.setProfileId(PROFILE_ID);
+        pairedDeviceRepo.save(d);
     }
 
     // ── Full sync ──────────────────────────────────────────────────────────────

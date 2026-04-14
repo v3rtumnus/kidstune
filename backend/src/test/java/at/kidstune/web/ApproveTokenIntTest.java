@@ -4,6 +4,7 @@ import at.kidstune.AbstractIntTest;
 import at.kidstune.content.ContentType;
 import at.kidstune.family.Family;
 import at.kidstune.family.FamilyRepository;
+import at.kidstune.device.PairedDeviceRepository;
 import at.kidstune.notification.EmailNotificationService;
 import at.kidstune.profile.AgeGroup;
 import at.kidstune.profile.AvatarColor;
@@ -51,6 +52,7 @@ class ApproveTokenIntTest extends AbstractIntTest {
     @Autowired ContentRequestRepository requestRepository;
     @Autowired ProfileRepository        profileRepository;
     @Autowired FamilyRepository         familyRepository;
+    @Autowired PairedDeviceRepository   pairedDeviceRepository;
     @Autowired EmailNotificationService emailService;
     @Autowired JavaMailSender           mailSender;
 
@@ -62,6 +64,7 @@ class ApproveTokenIntTest extends AbstractIntTest {
                 .baseUrl("http://localhost:" + port)
                 .build();
         requestRepository.deleteAll();
+        pairedDeviceRepository.deleteAll();
         profileRepository.deleteAll();
         familyRepository.deleteAll();
         reset(mailSender);

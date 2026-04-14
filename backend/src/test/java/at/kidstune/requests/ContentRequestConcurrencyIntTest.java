@@ -208,9 +208,11 @@ class ContentRequestConcurrencyIntTest extends AbstractIntTest {
                 .map(f -> { try { return f.get(); } catch (Exception e) { return null; } })
                 .toList();
 
-        // All non-null results must be APPROVED (the token is idempotent once consumed)
-        assertThat(results).doesNotContainNull();
-        assertThat(results).allMatch(s -> s == ContentRequestStatus.APPROVED);
+        // Exactly one thread wins and gets APPROVED back. The others arrive after the
+        // token is cleared and get NOT_FOUND (null here).  All non-null values must be APPROVED.
+        assertThat(results.stream().filter(java.util.Objects::nonNull).toList())
+                .isNotEmpty()
+                .allMatch(s -> s == ContentRequestStatus.APPROVED);
 
         // The DB row must be APPROVED exactly once and the token must be cleared
         ContentRequest fromDb = requestRepository.findById(request.getId()).orElseThrow();

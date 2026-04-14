@@ -191,8 +191,17 @@ class SpotifySuggestionsIntTest extends AbstractIntTest {
 
     @Test
     void suggestions_emptyWhenProfileHasNoContent() {
-        // Profile with no approved content and no favourites → empty list
+        // Profile with no approved content and no favourites → empty list.
+        // The profile must exist in the DB so the ownership check passes.
         String emptyProfileId = UUID.randomUUID().toString();
+        ChildProfile empty = new ChildProfile();
+        empty.setId(emptyProfileId);
+        empty.setFamilyId(FAMILY_ID);
+        empty.setName("EmptyKid");
+        empty.setAgeGroup(AgeGroup.SCHOOL);
+        empty.setAvatarIcon(AvatarIcon.OWL);
+        empty.setAvatarColor(AvatarColor.GREEN);
+        profileRepository.save(empty);
 
         List<SpotifyItemDto> results = client.get()
             .uri("/api/v1/spotify/suggestions?profileId=" + emptyProfileId)

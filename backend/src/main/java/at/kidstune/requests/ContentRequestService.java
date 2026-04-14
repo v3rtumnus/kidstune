@@ -14,6 +14,7 @@ import at.kidstune.resolver.ContentResolver;
 import at.kidstune.sse.SseRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -385,19 +386,42 @@ public class ContentRequestService {
      * transaction is opened on the calling thread (WebFlux event loop) while the actual
      * DB work runs on a different thread via subscribeOn.
      */
+    private static final int MAX_DEADLOCK_RETRIES = 3;
+
+    /**
+     * Executes {@code callable} inside a transaction, retrying up to
+     * {@link #MAX_DEADLOCK_RETRIES} times on deadlock (PessimisticLockingFailureException).
+     * MariaDB's InnoDB occasionally chooses a transaction as the deadlock victim when
+     * multiple threads compete for the same pessimistic write locks; retrying resolves
+     * the race deterministically.
+     */
     private <T> Mono<T> dbTx(java.util.concurrent.Callable<T> callable) {
-        return Mono.fromCallable(() ->
-            txTemplate.execute(status -> {
-                try {
-                    return callable.call();
-                } catch (RuntimeException e) {
-                    status.setRollbackOnly();
-                    throw e;
-                } catch (Exception e) {
-                    status.setRollbackOnly();
-                    throw new RuntimeException(e);
+        return Mono.fromCallable(() -> {
+            PessimisticLockingFailureException lastDeadlock = null;
+            for (int attempt = 0; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
+                if (attempt > 0) {
+                    try { Thread.sleep(20L * attempt); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
                 }
-            })
-        ).subscribeOn(Schedulers.boundedElastic());
+                try {
+                    return txTemplate.execute(status -> {
+                        try {
+                            return callable.call();
+                        } catch (RuntimeException e) {
+                            status.setRollbackOnly();
+                            throw e;
+                        } catch (Exception e) {
+                            status.setRollbackOnly();
+                            throw new RuntimeException(e);
+                        }
+                    });
+                } catch (PessimisticLockingFailureException e) {
+                    lastDeadlock = e;
+                    log.warn("Deadlock on attempt {}/{}, retrying", attempt + 1, MAX_DEADLOCK_RETRIES + 1);
+                }
+            }
+            throw lastDeadlock;
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 }

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import reactor.test.StepVerifier;
 
@@ -16,6 +17,7 @@ import java.util.Optional;
 import static at.kidstune.profile.ProfileService.MAX_PROFILES_PER_FAMILY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,7 +34,18 @@ class ProfileServiceTest {
             new ProfileRequest("Lena", AvatarIcon.FOX, AvatarColor.PURPLE, AgeGroup.PRESCHOOL);
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
+        // Make txTemplate.execute() actually invoke the callback, just as the real
+        // TransactionTemplate does.  Without this stub the mock returns null and
+        // the lambda body is never executed, causing every transactional method to
+        // silently return null instead of running the repository calls.
+        // lenient() suppresses UnnecessaryStubbingException for tests that don't
+        // call transactional methods (e.g. listProfiles, updateProfile).
+        lenient().when(txTemplate.execute(any())).thenAnswer(inv -> {
+            TransactionCallback<?> cb = inv.getArgument(0);
+            return cb.doInTransaction(null);
+        });
         profileService = new ProfileService(profileRepository, txTemplate);
     }
 
