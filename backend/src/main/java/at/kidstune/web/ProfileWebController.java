@@ -35,6 +35,7 @@ public class ProfileWebController {
     private static final Logger log = LoggerFactory.getLogger(ProfileWebController.class);
 
     private static final String[] CHILD_SPOTIFY_SCOPES = {
+            "user-read-private",
             "user-library-read",
             "user-library-modify",
             "user-read-recently-played",
