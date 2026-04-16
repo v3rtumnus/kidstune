@@ -48,22 +48,22 @@
                     </thead>
                     <tbody>
                         <tr th:each="row : ${rows}"
-                            th:id="'fav-row-' + ${row.favorite().id()}">
+                            th:id="'fav-row-' + ${row.favorite().id}">
                             <td class="align-middle">
                                 <div class="d-flex align-items-center gap-2">
-                                    <img th:if="${row.favorite().trackImageUrl() != null}"
-                                         th:src="${row.favorite().trackImageUrl()}"
+                                    <img th:if="${row.favorite().trackImageUrl != null}"
+                                         th:src="${row.favorite().trackImageUrl}"
                                          alt="" width="28" height="28"
                                          class="rounded flex-shrink-0" style="object-fit:cover">
                                     <span class="text-truncate" style="max-width:180px"
-                                          th:text="${row.favorite().trackTitle()}"></span>
+                                          th:text="${row.favorite().trackTitle}"></span>
                                 </div>
                             </td>
                             <td class="align-middle d-none d-sm-table-cell text-muted"
-                                th:text="${row.favorite().artistName()}"></td>
+                                th:text="${row.favorite().artistName}"></td>
                             <td class="align-middle" th:text="${row.profileName()}"></td>
                             <td class="align-middle d-none d-md-table-cell text-muted"
-                                th:text="${#temporals.format(row.favorite().addedAt(), 'dd.MM.yyyy HH:mm')}"></td>
+                                th:text="${#temporals.format(row.favorite().addedAt, 'dd.MM.yyyy HH:mm')}"></td>
                             <td class="align-middle d-none d-md-table-cell">
                                 <span th:if="${row.spotifyLinked()}"
                                       class="badge bg-success">Verknüpft</span>
@@ -72,8 +72,8 @@
                             </td>
                             <td class="align-middle text-end">
                                 <button class="btn btn-sm btn-outline-danger"
-                                        th:attr="hx-post=@{/web/admin/favorites/{id}/delete(id=${row.favorite().id()})},
-                                                 hx-target='#fav-row-' + ${row.favorite().id()},
+                                        th:attr="hx-post=@{/web/admin/favorites/{id}/delete(id=${row.favorite().id})},
+                                                 hx-target='#fav-row-' + ${row.favorite().id},
                                                  hx-swap='outerHTML',
                                                  hx-confirm='Favorit wirklich löschen?'">
                                     &times;

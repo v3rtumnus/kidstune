@@ -29,15 +29,15 @@
                     <tbody>
                         <tr th:each="row : ${families}">
                             <td class="font-monospace small text-muted"
-                                th:text="${#strings.substring(row.family().id(), 0, 8) + '…'}"></td>
-                            <td th:text="${row.family().email()}"></td>
+                                th:text="${#strings.substring(row.family().id, 0, 8) + '…'}"></td>
+                            <td th:text="${row.family().email}"></td>
                             <td class="font-monospace small text-muted"
                                 th:text="${row.maskedSpotifyId() != null ? row.maskedSpotifyId() : '–'}"></td>
                             <td class="text-end">
                                 <span class="badge bg-primary" th:text="${row.profileCount()}"></span>
                             </td>
                             <td class="d-none d-md-table-cell text-muted small"
-                                th:text="${#temporals.format(row.family().createdAt(), 'dd.MM.yyyy HH:mm')}"></td>
+                                th:text="${#temporals.format(row.family().createdAt, 'dd.MM.yyyy HH:mm')}"></td>
                         </tr>
                     </tbody>
                 </table>

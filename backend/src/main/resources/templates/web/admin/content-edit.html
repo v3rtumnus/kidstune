@@ -16,20 +16,20 @@
         <div class="card-body">
 
             <div class="mb-3 p-3 bg-light rounded d-flex align-items-center gap-3">
-                <img th:if="${content.imageUrl() != null}"
-                     th:src="${content.imageUrl()}"
+                <img th:if="${content.imageUrl != null}"
+                     th:src="${content.imageUrl}"
                      alt="" width="48" height="48" class="rounded" style="object-fit:cover">
                 <div>
-                    <div class="fw-medium" th:text="${content.title()}"></div>
-                    <div class="text-muted small" th:text="${content.artistName()}"></div>
+                    <div class="fw-medium" th:text="${content.title}"></div>
+                    <div class="text-muted small" th:text="${content.artistName}"></div>
                     <div class="text-muted small font-monospace"
-                         th:text="${#strings.abbreviate(content.spotifyUri(), 40)}"></div>
+                         th:text="${#strings.abbreviate(content.spotifyUri, 40)}"></div>
                 </div>
             </div>
 
             <p class="text-muted small mb-3">Profil: <strong th:text="${profileName}"></strong></p>
 
-            <form th:action="@{/web/admin/content/{id}/edit(id=${content.id()})}" method="post">
+            <form th:action="@{/web/admin/content/{id}/edit(id=${content.id})}" method="post">
 
                 <div class="mb-3">
                     <label class="form-label fw-medium">Inhaltstyp</label>
@@ -37,7 +37,7 @@
                         <option th:each="ct : ${contentTypes}"
                                 th:value="${ct}"
                                 th:text="${ct}"
-                                th:selected="${content.contentType() == ct}"></option>
+                                th:selected="${content.contentType == ct}"></option>
                     </select>
                 </div>
 
@@ -47,7 +47,7 @@
                         <option th:each="cs : ${contentScopes}"
                                 th:value="${cs}"
                                 th:text="${cs}"
-                                th:selected="${content.scope() == cs}"></option>
+                                th:selected="${content.scope == cs}"></option>
                     </select>
                     <div class="form-text">Hinweis: Die Spotify-URI wird nicht geändert.</div>
                 </div>

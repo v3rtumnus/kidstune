@@ -9,8 +9,19 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">Meine Geräte</h1>
-        <span class="badge bg-secondary" th:text="${rows.size()} + ' gesamt'"></span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary" th:text="${rows.size()} + ' gesamt'"></span>
+            <button class="btn btn-primary btn-sm"
+                    hx-post="/web/devices/pair"
+                    hx-target="#pairing-code-area"
+                    hx-swap="innerHTML">
+                + Gerät koppeln
+            </button>
+        </div>
     </div>
+
+    <!-- Pairing code area — filled by HTMX on button click -->
+    <div id="pairing-code-area"></div>
 
     <div class="card border-0 shadow-sm">
         <div class="card-body p-0">

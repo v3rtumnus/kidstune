@@ -66,42 +66,42 @@
                     </thead>
                     <tbody>
                         <tr th:each="row : ${rows}"
-                            th:id="'content-row-' + ${row.content().id()}">
+                            th:id="'content-row-' + ${row.content().id}">
                             <td class="align-middle">
                                 <div class="d-flex align-items-center gap-2">
-                                    <img th:if="${row.content().imageUrl() != null}"
-                                         th:src="${row.content().imageUrl()}"
+                                    <img th:if="${row.content().imageUrl != null}"
+                                         th:src="${row.content().imageUrl}"
                                          alt="" width="28" height="28"
                                          class="rounded flex-shrink-0" style="object-fit:cover">
                                     <span class="text-truncate" style="max-width:180px"
-                                          th:text="${row.content().title()}"></span>
+                                          th:text="${row.content().title}"></span>
                                 </div>
                             </td>
                             <td class="align-middle d-none d-sm-table-cell text-muted"
-                                th:text="${row.content().artistName()}"></td>
+                                th:text="${row.content().artistName}"></td>
                             <td class="align-middle">
                                 <span class="badge bg-secondary"
-                                      th:text="${row.content().scope()}"></span>
+                                      th:text="${row.content().scope}"></span>
                             </td>
                             <td class="align-middle d-none d-md-table-cell">
                                 <span class="badge"
-                                      th:classappend="${row.content().contentType().name() == 'MUSIC'} ? 'bg-primary' : 'bg-success'"
-                                      th:text="${row.content().contentType()}"></span>
+                                      th:classappend="${row.content().contentType.name() == 'MUSIC'} ? 'bg-primary' : 'bg-success'"
+                                      th:text="${row.content().contentType}"></span>
                             </td>
                             <td class="align-middle d-none d-lg-table-cell text-muted"
                                 th:text="${row.profileName()}"></td>
                             <td class="align-middle d-none d-xl-table-cell font-monospace text-muted"
                                 style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"
-                                th:title="${row.content().spotifyUri()}"
-                                th:text="${#strings.abbreviate(row.content().spotifyUri(), 24)}"></td>
+                                th:title="${row.content().spotifyUri}"
+                                th:text="${#strings.abbreviate(row.content().spotifyUri, 24)}"></td>
                             <td class="align-middle d-none d-md-table-cell text-muted"
-                                th:text="${#temporals.format(row.content().createdAt(), 'dd.MM.yyyy')}"></td>
+                                th:text="${#temporals.format(row.content().createdAt, 'dd.MM.yyyy')}"></td>
                             <td class="align-middle text-end text-nowrap">
-                                <a th:href="@{/web/admin/content/{id}/edit(id=${row.content().id()})}"
+                                <a th:href="@{/web/admin/content/{id}/edit(id=${row.content().id})}"
                                    class="btn btn-sm btn-outline-secondary me-1">Bearbeiten</a>
                                 <button class="btn btn-sm btn-outline-danger"
-                                        th:attr="hx-post=@{/web/admin/content/{id}/delete(id=${row.content().id()})},
-                                                 hx-target='#content-row-' + ${row.content().id()},
+                                        th:attr="hx-post=@{/web/admin/content/{id}/delete(id=${row.content().id})},
+                                                 hx-target='#content-row-' + ${row.content().id},
                                                  hx-swap='outerHTML',
                                                  hx-confirm='Inhalt wirklich löschen? Aufgelöste Alben und Titel werden ebenfalls entfernt.'">
                                     &times;

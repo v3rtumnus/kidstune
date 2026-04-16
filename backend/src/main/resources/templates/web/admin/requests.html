@@ -49,44 +49,44 @@
                     </thead>
                     <tbody>
                         <tr th:each="row : ${rows}"
-                            th:id="'req-row-' + ${row.request().id()}">
+                            th:id="'req-row-' + ${row.request().id}">
                             <td class="align-middle">
                                 <div class="d-flex align-items-center gap-2">
-                                    <img th:if="${row.request().imageUrl() != null}"
-                                         th:src="${row.request().imageUrl()}"
+                                    <img th:if="${row.request().imageUrl != null}"
+                                         th:src="${row.request().imageUrl}"
                                          alt="" width="28" height="28"
                                          class="rounded flex-shrink-0" style="object-fit:cover">
                                     <span class="text-truncate" style="max-width:160px"
-                                          th:text="${row.request().title()}"></span>
+                                          th:text="${row.request().title}"></span>
                                 </div>
                             </td>
                             <td class="align-middle d-none d-sm-table-cell"
                                 th:text="${row.profileName()}"></td>
                             <td class="align-middle">
                                 <span class="badge"
-                                      th:classappend="${row.request().status().name() == 'PENDING'} ? 'bg-warning text-dark' :
-                                                      (${row.request().status().name() == 'APPROVED'} ? 'bg-success' :
-                                                      (${row.request().status().name() == 'REJECTED'} ? 'bg-danger' : 'bg-secondary'))"
-                                      th:text="${row.request().status()}"></span>
+                                      th:classappend="${row.request().status.name() == 'PENDING'} ? 'bg-warning text-dark' :
+                                                      (${row.request().status.name() == 'APPROVED'} ? 'bg-success' :
+                                                      (${row.request().status.name() == 'REJECTED'} ? 'bg-danger' : 'bg-secondary'))"
+                                      th:text="${row.request().status}"></span>
                             </td>
                             <td class="align-middle d-none d-md-table-cell text-muted"
-                                th:text="${#temporals.format(row.request().requestedAt(), 'dd.MM.yyyy HH:mm')}"></td>
+                                th:text="${#temporals.format(row.request().requestedAt, 'dd.MM.yyyy HH:mm')}"></td>
                             <td class="align-middle d-none d-lg-table-cell text-muted"
-                                th:text="${row.request().resolvedAt() != null ? #temporals.format(row.request().resolvedAt(), 'dd.MM.yyyy HH:mm') : '–'}"></td>
+                                th:text="${row.request().resolvedAt != null ? #temporals.format(row.request().resolvedAt, 'dd.MM.yyyy HH:mm') : '–'}"></td>
                             <td class="align-middle d-none d-lg-table-cell text-muted"
-                                th:text="${row.request().parentNote()}"></td>
+                                th:text="${row.request().parentNote}"></td>
                             <td class="align-middle text-end text-nowrap">
-                                <button th:if="${row.request().status().name() == 'PENDING'}"
+                                <button th:if="${row.request().status.name() == 'PENDING'}"
                                         class="btn btn-sm btn-outline-secondary me-1"
-                                        th:attr="hx-post=@{/web/admin/requests/{id}/expire(id=${row.request().id()})},
-                                                 hx-target='#req-row-' + ${row.request().id()},
+                                        th:attr="hx-post=@{/web/admin/requests/{id}/expire(id=${row.request().id})},
+                                                 hx-target='#req-row-' + ${row.request().id},
                                                  hx-swap='outerHTML',
                                                  hx-confirm='Anfrage als abgelaufen markieren?'">
                                     Ablaufen lassen
                                 </button>
                                 <button class="btn btn-sm btn-outline-danger"
-                                        th:attr="hx-post=@{/web/admin/requests/{id}/delete(id=${row.request().id()})},
-                                                 hx-target='#req-row-' + ${row.request().id()},
+                                        th:attr="hx-post=@{/web/admin/requests/{id}/delete(id=${row.request().id})},
+                                                 hx-target='#req-row-' + ${row.request().id},
                                                  hx-swap='outerHTML',
                                                  hx-confirm='Anfrage wirklich löschen?'">
                                     &times;

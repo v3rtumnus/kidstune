@@ -1,5 +1,6 @@
 package at.kidstune.web;
 
+import at.kidstune.auth.DevicePairingService;
 import at.kidstune.device.PairedDevice;
 import at.kidstune.device.PairedDeviceRepository;
 import at.kidstune.profile.ChildProfile;
@@ -29,11 +30,14 @@ public class DeviceWebController {
 
     private final PairedDeviceRepository deviceRepository;
     private final ProfileRepository      profileRepository;
+    private final DevicePairingService   devicePairingService;
 
     public DeviceWebController(PairedDeviceRepository deviceRepository,
-                               ProfileRepository profileRepository) {
-        this.deviceRepository  = deviceRepository;
-        this.profileRepository = profileRepository;
+                               ProfileRepository profileRepository,
+                               DevicePairingService devicePairingService) {
+        this.deviceRepository    = deviceRepository;
+        this.profileRepository   = profileRepository;
+        this.devicePairingService = devicePairingService;
     }
 
     // ── GET /web/devices ──────────────────────────────────────────────────────
@@ -83,6 +87,23 @@ public class DeviceWebController {
             exchange.getResponse().getHeaders().setLocation(URI.create("/web/devices"));
         }))
         .then(exchange.getResponse().setComplete());
+    }
+
+    // ── POST /web/devices/pair ────────────────────────────────────────────────
+
+    /**
+     * Generates a pairing code for the authenticated family and returns an
+     * HTMX partial showing the 6-digit code with a 5-minute countdown.
+     */
+    @PostMapping("/pair")
+    public Mono<String> generatePairingCode(Model model,
+                                            @AuthenticationPrincipal String familyId) {
+        return devicePairingService.generatePairingCode(familyId)
+                .doOnNext(resp -> {
+                    model.addAttribute("pairingCode", resp.code());
+                    model.addAttribute("expiresAt",   resp.expiresAt().toEpochMilli());
+                })
+                .thenReturn("web/devices/pairing-code :: pairingCode");
     }
 
     // ── View model ────────────────────────────────────────────────────────────
