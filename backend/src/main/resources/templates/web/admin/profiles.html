@@ -30,30 +30,30 @@
                     </thead>
                     <tbody>
                         <tr th:each="row : ${rows}"
-                            th:id="'profile-row-' + ${row.profile().id()}">
+                            th:id="'profile-row-' + ${row.profile().id}">
                             <td class="align-middle">
                                 <span class="fs-4"
                                       th:style="'color:' + ${row.cssColor()}"
                                       th:text="${row.emoji()}"></span>
                             </td>
-                            <td class="align-middle fw-medium" th:text="${row.profile().name()}"></td>
+                            <td class="align-middle fw-medium" th:text="${row.profile().name}"></td>
                             <td class="align-middle d-none d-sm-table-cell">
                                 <span class="badge bg-secondary"
-                                      th:text="${row.profile().ageGroup()}"></span>
+                                      th:text="${row.profile().ageGroup}"></span>
                             </td>
                             <td class="align-middle text-end d-none d-md-table-cell">
                                 <span class="badge bg-primary" th:text="${row.contentCount()}"></span>
                             </td>
                             <td class="align-middle d-none d-lg-table-cell font-monospace small text-muted"
-                                th:text="${#strings.substring(row.profile().familyId(), 0, 8) + '…'}"></td>
+                                th:text="${#strings.substring(row.profile().familyId, 0, 8) + '…'}"></td>
                             <td class="align-middle d-none d-md-table-cell text-muted small"
-                                th:text="${#temporals.format(row.profile().createdAt(), 'dd.MM.yyyy')}"></td>
+                                th:text="${#temporals.format(row.profile().createdAt, 'dd.MM.yyyy')}"></td>
                             <td class="align-middle text-end">
-                                <a th:href="@{/web/admin/profiles/{id}/edit(id=${row.profile().id()})}"
+                                <a th:href="@{/web/admin/profiles/{id}/edit(id=${row.profile().id})}"
                                    class="btn btn-sm btn-outline-secondary me-1">Bearbeiten</a>
                                 <button class="btn btn-sm btn-outline-danger"
-                                        th:attr="hx-post=@{/web/admin/profiles/{id}/delete(id=${row.profile().id()})},
-                                                 hx-target='#profile-row-' + ${row.profile().id()},
+                                        th:attr="hx-post=@{/web/admin/profiles/{id}/delete(id=${row.profile().id})},
+                                                 hx-target='#profile-row-' + ${row.profile().id},
                                                  hx-swap='outerHTML',
                                                  hx-confirm='Profil wirklich löschen? Alle zugehörigen Inhalte, Favoriten und Anfragen werden ebenfalls gelöscht.'">
                                     &times;
