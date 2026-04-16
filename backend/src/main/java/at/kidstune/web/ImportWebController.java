@@ -86,7 +86,7 @@ public class ImportWebController {
             ServerWebExchange exchange) {
 
         return exchange.getFormData().flatMap(form -> {
-            List<String> profileIds = form.get("profileIds");
+            List<String> profileIds = form.get("allProfileIds");
             return loadSuggestionsInternal(profileIds, model, familyId);
         });
     }
