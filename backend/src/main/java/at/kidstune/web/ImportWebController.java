@@ -123,16 +123,21 @@ public class ImportWebController {
                     .filter(p -> spotifyTokenService.isProfileSpotifyLinked(p.getId()))
                     .findFirst();
 
+            List<ProfileImportItem> profileItems = profiles.stream()
+                    .map(p -> new ProfileImportItem(p,
+                            spotifyTokenService.isProfileSpotifyLinked(p.getId())))
+                    .toList();
+
             if (source.isEmpty()) {
                 model.addAttribute("noSpotifyLinked", true);
-                model.addAttribute("profiles", profiles);
+                model.addAttribute("profiles", profileItems);
                 return Mono.just("web/fragments/import-suggestions :: suggestions");
             }
 
             return spotifyImportService.getImportSuggestions(source.get().getId())
                     .doOnNext(suggestions -> {
                         model.addAttribute("suggestions", suggestions);
-                        model.addAttribute("profiles", profiles);
+                        model.addAttribute("profiles", profileItems);
                         model.addAttribute("noSpotifyLinked", false);
                         model.addAttribute("noProfilesSelected", false);
                     })
@@ -140,7 +145,7 @@ public class ImportWebController {
                     .onErrorResume(e -> {
                         log.warn("Failed to load import suggestions for family {}: {}", familyId, e.getMessage());
                         model.addAttribute("suggestionsError", true);
-                        model.addAttribute("profiles", profiles);
+                        model.addAttribute("profiles", profileItems);
                         return Mono.just("web/fragments/import-suggestions :: suggestions");
                     });
         });
