@@ -241,6 +241,7 @@ public class ImportWebController {
 
     private List<ImportContentRequest.ImportItem> buildImportRequest(String itemsJson, String familyId) {
         if (itemsJson == null || itemsJson.isBlank() || itemsJson.equals("[]")) {
+            log.debug("Import: itemsJson is empty for family {}", familyId);
             return List.of();
         }
         List<WizardItem> wizardItems;

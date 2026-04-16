@@ -122,8 +122,16 @@ function updateStepSummary() {
     }
 }
 
-// Live-update the summary as checkboxes change.
+// When a suggestion's master checkbox is toggled, sync all its per-profile checkboxes.
 document.body.addEventListener('change', function (e) {
+    if (e.target.classList.contains('item-master-check')) {
+        var card = e.target.closest('.suggestion-item');
+        if (card) {
+            card.querySelectorAll('.item-profile-check').forEach(function (cb) {
+                cb.checked = e.target.checked;
+            });
+        }
+    }
     if (e.target.classList.contains('item-master-check') ||
         e.target.classList.contains('item-profile-check')) {
         updateStepSummary();
