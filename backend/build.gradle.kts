@@ -114,12 +114,23 @@ tasks.register<Test>("e2eTest") {
     }
 }
 
-// One-time browser install: ./gradlew playwrightInstall
+// Download Chromium binaries: ./gradlew playwrightInstall
 // Browsers are cached in ~/.cache/ms-playwright so only needs to run once per machine/agent.
+// Does NOT install OS-level system deps — run playwrightInstallDeps once as root for that.
 tasks.register<JavaExec>("playwrightInstall") {
-    description = "Download Playwright Chromium binaries"
+    description = "Download Playwright Chromium binaries (no OS deps)"
     group = "build setup"
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("com.microsoft.playwright.CLI")
-    args = listOf("install", "chromium", "--with-deps")
+    args = listOf("install", "chromium")
+}
+
+// Install OS-level browser dependencies (requires root / sudo).
+// Run once on a new CI agent: sudo ./gradlew playwrightInstallDeps
+tasks.register<JavaExec>("playwrightInstallDeps") {
+    description = "Install OS-level Chromium system dependencies (must run as root)"
+    group = "build setup"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+    args = listOf("install-deps", "chromium")
 }
