@@ -112,7 +112,7 @@ class ImportWebControllerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.post("/web/import/suggestions")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .body("profileIds=" + PROFILE_ID_1));
+                        .body("allProfileIds=" + PROFILE_ID_1));
 
         Model model = new ExtendedModelMap();
         StepVerifier.create(controller.loadSuggestions(model, FAMILY_ID, exchange))
@@ -139,7 +139,7 @@ class ImportWebControllerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.post("/web/import/suggestions")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .body("profileIds=" + PROFILE_ID_1));
+                        .body("allProfileIds=" + PROFILE_ID_1));
 
         Model model = new ExtendedModelMap();
         StepVerifier.create(controller.loadSuggestions(model, FAMILY_ID, exchange))
@@ -173,7 +173,7 @@ class ImportWebControllerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.post("/web/import/suggestions")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .body("profileIds=" + PROFILE_ID_1));
+                        .body("allProfileIds=" + PROFILE_ID_1));
 
         Model model = new ExtendedModelMap();
         StepVerifier.create(controller.loadSuggestions(model, FAMILY_ID, exchange))
