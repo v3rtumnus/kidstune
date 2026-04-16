@@ -54,26 +54,26 @@
                         </thead>
                         <tbody>
                             <tr th:each="fav : ${favorites}"
-                                th:id="'fav-row-' + ${fav.id()}">
+                                th:id="'fav-row-' + ${fav.id}">
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
-                                        <img th:if="${fav.trackImageUrl() != null}"
-                                             th:src="${fav.trackImageUrl()}"
+                                        <img th:if="${fav.trackImageUrl != null}"
+                                             th:src="${fav.trackImageUrl}"
                                              alt="" width="36" height="36"
                                              class="rounded flex-shrink-0"
                                              style="object-fit:cover">
                                         <span class="text-truncate" style="max-width:200px"
-                                              th:text="${fav.trackTitle()}"></span>
+                                              th:text="${fav.trackTitle}"></span>
                                     </div>
                                 </td>
                                 <td class="d-none d-sm-table-cell text-muted small align-middle"
-                                    th:text="${fav.artistName()}"></td>
+                                    th:text="${fav.artistName}"></td>
                                 <td class="d-none d-md-table-cell align-middle text-muted small"
-                                    th:text="${#temporals.format(fav.addedAt(), 'dd.MM.yyyy HH:mm')}"></td>
+                                    th:text="${#temporals.format(fav.addedAt, 'dd.MM.yyyy HH:mm')}"></td>
                                 <td class="align-middle text-end">
                                     <button class="btn btn-sm btn-outline-danger"
-                                            th:attr="hx-post=@{/web/profiles/{pid}/content/favorites/{id}/delete(pid=${profileId},id=${fav.id()})},
-                                                     hx-target='#fav-row-' + ${fav.id()},
+                                            th:attr="hx-post=@{/web/profiles/{pid}/content/favorites/{id}/delete(pid=${profileId},id=${fav.id})},
+                                                     hx-target='#fav-row-' + ${fav.id},
                                                      hx-swap='outerHTML',
                                                      hx-confirm='Favorit wirklich entfernen?'">
                                         &times;

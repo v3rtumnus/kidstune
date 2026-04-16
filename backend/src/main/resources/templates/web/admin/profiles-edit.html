@@ -21,7 +21,7 @@
                 <div class="mb-3">
                     <label class="form-label fw-medium">Name</label>
                     <input type="text" name="name" class="form-control"
-                           th:value="${profile.name()}" required maxlength="100">
+                           th:value="${profile.name}" required maxlength="100">
                 </div>
 
                 <div class="mb-3">
@@ -31,7 +31,7 @@
                             <input type="radio" class="btn-check" name="avatarIcon"
                                    th:id="'icon-' + ${icon}"
                                    th:value="${icon}"
-                                   th:checked="${profile.avatarIcon() == icon}">
+                                   th:checked="${profile.avatarIcon == icon}">
                             <label class="btn btn-outline-secondary fs-4 px-3"
                                    th:for="'icon-' + ${icon}"
                                    th:text="${avatarHelper.emoji(icon)}"></label>
@@ -46,7 +46,7 @@
                             <input type="radio" class="btn-check" name="avatarColor"
                                    th:id="'color-' + ${color}"
                                    th:value="${color}"
-                                   th:checked="${profile.avatarColor() == color}">
+                                   th:checked="${profile.avatarColor == color}">
                             <label class="btn btn-outline-secondary"
                                    th:for="'color-' + ${color}"
                                    th:style="'border-color:' + ${avatarHelper.cssColor(color)} + '; color:' + ${avatarHelper.cssColor(color)}"
@@ -61,7 +61,7 @@
                         <option th:each="ag : ${ageGroups}"
                                 th:value="${ag}"
                                 th:text="${ag}"
-                                th:selected="${profile.ageGroup() == ag}"></option>
+                                th:selected="${profile.ageGroup == ag}"></option>
                     </select>
                 </div>
 
