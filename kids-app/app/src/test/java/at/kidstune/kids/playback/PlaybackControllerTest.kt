@@ -286,6 +286,7 @@ class FakeTrackDao : TrackDao {
     override fun getByAlbumId(albumId: String) = flowOf(emptyList<LocalTrack>())
     override suspend fun getByAlbumIdOnce(albumId: String) = emptyList<LocalTrack>()
     override suspend fun deleteByAlbumId(albumId: String) {}
+    override fun getByContentEntryId(contentEntryId: String) = flowOf(emptyList<LocalTrack>())
 }
 
 class FakeAlbumDao : AlbumDao {

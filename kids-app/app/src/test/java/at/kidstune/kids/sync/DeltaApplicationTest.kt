@@ -27,7 +27,9 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.Runs
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -58,6 +60,7 @@ class DeltaApplicationTest {
     private val testProfileId = "profile-delta-001"
     private val prefs = mockk<ProfilePreferences> {
         every { boundProfileId } returns testProfileId
+        every { pinAvailable = any() } just Runs
     }
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -119,7 +122,7 @@ class DeltaApplicationTest {
         val client = HttpClient(engine) { install(ContentNegotiation) { json(json) } }
         val api = KidstuneApiClient(client, "")
         favoriteRepository = FavoriteRepository(db.favoriteDao(), api, prefs)
-        return SyncRepository(api, db, favoriteRepository)
+        return SyncRepository(api, db, favoriteRepository, prefs)
     }
 
     // ── added ─────────────────────────────────────────────────────────────────
@@ -275,7 +278,7 @@ class DeltaApplicationTest {
         val failClient = HttpClient(failEngine) { install(ContentNegotiation) { json(json) } }
         val failApi = KidstuneApiClient(failClient, "")
         val failFavRepo = FavoriteRepository(db.favoriteDao(), failApi, prefs)
-        val failRepo = SyncRepository(failApi, db, failFavRepo)
+        val failRepo = SyncRepository(failApi, db, failFavRepo, prefs)
 
         val result = failRepo.deltaSync(testProfileId, "2025-01-01T00:00:00Z")
 

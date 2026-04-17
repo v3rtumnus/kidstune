@@ -24,7 +24,9 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.Runs
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -50,6 +52,7 @@ class SyncRepositoryTest {
     private val testProfileId = "profile-test-001"
     private val prefs = mockk<ProfilePreferences> {
         every { boundProfileId } returns testProfileId
+        every { pinAvailable = any() } just Runs
     }
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -130,7 +133,7 @@ class SyncRepositoryTest {
         }
         val apiClient = KidstuneApiClient(mockClient, baseUrl = "")
         favoriteRepository = FavoriteRepository(db.favoriteDao(), apiClient, prefs)
-        syncRepository = SyncRepository(apiClient, db, favoriteRepository)
+        syncRepository = SyncRepository(apiClient, db, favoriteRepository, prefs)
     }
 
     @After
@@ -195,7 +198,7 @@ class SyncRepositoryTest {
         val emptyClient  = HttpClient(emptyEngine) { install(ContentNegotiation) { json(json) } }
         val emptyApiClient = KidstuneApiClient(emptyClient, "")
         val emptyFavRepo = FavoriteRepository(db.favoriteDao(), emptyApiClient, prefs)
-        val repo2        = SyncRepository(emptyApiClient, db, emptyFavRepo)
+        val repo2        = SyncRepository(emptyApiClient, db, emptyFavRepo, prefs)
 
         repo2.fullSync(testProfileId)
 
@@ -214,7 +217,7 @@ class SyncRepositoryTest {
         val failClient = HttpClient(failEngine) { install(ContentNegotiation) { json(json) } }
         val failApiClient = KidstuneApiClient(failClient, "")
         val failFavRepo = FavoriteRepository(db.favoriteDao(), failApiClient, prefs)
-        val failRepo   = SyncRepository(failApiClient, db, failFavRepo)
+        val failRepo   = SyncRepository(failApiClient, db, failFavRepo, prefs)
 
         val result = failRepo.fullSync(testProfileId)
 
