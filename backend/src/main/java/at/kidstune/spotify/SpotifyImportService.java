@@ -31,7 +31,6 @@ public class SpotifyImportService {
     private static final Logger log = LoggerFactory.getLogger(SpotifyImportService.class);
 
     private static final int LIKED_SONGS_PAGE_SIZE = 50;
-    private static final int LIKED_SONGS_MAX       = 200;
 
     private final SpotifyTokenService tokenService;
     private final FavoriteRepository  favoriteRepository;
@@ -210,14 +209,11 @@ public class SpotifyImportService {
     }
 
     private Mono<List<ApiSavedTrack>> fetchLikedTracksPage(String token, int offset, List<ApiSavedTrack> acc) {
-        if (acc.size() >= LIKED_SONGS_MAX) return Mono.just(acc);
-
-        int limit = Math.min(LIKED_SONGS_PAGE_SIZE, LIKED_SONGS_MAX - acc.size());
         final int finalOffset = offset;
 
         return spotifyApi.get()
                 .uri(u -> u.path("/v1/me/tracks")
-                        .queryParam("limit", limit)
+                        .queryParam("limit", LIKED_SONGS_PAGE_SIZE)
                         .queryParam("offset", finalOffset)
                         .build())
                 .header("Authorization", "Bearer " + token)
@@ -230,7 +226,7 @@ public class SpotifyImportService {
                             acc.add(item);
                         }
                     }
-                    if (page.next() == null || acc.size() >= LIKED_SONGS_MAX) {
+                    if (page.next() == null) {
                         return Mono.just(acc);
                     }
                     return fetchLikedTracksPage(token, offset + LIKED_SONGS_PAGE_SIZE, acc);
