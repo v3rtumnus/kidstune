@@ -58,7 +58,8 @@ data class SyncTrackDto(
     val durationMs: Long? = null,
     val trackNumber: Int? = null,
     val discNumber: Int? = null,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val playlistPosition: Int? = null
 )
 
 @Serializable

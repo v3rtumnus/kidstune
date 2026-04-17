@@ -39,6 +39,10 @@ public class ResolvedTrack {
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
 
+    /** Position within a Spotify playlist (0-based). NULL for non-playlist tracks. */
+    @Column(name = "playlist_position")
+    private Integer playlistPosition;
+
     @PrePersist
     void prePersist() {
         if (id == null) id = UUID.randomUUID().toString();
@@ -70,4 +74,7 @@ public class ResolvedTrack {
 
     public String getImageUrl()                  { return imageUrl; }
     public void   setImageUrl(String imageUrl)   { this.imageUrl = imageUrl; }
+
+    public Integer getPlaylistPosition()                       { return playlistPosition; }
+    public void    setPlaylistPosition(Integer playlistPosition) { this.playlistPosition = playlistPosition; }
 }

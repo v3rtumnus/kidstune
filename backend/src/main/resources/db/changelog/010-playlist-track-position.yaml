@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-playlist-track-position
+      author: kidstune
+      changes:
+        - addColumn:
+            tableName: resolved_track
+            columns:
+              - column:
+                  name: playlist_position
+                  type: INT
+                  constraints:
+                    nullable: true

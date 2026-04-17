@@ -4,11 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.kidstune.kids.data.local.AlbumDao
-import at.kidstune.kids.data.local.ContentDao
 import at.kidstune.kids.data.local.TrackDao
 import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalTrack
-import at.kidstune.kids.domain.model.ContentScope
 import at.kidstune.kids.playback.PlaybackController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,10 +17,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class TrackListState(
-    val album: LocalAlbum?      = null,
+    val album: LocalAlbum?       = null,
+    val title: String?           = null,
     val tracks: List<LocalTrack> = emptyList(),
     val navigateToNowPlaying: Boolean = false
-)
+) {
+    val screenTitle: String get() = album?.title ?: title ?: "Titel"
+}
 
 sealed interface TrackListIntent {
     data class TrackTapped(val track: LocalTrack, val trackIndex: Int) : TrackListIntent
@@ -34,7 +35,6 @@ class TrackListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val albumDao: AlbumDao,
     private val trackDao: TrackDao,
-    private val contentDao: ContentDao,
     private val playbackController: PlaybackController
 ) : ViewModel() {
 
@@ -62,15 +62,10 @@ class TrackListViewModel @Inject constructor(
     private fun handleTrackTapped(track: LocalTrack, trackIndex: Int) {
         viewModelScope.launch {
             val album = _state.value.album ?: return@launch
-            val contentEntry = contentDao.getById(album.contentEntryId)
-
-            if (contentEntry?.scope == ContentScope.PLAYLIST) {
-                // Playlist: use the playlist URI from the content entry
-                playbackController.playFromPlaylist(contentEntry.spotifyUri, trackIndex)
-            } else {
-                // Regular album: use album URI as context so Spotify auto-advances
-                playbackController.playFromChapter(album.spotifyAlbumUri, trackIndex)
-            }
+            // Always play from the album URI so Spotify auto-advances within this album.
+            // Playlist tracks are grouped by source album in Room; playing via the playlist URI
+            // with a within-album index would play the wrong track.
+            playbackController.playFromChapter(album.spotifyAlbumUri, trackIndex)
             _state.update { it.copy(navigateToNowPlaying = true) }
         }
     }

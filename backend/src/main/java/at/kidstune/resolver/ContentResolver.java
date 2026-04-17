@@ -169,7 +169,7 @@ public class ContentResolver {
         String playlistId = idFromUri(content.getSpotifyUri());
         List<TrackData> tracks = spotifyClient.getPlaylistTracks(familyId, playlistId).block();
         if (tracks == null || tracks.isEmpty()) return;
-        persistPlaylistTracks(content, groupByAlbum(tracks));
+        persistPlaylistTracks(content, tracks);
     }
 
     private void resolveTrack(AllowedContent content, String familyId) {
@@ -243,28 +243,9 @@ public class ContentResolver {
 
     private void reResolvePlaylist(AllowedContent content, String familyId,
                                     Map<String, ResolvedAlbum> existingByUri) {
-        String playlistId = idFromUri(content.getSpotifyUri());
-        List<TrackData> freshTracks = spotifyClient.getPlaylistTracks(familyId, playlistId).block();
-        if (freshTracks == null) freshTracks = List.of();
-
-        Map<String, List<TrackData>> freshByAlbum = groupByAlbum(freshTracks);
-
-        Set<String> freshUris = freshByAlbum.keySet();
-
-        // Remove albums no longer present
-        removeStaleAlbums(existingByUri, freshUris);
-
-        // Add new albums (with their tracks from the already-fetched batch)
-        for (Map.Entry<String, List<TrackData>> entry : freshByAlbum.entrySet()) {
-            if (!existingByUri.containsKey(entry.getKey())) {
-                try {
-                    persistPlaylistTracks(content, Map.of(entry.getKey(), entry.getValue()));
-                } catch (Exception e) {
-                    log.warn("Skipping new album {} during playlist re-resolution: {}",
-                             entry.getKey(), e.getMessage());
-                }
-            }
-        }
+        // Full delete + re-fetch: playlist order/composition may have changed entirely
+        existingByUri.values().forEach(albumRepo::delete);
+        resolvePlaylist(content, familyId);
     }
 
     private void removeStaleAlbums(Map<String, ResolvedAlbum> existingByUri, Set<String> freshUris) {
@@ -306,19 +287,23 @@ public class ContentResolver {
     }
 
     /**
-     * Persists playlist tracks already grouped by album URI.
-     * No extra Spotify call needed – album info is embedded in each {@link TrackData}.
+     * Persists a playlist's flat track list, grouping by source album URI while
+     * preserving the original playlist position on every {@link ResolvedTrack}.
      */
-    private void persistPlaylistTracks(AllowedContent content,
-                                        Map<String, List<TrackData>> byAlbum) {
+    private void persistPlaylistTracks(AllowedContent content, List<TrackData> tracks) {
+        // Build position map before grouping so playlist order is never lost
+        Map<String, Integer> positionByUri = new LinkedHashMap<>();
+        for (int i = 0; i < tracks.size(); i++) {
+            positionByUri.putIfAbsent(tracks.get(i).uri(), i);
+        }
+
+        Map<String, List<TrackData>> byAlbum = groupByAlbum(tracks);
+
         for (Map.Entry<String, List<TrackData>> entry : byAlbum.entrySet()) {
             List<TrackData> albumTracks = entry.getValue();
             TrackData first = albumTracks.get(0);
 
-            long avgDurationMs = avgDuration(albumTracks);
             String albumTitle = first.albumTitle() != null ? first.albumTitle() : "Unknown Album";
-
-            // Playlist tracks carry no genre data – inherit from the AllowedContent type
             ContentType contentType = content.getContentType();
 
             ResolvedAlbum resolvedAlbum = buildAndSaveAlbum(
@@ -326,7 +311,7 @@ public class ContentResolver {
                     null, albumTracks.size(), contentType);
 
             for (TrackData track : albumTracks) {
-                persistTrack(resolvedAlbum, track);
+                persistTrack(resolvedAlbum, track, positionByUri.get(track.uri()));
             }
         }
     }
@@ -348,6 +333,10 @@ public class ContentResolver {
     }
 
     private void persistTrack(ResolvedAlbum album, TrackData data) {
+        persistTrack(album, data, null);
+    }
+
+    private void persistTrack(ResolvedAlbum album, TrackData data, Integer playlistPosition) {
         ResolvedTrack track = new ResolvedTrack();
         track.setResolvedAlbumId(album.getId());
         track.setSpotifyTrackUri(data.uri());
@@ -357,6 +346,7 @@ public class ContentResolver {
         track.setTrackNumber(data.trackNumber() > 0 ? data.trackNumber() : null);
         track.setDiscNumber(data.discNumber() > 0 ? data.discNumber() : null);
         track.setImageUrl(album.getImageUrl());
+        track.setPlaylistPosition(playlistPosition);
         trackRepo.save(track);
     }
 

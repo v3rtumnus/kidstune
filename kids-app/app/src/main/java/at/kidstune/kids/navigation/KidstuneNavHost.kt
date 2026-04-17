@@ -24,6 +24,7 @@ import at.kidstune.kids.ui.screens.DiscoverScreen
 import at.kidstune.kids.ui.screens.HomeScreen
 import at.kidstune.kids.ui.screens.NowPlayingScreen
 import at.kidstune.kids.ui.screens.PairingScreen
+import at.kidstune.kids.ui.screens.PlaylistTrackListScreen
 import at.kidstune.kids.ui.screens.ProfileSelectionScreen
 import at.kidstune.kids.ui.screens.TrackListScreen
 import kotlinx.serialization.Serializable
@@ -57,6 +58,10 @@ data class TrackListRoute(val albumId: String)
  */
 @Serializable
 data class ChapterListRoute(val albumId: String)
+
+/** Shows all tracks in a playlist in flat playlist order. */
+@Serializable
+data class PlaylistTrackListRoute(val contentEntryId: String)
 
 @Serializable
 object NowPlayingRoute
@@ -135,6 +140,9 @@ fun KidstuneNavHost(
                             onNavigateToTrackList  = { albumId ->
                                 navController.navigate(TrackListRoute(albumId))
                             },
+                            onNavigateToPlaylistTrackList = { contentEntryId ->
+                                navController.navigate(PlaylistTrackListRoute(contentEntryId))
+                            },
                             onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
                         )
                     }
@@ -144,10 +152,12 @@ fun KidstuneNavHost(
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                         AlbumGridScreen(
                             onNavigateUp            = { navController.navigateUp() },
+                            onNavigateToTrackList   = { albumId ->
+                                navController.navigate(TrackListRoute(albumId))
+                            },
                             onNavigateToChapterList = { albumId ->
                                 navController.navigate(ChapterListRoute(albumId))
-                            },
-                            onNavigateToNowPlaying  = { navController.navigate(NowPlayingRoute) }
+                            }
                         )
                     }
                 }
@@ -155,6 +165,15 @@ fun KidstuneNavHost(
                 composable<TrackListRoute> {
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                         TrackListScreen(
+                            onNavigateUp           = { navController.navigateUp() },
+                            onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
+                        )
+                    }
+                }
+
+                composable<PlaylistTrackListRoute> {
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                        PlaylistTrackListScreen(
                             onNavigateUp           = { navController.navigateUp() },
                             onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
                         )

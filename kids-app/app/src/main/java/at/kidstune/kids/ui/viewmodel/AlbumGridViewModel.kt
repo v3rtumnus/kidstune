@@ -8,7 +8,6 @@ import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.data.repository.ContentRepository
 import at.kidstune.kids.domain.model.ContentType
-import at.kidstune.kids.playback.PlaybackController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,10 +31,10 @@ sealed interface AlbumGridIntent {
 }
 
 sealed interface AlbumGridNavigation {
-    /** AUDIOBOOK album tapped – show chapter list. */
+    /** MUSIC album tapped – show the track list before playing. */
+    data class ToTrackList(val albumId: String) : AlbumGridNavigation
+    /** AUDIOBOOK album tapped – show chapter list for deliberate selection. */
     data class ToChapterList(val albumId: String) : AlbumGridNavigation
-    /** MUSIC album tapped – playback started, go to player. */
-    data object ToNowPlaying : AlbumGridNavigation
 }
 
 private const val ALBUMS_PER_PAGE = 4
@@ -44,8 +43,7 @@ private const val ALBUMS_PER_PAGE = 4
 class AlbumGridViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val contentRepository: ContentRepository,
-    private val albumDao: AlbumDao,
-    private val playbackController: PlaybackController
+    private val albumDao: AlbumDao
 ) : ViewModel() {
 
     private val contentEntryId: String = checkNotNull(savedStateHandle["contentEntryId"])
@@ -79,11 +77,8 @@ class AlbumGridViewModel @Inject constructor(
         viewModelScope.launch {
             val album = albumDao.getById(albumId) ?: return@launch
             if (album.contentType == ContentType.MUSIC) {
-                // Music: play immediately from track 1 and go to player
-                playbackController.playAlbumFromStart(album.spotifyAlbumUri)
-                _state.update { it.copy(navigation = AlbumGridNavigation.ToNowPlaying) }
+                _state.update { it.copy(navigation = AlbumGridNavigation.ToTrackList(albumId)) }
             } else {
-                // Audiobook: show chapter list for deliberate chapter selection
                 _state.update { it.copy(navigation = AlbumGridNavigation.ToChapterList(albumId)) }
             }
         }

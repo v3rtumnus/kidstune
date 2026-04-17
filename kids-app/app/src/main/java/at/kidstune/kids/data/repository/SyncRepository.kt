@@ -213,15 +213,16 @@ class SyncRepository @Inject constructor(
             )
             albumDto.tracks.forEach { trackDto ->
                 tracks += LocalTrack(
-                    id              = "${albumId}__${trackDto.spotifyTrackUri}",
-                    albumId         = albumId,
-                    spotifyTrackUri = trackDto.spotifyTrackUri,
-                    title           = trackDto.title,
-                    artistName      = trackDto.artistName,
-                    durationMs      = trackDto.durationMs ?: 0L,
-                    trackNumber     = trackDto.trackNumber ?: 1,
-                    discNumber      = trackDto.discNumber ?: 1,
-                    imageUrl        = trackDto.imageUrl
+                    id               = "${albumId}__${trackDto.spotifyTrackUri}",
+                    albumId          = albumId,
+                    spotifyTrackUri  = trackDto.spotifyTrackUri,
+                    title            = trackDto.title,
+                    artistName       = trackDto.artistName,
+                    durationMs       = trackDto.durationMs ?: 0L,
+                    trackNumber      = trackDto.trackNumber ?: 1,
+                    discNumber       = trackDto.discNumber ?: 1,
+                    imageUrl         = trackDto.imageUrl,
+                    playlistPosition = trackDto.playlistPosition
                 )
             }
         }

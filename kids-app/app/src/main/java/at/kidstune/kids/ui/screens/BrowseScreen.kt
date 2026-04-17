@@ -58,6 +58,7 @@ fun BrowseScreen(
     onNavigateUp: () -> Unit = {},
     onNavigateToAlbumGrid: (contentEntryId: String) -> Unit = {},
     onNavigateToTrackList: (albumId: String) -> Unit = {},
+    onNavigateToPlaylistTrackList: (contentEntryId: String) -> Unit = {},
     onNavigateToNowPlaying: () -> Unit = {}
 ) {
     LaunchedEffect(category) { viewModel.init(category) }
@@ -72,6 +73,10 @@ fun BrowseScreen(
             }
             is BrowseNavigation.ToTrackList -> {
                 onNavigateToTrackList(nav.albumId)
+                viewModel.onIntent(BrowseIntent.NavigationHandled)
+            }
+            is BrowseNavigation.ToPlaylistTrackList -> {
+                onNavigateToPlaylistTrackList(nav.contentEntryId)
                 viewModel.onIntent(BrowseIntent.NavigationHandled)
             }
             BrowseNavigation.ToNowPlaying -> {

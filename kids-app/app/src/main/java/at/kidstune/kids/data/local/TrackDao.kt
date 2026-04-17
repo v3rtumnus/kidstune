@@ -37,6 +37,15 @@ interface TrackDao {
     @Query("SELECT * FROM local_track WHERE spotify_track_uri = :trackUri LIMIT 1")
     suspend fun getByUri(trackUri: String): LocalTrack?
 
+    /** All tracks for a playlist content entry, ordered by playlist position. */
+    @Query("""
+        SELECT t.* FROM local_track t
+        INNER JOIN local_album a ON t.album_id = a.id
+        WHERE a.content_entry_id = :contentEntryId
+        ORDER BY t.playlist_position ASC
+    """)
+    fun getByContentEntryId(contentEntryId: String): Flow<List<LocalTrack>>
+
     @Query("DELETE FROM local_track WHERE album_id = :albumId")
     suspend fun deleteByAlbumId(albumId: String)
 }

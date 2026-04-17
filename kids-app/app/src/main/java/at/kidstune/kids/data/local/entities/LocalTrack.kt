@@ -47,5 +47,9 @@ data class LocalTrack(
     val discNumber: Int,
 
     @ColumnInfo(name = "image_url")
-    val imageUrl: String?
+    val imageUrl: String?,
+
+    /** Position within a Spotify playlist (0-based). Null for non-playlist tracks. */
+    @ColumnInfo(name = "playlist_position")
+    val playlistPosition: Int? = null
 )

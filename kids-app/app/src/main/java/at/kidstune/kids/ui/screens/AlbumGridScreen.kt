@@ -50,19 +50,19 @@ fun AlbumGridScreen(
     modifier: Modifier = Modifier,
     viewModel: AlbumGridViewModel = hiltViewModel(),
     onNavigateUp: () -> Unit = {},
-    onNavigateToChapterList: (albumId: String) -> Unit = {},
-    onNavigateToNowPlaying: () -> Unit = {}
+    onNavigateToTrackList: (albumId: String) -> Unit = {},
+    onNavigateToChapterList: (albumId: String) -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(state.navigation) {
         when (val nav = state.navigation) {
-            is AlbumGridNavigation.ToChapterList -> {
-                onNavigateToChapterList(nav.albumId)
+            is AlbumGridNavigation.ToTrackList -> {
+                onNavigateToTrackList(nav.albumId)
                 viewModel.onIntent(AlbumGridIntent.NavigationHandled)
             }
-            AlbumGridNavigation.ToNowPlaying -> {
-                onNavigateToNowPlaying()
+            is AlbumGridNavigation.ToChapterList -> {
+                onNavigateToChapterList(nav.albumId)
                 viewModel.onIntent(AlbumGridIntent.NavigationHandled)
             }
             null -> Unit
@@ -73,7 +73,7 @@ fun AlbumGridScreen(
         modifier     = modifier,
         state        = state,
         onIntent     = viewModel::onIntent,
-        onNavigateUp = onNavigateUp,
+        onNavigateUp = onNavigateUp
     )
 }
 

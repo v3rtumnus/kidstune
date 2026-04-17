@@ -11,8 +11,17 @@ public interface ResolvedTrackRepository extends JpaRepository<ResolvedTrack, St
 
     List<ResolvedTrack> findByResolvedAlbumId(String resolvedAlbumId);
 
-    /** Batch-fetch tracks for multiple albums, ordered by disc then track number. */
-    @Query("SELECT t FROM ResolvedTrack t WHERE t.resolvedAlbumId IN :ids ORDER BY t.discNumber ASC, t.trackNumber ASC")
+    /**
+     * Batch-fetch tracks for multiple albums.
+     * Playlist tracks sort by playlistPosition; all others sort by disc + track number.
+     */
+    @Query("""
+            SELECT t FROM ResolvedTrack t WHERE t.resolvedAlbumId IN :ids
+            ORDER BY
+              CASE WHEN t.playlistPosition IS NOT NULL THEN t.playlistPosition ELSE 9999999 END ASC,
+              COALESCE(t.discNumber, 0) ASC,
+              COALESCE(t.trackNumber, 0) ASC
+            """)
     List<ResolvedTrack> findByResolvedAlbumIdInOrderByDiscTrack(@Param("ids") Collection<String> ids);
 
     /**

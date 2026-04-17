@@ -9,11 +9,13 @@ public record SyncTrackDto(
         Long durationMs,
         Integer trackNumber,
         Integer discNumber,
-        String imageUrl
+        String imageUrl,
+        Integer playlistPosition
 ) {
     public static SyncTrackDto from(ResolvedTrack t) {
         return new SyncTrackDto(
                 t.getSpotifyTrackUri(), t.getTitle(), t.getArtistName(),
-                t.getDurationMs(), t.getTrackNumber(), t.getDiscNumber(), t.getImageUrl());
+                t.getDurationMs(), t.getTrackNumber(), t.getDiscNumber(), t.getImageUrl(),
+                t.getPlaylistPosition());
     }
 }

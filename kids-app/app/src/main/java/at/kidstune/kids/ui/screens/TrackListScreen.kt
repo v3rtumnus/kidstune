@@ -96,7 +96,7 @@ fun TrackListScreen(
                     )
                 }
                 Text(
-                    text  = state.album?.title ?: "Titel",
+                    text  = state.screenTitle,
                     style = MaterialTheme.typography.titleLarge
                 )
             }

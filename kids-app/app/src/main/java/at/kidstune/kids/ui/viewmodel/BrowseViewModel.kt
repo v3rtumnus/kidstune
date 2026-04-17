@@ -26,8 +26,10 @@ import javax.inject.Inject
 sealed interface BrowseNavigation {
     /** Tap on an ARTIST entry → show all albums by that artist. */
     data class ToAlbumGrid(val contentEntryId: String) : BrowseNavigation
-    /** Tap on an ALBUM/PLAYLIST entry → go straight to the track list. */
+    /** Tap on an ALBUM entry → go straight to the track list for the single album. */
     data class ToTrackList(val albumId: String) : BrowseNavigation
+    /** Tap on a PLAYLIST entry → show all tracks flat, in original playlist order. */
+    data class ToPlaylistTrackList(val contentEntryId: String) : BrowseNavigation
     /** Tap on a TRACK entry or favorite → go to the player. */
     data object ToNowPlaying : BrowseNavigation
 }
@@ -121,11 +123,14 @@ class BrowseViewModel @Inject constructor(
                 ContentScope.ARTIST ->
                     BrowseNavigation.ToAlbumGrid(entry.id)
 
-                ContentScope.ALBUM, ContentScope.PLAYLIST -> {
+                ContentScope.ALBUM -> {
                     val firstAlbum = albumDao.getByContentEntryIdOnce(entry.id).firstOrNull()
                     if (firstAlbum != null) BrowseNavigation.ToTrackList(firstAlbum.id)
                     else BrowseNavigation.ToAlbumGrid(entry.id)
                 }
+
+                ContentScope.PLAYLIST ->
+                    BrowseNavigation.ToPlaylistTrackList(entry.id)
 
                 ContentScope.TRACK -> {
                     // Single track: play directly as a bare URI (similar to favorites)
