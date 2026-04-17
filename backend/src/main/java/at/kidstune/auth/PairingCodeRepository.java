@@ -12,6 +12,8 @@ public interface PairingCodeRepository extends JpaRepository<PairingCode, String
 
     Optional<PairingCode> findByCode(String code);
 
+    Optional<PairingCode> findFirstByFamilyIdAndExpiresAtAfter(String familyId, Instant now);
+
     long countByFamilyId(String familyId);
 
     @Modifying

@@ -1,6 +1,7 @@
 package at.kidstune.web;
 
 import at.kidstune.auth.DevicePairingService;
+import at.kidstune.auth.PairingCodeRepository;
 import at.kidstune.device.PairedDevice;
 import at.kidstune.device.PairedDeviceRepository;
 import at.kidstune.profile.ChildProfile;
@@ -18,6 +19,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,13 +33,16 @@ public class DeviceWebController {
     private final PairedDeviceRepository deviceRepository;
     private final ProfileRepository      profileRepository;
     private final DevicePairingService   devicePairingService;
+    private final PairingCodeRepository  pairingCodeRepository;
 
     public DeviceWebController(PairedDeviceRepository deviceRepository,
                                ProfileRepository profileRepository,
-                               DevicePairingService devicePairingService) {
+                               DevicePairingService devicePairingService,
+                               PairingCodeRepository pairingCodeRepository) {
         this.deviceRepository    = deviceRepository;
         this.profileRepository   = profileRepository;
         this.devicePairingService = devicePairingService;
+        this.pairingCodeRepository = pairingCodeRepository;
     }
 
     // ── GET /web/devices ──────────────────────────────────────────────────────
@@ -63,6 +68,15 @@ public class DeviceWebController {
 
             model.addAttribute("rows",     rows);
             model.addAttribute("familyId", familyId);
+
+            // Pre-populate active pairing code (survives page refresh)
+            pairingCodeRepository
+                    .findFirstByFamilyIdAndExpiresAtAfter(familyId, Instant.now())
+                    .ifPresent(pc -> {
+                        model.addAttribute("pairingCode", pc.getCode());
+                        model.addAttribute("expiresAt",   pc.getExpiresAt().toEpochMilli());
+                    });
+
             return "web/devices/index";
         }).subscribeOn(Schedulers.boundedElastic());
     }

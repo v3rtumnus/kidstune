@@ -20,8 +20,12 @@
         </div>
     </div>
 
-    <!-- Pairing code area — filled by HTMX on button click -->
-    <div id="pairing-code-area"></div>
+    <!-- Pairing code area — filled by HTMX on button click, or pre-rendered on refresh -->
+    <div id="pairing-code-area">
+        <th:block th:if="${pairingCode != null}"
+                  th:replace="~{web/devices/pairing-code :: pairingCode}">
+        </th:block>
+    </div>
 
     <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
