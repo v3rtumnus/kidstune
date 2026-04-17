@@ -26,7 +26,7 @@ class PushNotificationServiceTest {
     @BeforeEach
     void setUp() {
         service = new PushNotificationService(
-                null, null, mock(PushService.class), new ObjectMapper());
+                null, null, null, mock(PushService.class), new ObjectMapper());
         ReflectionTestUtils.setField(service, "baseUrl", "https://kidstune.test");
     }
 

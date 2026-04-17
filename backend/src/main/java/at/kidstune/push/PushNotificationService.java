@@ -29,6 +29,7 @@ public class PushNotificationService {
     private static final Logger log = LoggerFactory.getLogger(PushNotificationService.class);
 
     private final PushSubscriptionRepository subRepository;
+    private final PushSubscriptionService    subService;
     private final ProfileRepository          profileRepository;
     private final PushService                pushService;
     private final ObjectMapper               objectMapper;
@@ -37,10 +38,12 @@ public class PushNotificationService {
     private String baseUrl;
 
     public PushNotificationService(PushSubscriptionRepository subRepository,
+                                   PushSubscriptionService subService,
                                    ProfileRepository profileRepository,
                                    PushService pushService,
                                    ObjectMapper objectMapper) {
         this.subRepository     = subRepository;
+        this.subService        = subService;
         this.profileRepository = profileRepository;
         this.pushService       = pushService;
         this.objectMapper      = objectMapper;
@@ -82,7 +85,7 @@ public class PushNotificationService {
             if (status == 410 || status == 404) {
                 log.info("Push subscription gone ({}), removing endpoint for family {}",
                         status, sub.getFamilyId());
-                subRepository.delete(sub);
+                subService.delete(sub);
             } else if (status >= 400) {
                 log.warn("Push delivery failed with HTTP {} for subscription {}",
                         status, sub.getId());

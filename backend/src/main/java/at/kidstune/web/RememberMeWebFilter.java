@@ -45,9 +45,12 @@ public class RememberMeWebFilter implements WebFilter {
     private static final Logger log = LoggerFactory.getLogger(RememberMeWebFilter.class);
 
     private final RememberMeTokenRepository tokenRepository;
+    private final RememberMeTokenService    tokenService;
 
-    public RememberMeWebFilter(RememberMeTokenRepository tokenRepository) {
+    public RememberMeWebFilter(RememberMeTokenRepository tokenRepository,
+                               RememberMeTokenService tokenService) {
         this.tokenRepository = tokenRepository;
+        this.tokenService    = tokenService;
     }
 
     @Override
@@ -85,9 +88,9 @@ public class RememberMeWebFilter implements WebFilter {
                         RememberMeToken stored = opt.get();
 
                         if (stored.getExpiresAt().isBefore(Instant.now())) {
-                            return Mono.fromRunnable(() -> tokenRepository.delete(stored))
+                            return Mono.fromCallable(() -> { tokenService.deleteToken(stored); return null; })
                                     .subscribeOn(Schedulers.boundedElastic())
-                                    .then(Mono.fromRunnable(() -> clearCookie(exchange)))
+                                    .doOnTerminate(() -> clearCookie(exchange))
                                     .then(chain.filter(exchange));
                         }
 
@@ -96,9 +99,9 @@ public class RememberMeWebFilter implements WebFilter {
                             // Series matches but token doesn't → cookie theft detected.
                             log.warn("Remember-me token theft suspected for family {}; "
                                     + "invalidating all persistent tokens.", stored.getFamilyId());
-                            return Mono.fromRunnable(() -> tokenRepository.deleteByFamilyId(stored.getFamilyId()))
+                            return Mono.fromCallable(() -> { tokenService.deleteAllForFamily(stored.getFamilyId()); return null; })
                                     .subscribeOn(Schedulers.boundedElastic())
-                                    .then(Mono.fromRunnable(() -> clearCookie(exchange)))
+                                    .doOnTerminate(() -> clearCookie(exchange))
                                     .then(chain.filter(exchange));
                         }
 

@@ -19,12 +19,12 @@ import java.util.Map;
 @RequestMapping("/web/push")
 public class PushController {
 
-    private final PushSubscriptionRepository subRepository;
-    private final String                     vapidPublicKeyString;
+    private final PushSubscriptionService subService;
+    private final String                  vapidPublicKeyString;
 
-    public PushController(PushSubscriptionRepository subRepository,
+    public PushController(PushSubscriptionService subService,
                           @Qualifier("vapidPublicKeyString") String vapidPublicKeyString) {
-        this.subRepository       = subRepository;
+        this.subService          = subService;
         this.vapidPublicKeyString = vapidPublicKeyString;
     }
 
@@ -41,17 +41,9 @@ public class PushController {
             @AuthenticationPrincipal String familyId,
             @RequestHeader(value = "User-Agent", defaultValue = "") String userAgent) {
 
-        return Mono.fromRunnable(() -> {
-                    // Upsert: delete old subscription with same endpoint, then save new one
-                    subRepository.deleteByEndpoint(body.endpoint());
-
-                    PushSubscription sub = new PushSubscription();
-                    sub.setFamilyId(familyId);
-                    sub.setEndpoint(body.endpoint());
-                    sub.setP256dh(body.p256dh());
-                    sub.setAuth(body.auth());
-                    sub.setUserAgent(userAgent.length() > 512 ? userAgent.substring(0, 512) : userAgent);
-                    subRepository.save(sub);
+        return Mono.fromCallable(() -> {
+                    subService.upsert(familyId, body.endpoint(), body.p256dh(), body.auth(), userAgent);
+                    return null;
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(ResponseEntity.<Void>noContent().build());
@@ -63,7 +55,7 @@ public class PushController {
             @RequestBody PushUnsubscribeRequest body,
             @AuthenticationPrincipal String familyId) {
 
-        return Mono.fromRunnable(() -> subRepository.deleteByEndpoint(body.endpoint()))
+        return Mono.fromCallable(() -> { subService.deleteByEndpoint(body.endpoint()); return null; })
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(ResponseEntity.<Void>noContent().build());
     }
