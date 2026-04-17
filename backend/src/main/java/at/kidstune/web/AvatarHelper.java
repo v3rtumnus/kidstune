@@ -19,7 +19,8 @@ public class AvatarHelper {
             case BUNNY   -> "\uD83D\uDC30"; // 🐰
             case OWL     -> "\uD83E\uDDA9"; // 🦉
             case CAT     -> "\uD83D\uDC31"; // 🐱
-            case PENGUIN -> "\uD83D\uDC27"; // 🐧
+            case PENGUIN  -> "\uD83D\uDC27"; // 🐧
+            case DINOSAUR -> "\uD83E\uDD95"; // 🦕
         };
     }
 
@@ -55,7 +56,8 @@ public class AvatarHelper {
             case BUNNY   -> "Hase";
             case OWL     -> "Eule";
             case CAT     -> "Katze";
-            case PENGUIN -> "Pinguin";
+            case PENGUIN  -> "Pinguin";
+            case DINOSAUR -> "Dinosaurier";
         };
     }
 }

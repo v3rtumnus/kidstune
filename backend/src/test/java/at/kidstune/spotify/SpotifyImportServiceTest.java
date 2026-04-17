@@ -1,10 +1,10 @@
 package at.kidstune.spotify;
 
 import at.kidstune.auth.SpotifyTokenService;
+import at.kidstune.content.AllowedContent;
+import at.kidstune.content.ContentRepository;
 import at.kidstune.favorites.Favorite;
 import at.kidstune.favorites.FavoriteRepository;
-import at.kidstune.resolver.ResolvedTrack;
-import at.kidstune.resolver.ResolvedTrackRepository;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
@@ -21,7 +21,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class SpotifyImportServiceTest {
@@ -29,26 +28,26 @@ class SpotifyImportServiceTest {
     private MockWebServer mockServer;
     private SpotifyImportService service;
 
-    private SpotifyTokenService     tokenService;
-    private FavoriteRepository      favoriteRepository;
-    private ResolvedTrackRepository resolvedTrackRepository;
+    private SpotifyTokenService tokenService;
+    private FavoriteRepository  favoriteRepository;
+    private ContentRepository   contentRepository;
 
     private static final String PROFILE_ID   = "profile-test-1";
     private static final String ACCESS_TOKEN = "mock-profile-token";
 
     @BeforeEach
     void setUp() throws IOException {
-        mockServer              = new MockWebServer();
+        mockServer         = new MockWebServer();
         mockServer.start();
 
-        tokenService            = mock(SpotifyTokenService.class);
-        favoriteRepository      = mock(FavoriteRepository.class);
-        resolvedTrackRepository = mock(ResolvedTrackRepository.class);
+        tokenService       = mock(SpotifyTokenService.class);
+        favoriteRepository = mock(FavoriteRepository.class);
+        contentRepository  = mock(ContentRepository.class);
 
         service = new SpotifyImportService(
                 tokenService,
                 favoriteRepository,
-                resolvedTrackRepository,
+                contentRepository,
                 mockServer.url("/").toString(),
                 WebClient.builder()
         );
@@ -85,14 +84,14 @@ class SpotifyImportServiceTest {
                 .verifyComplete();
 
         assertThat(mockServer.getRequestCount()).isZero();
-        verifyNoInteractions(favoriteRepository, resolvedTrackRepository);
+        verifyNoInteractions(favoriteRepository, contentRepository);
     }
 
-    // ── importLikedSongsAsFavorites – matched tracks ──────────────────────────
+    // ── importLikedSongsAsFavorites – all liked tracks saved ─────────────────
 
     @Test
-    @DisplayName("liked track URI matching resolved content creates Favorite row")
-    void importLikedSongs_matchedTrack_createsFavorite() {
+    @DisplayName("all liked tracks are added as AllowedContent and Favorites regardless of prior whitelist")
+    void importLikedSongs_allTracksCreateFavoriteAndAllowedContent() {
         when(tokenService.isProfileSpotifyLinked(PROFILE_ID)).thenReturn(true);
         when(tokenService.getValidProfileAccessToken(PROFILE_ID))
                 .thenReturn(reactor.core.publisher.Mono.just(ACCESS_TOKEN));
@@ -100,37 +99,15 @@ class SpotifyImportServiceTest {
         mockServer.enqueue(likedSongsResponse(
                 List.of("spotify:track:liked-1", "spotify:track:liked-2")));
 
-        ResolvedTrack track1 = resolvedTrack("spotify:track:liked-1", "Song 1", "Bibi & Tina");
-        when(resolvedTrackRepository.findByProfileIdAndSpotifyTrackUriIn(eq(PROFILE_ID), any()))
-                .thenReturn(List.of(track1));
-        when(favoriteRepository.existsByProfileIdAndSpotifyTrackUri(PROFILE_ID, "spotify:track:liked-1"))
-                .thenReturn(false);
+        when(contentRepository.existsByProfileIdAndSpotifyUri(any(), any())).thenReturn(false);
+        when(favoriteRepository.existsByProfileIdAndSpotifyTrackUri(any(), any())).thenReturn(false);
 
         StepVerifier.create(service.importLikedSongsAsFavorites(PROFILE_ID))
-                .expectNext(1)
+                .expectNext(2)
                 .verifyComplete();
 
-        verify(favoriteRepository).save(any(Favorite.class));
-    }
-
-    @Test
-    @DisplayName("liked track URI not in resolved content is silently skipped")
-    void importLikedSongs_unwhitelistedTrack_isSkipped() {
-        when(tokenService.isProfileSpotifyLinked(PROFILE_ID)).thenReturn(true);
-        when(tokenService.getValidProfileAccessToken(PROFILE_ID))
-                .thenReturn(reactor.core.publisher.Mono.just(ACCESS_TOKEN));
-
-        mockServer.enqueue(likedSongsResponse(
-                List.of("spotify:track:not-whitelisted")));
-
-        when(resolvedTrackRepository.findByProfileIdAndSpotifyTrackUriIn(eq(PROFILE_ID), any()))
-                .thenReturn(List.of());
-
-        StepVerifier.create(service.importLikedSongsAsFavorites(PROFILE_ID))
-                .expectNext(0)
-                .verifyComplete();
-
-        verify(favoriteRepository, never()).save(any());
+        verify(contentRepository, times(2)).save(any(AllowedContent.class));
+        verify(favoriteRepository, times(2)).save(any(Favorite.class));
     }
 
     @Test
@@ -142,9 +119,8 @@ class SpotifyImportServiceTest {
 
         mockServer.enqueue(likedSongsResponse(List.of("spotify:track:existing")));
 
-        ResolvedTrack track = resolvedTrack("spotify:track:existing", "Existing Song", "Artist");
-        when(resolvedTrackRepository.findByProfileIdAndSpotifyTrackUriIn(eq(PROFILE_ID), any()))
-                .thenReturn(List.of(track));
+        when(contentRepository.existsByProfileIdAndSpotifyUri(PROFILE_ID, "spotify:track:existing"))
+                .thenReturn(true);
         when(favoriteRepository.existsByProfileIdAndSpotifyTrackUri(PROFILE_ID, "spotify:track:existing"))
                 .thenReturn(true);
 
@@ -153,6 +129,29 @@ class SpotifyImportServiceTest {
                 .verifyComplete();
 
         verify(favoriteRepository, never()).save(any());
+        verify(contentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("track not yet in AllowedContent is added during liked songs import")
+    void importLikedSongs_newTrack_addedToAllowedContent() {
+        when(tokenService.isProfileSpotifyLinked(PROFILE_ID)).thenReturn(true);
+        when(tokenService.getValidProfileAccessToken(PROFILE_ID))
+                .thenReturn(reactor.core.publisher.Mono.just(ACCESS_TOKEN));
+
+        mockServer.enqueue(likedSongsResponse(List.of("spotify:track:new-track")));
+
+        when(contentRepository.existsByProfileIdAndSpotifyUri(PROFILE_ID, "spotify:track:new-track"))
+                .thenReturn(false);
+        when(favoriteRepository.existsByProfileIdAndSpotifyTrackUri(PROFILE_ID, "spotify:track:new-track"))
+                .thenReturn(false);
+
+        StepVerifier.create(service.importLikedSongsAsFavorites(PROFILE_ID))
+                .expectNext(1)
+                .verifyComplete();
+
+        verify(contentRepository).save(any(AllowedContent.class));
+        verify(favoriteRepository).save(any(Favorite.class));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -166,20 +165,12 @@ class SpotifyImportServiceTest {
             sb.append("{\"track\":{\"id\":\"").append(id)
               .append("\",\"name\":\"Track ").append(id)
               .append("\",\"uri\":\"").append(uri)
-              .append("\",\"artists\":[]}}");
+              .append("\",\"artists\":[],\"album\":{\"images\":[]}}}");
         }
         sb.append("],\"next\":null}");
         return new MockResponse()
                 .setResponseCode(200)
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(sb.toString());
-    }
-
-    private ResolvedTrack resolvedTrack(String uri, String title, String artist) {
-        ResolvedTrack t = new ResolvedTrack();
-        t.setSpotifyTrackUri(uri);
-        t.setTitle(title);
-        t.setArtistName(artist);
-        return t;
     }
 }

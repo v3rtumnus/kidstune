@@ -2,10 +2,12 @@ package at.kidstune.spotify;
 
 import at.kidstune.auth.SpotifyConfig;
 import at.kidstune.auth.SpotifyTokenService;
+import at.kidstune.content.AllowedContent;
+import at.kidstune.content.ContentRepository;
+import at.kidstune.content.ContentScope;
+import at.kidstune.content.ContentType;
 import at.kidstune.favorites.Favorite;
 import at.kidstune.favorites.FavoriteRepository;
-import at.kidstune.resolver.ResolvedTrack;
-import at.kidstune.resolver.ResolvedTrackRepository;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,31 +33,31 @@ public class SpotifyImportService {
     private static final int LIKED_SONGS_PAGE_SIZE = 50;
     private static final int LIKED_SONGS_MAX       = 200;
 
-    private final SpotifyTokenService     tokenService;
-    private final FavoriteRepository      favoriteRepository;
-    private final ResolvedTrackRepository resolvedTrackRepository;
-    private final WebClient               spotifyApi;
+    private final SpotifyTokenService tokenService;
+    private final FavoriteRepository  favoriteRepository;
+    private final ContentRepository   contentRepository;
+    private final WebClient           spotifyApi;
 
     @Autowired
     public SpotifyImportService(SpotifyTokenService tokenService,
                                 FavoriteRepository favoriteRepository,
-                                ResolvedTrackRepository resolvedTrackRepository,
+                                ContentRepository contentRepository,
                                 SpotifyConfig spotifyConfig,
                                 WebClient.Builder webClientBuilder) {
         this(tokenService, favoriteRepository,
-                resolvedTrackRepository, spotifyConfig.getApiBaseUrl(), webClientBuilder);
+                contentRepository, spotifyConfig.getApiBaseUrl(), webClientBuilder);
     }
 
     /** Package-private constructor for tests – allows overriding the Spotify API base URL. */
     SpotifyImportService(SpotifyTokenService tokenService,
                          FavoriteRepository favoriteRepository,
-                         ResolvedTrackRepository resolvedTrackRepository,
+                         ContentRepository contentRepository,
                          String spotifyApiBaseUrl,
                          WebClient.Builder webClientBuilder) {
-        this.tokenService            = tokenService;
-        this.favoriteRepository      = favoriteRepository;
-        this.resolvedTrackRepository = resolvedTrackRepository;
-        this.spotifyApi              = webClientBuilder.baseUrl(spotifyApiBaseUrl).build();
+        this.tokenService     = tokenService;
+        this.favoriteRepository  = favoriteRepository;
+        this.contentRepository   = contentRepository;
+        this.spotifyApi          = webClientBuilder.baseUrl(spotifyApiBaseUrl).build();
     }
 
     // ── getImportSuggestions ──────────────────────────────────────────────────
@@ -182,10 +184,10 @@ public class SpotifyImportService {
     // ── importLikedSongsAsFavorites ───────────────────────────────────────────
 
     /**
-     * Imports the child's Spotify Liked Songs as KidsTune favorites.
+     * Imports all of the child's Spotify Liked Songs as KidsTune favorites.
      *
-     * Only tracks that are already in the child's resolved (approved) content are imported —
-     * this preserves the parental safety model. Tracks not in the whitelist are silently skipped.
+     * Each liked song is also added to the profile's AllowedContent (TRACK scope) so it
+     * is accessible on the device without requiring separate parental approval.
      * Silently returns 0 if the profile has no linked Spotify account (no exception).
      *
      * @return count of new Favorite rows created
@@ -197,17 +199,17 @@ public class SpotifyImportService {
         }
 
         return tokenService.getValidProfileAccessToken(profileId)
-                .flatMap(token -> fetchAllLikedTrackUris(token))
-                .flatMap(uris -> Mono.fromCallable(() ->
-                        saveFavoritesForMatchingTracks(profileId, uris)
+                .flatMap(this::fetchAllLikedTracks)
+                .flatMap(tracks -> Mono.fromCallable(() ->
+                        saveAllLikedSongs(profileId, tracks)
                 ).subscribeOn(Schedulers.boundedElastic()));
     }
 
-    private Mono<List<String>> fetchAllLikedTrackUris(String token) {
+    private Mono<List<ApiSavedTrack>> fetchAllLikedTracks(String token) {
         return fetchLikedTracksPage(token, 0, new ArrayList<>());
     }
 
-    private Mono<List<String>> fetchLikedTracksPage(String token, int offset, List<String> acc) {
+    private Mono<List<ApiSavedTrack>> fetchLikedTracksPage(String token, int offset, List<ApiSavedTrack> acc) {
         if (acc.size() >= LIKED_SONGS_MAX) return Mono.just(acc);
 
         int limit = Math.min(LIKED_SONGS_PAGE_SIZE, LIKED_SONGS_MAX - acc.size());
@@ -223,13 +225,11 @@ public class SpotifyImportService {
                 .bodyToMono(ApiSavedTracksPage.class)
                 .flatMap(page -> {
                     if (page.items() == null || page.items().isEmpty()) return Mono.just(acc);
-
                     for (ApiSavedTrack item : page.items()) {
                         if (item.track() != null && item.track().uri() != null) {
-                            acc.add(item.track().uri());
+                            acc.add(item);
                         }
                     }
-
                     if (page.next() == null || acc.size() >= LIKED_SONGS_MAX) {
                         return Mono.just(acc);
                     }
@@ -237,22 +237,42 @@ public class SpotifyImportService {
                 });
     }
 
-    private int saveFavoritesForMatchingTracks(String profileId, List<String> uris) {
-        if (uris.isEmpty()) return 0;
-
-        List<ResolvedTrack> matching = resolvedTrackRepository
-                .findByProfileIdAndSpotifyTrackUriIn(profileId, uris);
+    private int saveAllLikedSongs(String profileId, List<ApiSavedTrack> savedTracks) {
+        if (savedTracks.isEmpty()) return 0;
 
         int created = 0;
-        for (ResolvedTrack track : matching) {
-            String uri = track.getSpotifyTrackUri();
+        for (ApiSavedTrack item : savedTracks) {
+            ApiTrackRef track = item.track();
+            if (track == null || track.uri() == null) continue;
+
+            String uri        = track.uri();
+            String title      = track.name() != null ? track.name() : uri;
+            String artistName = (track.artists() != null && !track.artists().isEmpty())
+                    ? track.artists().get(0).name() : null;
+            String imageUrl   = (track.album() != null) ? extractImage(track.album().images()) : null;
+
+            // Add to AllowedContent as TRACK scope (idempotent)
+            if (!contentRepository.existsByProfileIdAndSpotifyUri(profileId, uri)) {
+                AllowedContent ac = new AllowedContent();
+                ac.setProfileId(profileId);
+                ac.setSpotifyUri(uri);
+                ac.setScope(ContentScope.TRACK);
+                ac.setContentType(ContentType.MUSIC);
+                ac.setTitle(title);
+                ac.setArtistName(artistName);
+                ac.setImageUrl(imageUrl);
+                ac.setAddedBy("liked-songs-import");
+                contentRepository.save(ac);
+            }
+
+            // Add as Favorite (idempotent)
             if (!favoriteRepository.existsByProfileIdAndSpotifyTrackUri(profileId, uri)) {
                 Favorite fav = new Favorite();
                 fav.setProfileId(profileId);
                 fav.setSpotifyTrackUri(uri);
-                fav.setTrackTitle(track.getTitle());
-                fav.setTrackImageUrl(track.getImageUrl());
-                fav.setArtistName(track.getArtistName());
+                fav.setTrackTitle(title);
+                fav.setTrackImageUrl(imageUrl);
+                fav.setArtistName(artistName);
                 favoriteRepository.save(fav);
                 created++;
             }
@@ -299,11 +319,16 @@ public class SpotifyImportService {
             @JsonProperty("images") List<ApiImage> images
     ) {}
 
+    private record ApiAlbum(
+            @JsonProperty("images") List<ApiImage> images
+    ) {}
+
     private record ApiTrackRef(
             @JsonProperty("id") String id,
             @JsonProperty("name") String name,
             @JsonProperty("uri") String uri,
-            @JsonProperty("artists") List<ApiArtistRef> artists
+            @JsonProperty("artists") List<ApiArtistRef> artists,
+            @JsonProperty("album") ApiAlbum album
     ) {}
 
     private record ApiPlayHistory(

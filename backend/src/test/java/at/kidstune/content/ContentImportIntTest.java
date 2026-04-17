@@ -16,10 +16,6 @@ import at.kidstune.profile.AvatarIcon;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
 import at.kidstune.resolver.ContentResolver;
-import at.kidstune.resolver.ResolvedAlbum;
-import at.kidstune.resolver.ResolvedAlbumRepository;
-import at.kidstune.resolver.ResolvedTrack;
-import at.kidstune.resolver.ResolvedTrackRepository;
 import at.kidstune.spotify.SpotifyImportService;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -41,7 +37,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -99,8 +94,6 @@ class ContentImportIntTest extends AbstractIntTest {
     @Autowired ProfileRepository        profileRepository;
     @Autowired ContentRepository        contentRepository;
     @Autowired FavoriteRepository       favoriteRepository;
-    @Autowired ResolvedAlbumRepository  resolvedAlbumRepository;
-    @Autowired ResolvedTrackRepository  resolvedTrackRepository;
     @Autowired SpotifyImportService     spotifyImportService;
 
     @BeforeEach
@@ -212,35 +205,7 @@ class ContentImportIntTest extends AbstractIntTest {
     // ── importLikedSongsAsFavorites ────────────────────────────────────────────
 
     @Test
-    void importLikedSongs_5_liked_tracks_3_in_resolved_content_creates_3_favorites() throws Exception {
-        // Set up approved content chain:
-        //   AllowedContent → ResolvedAlbum → 3 ResolvedTracks (whitelisted URIs)
-        String allowedContentId = UUID.randomUUID().toString();
-        AllowedContent content = new AllowedContent();
-        content.setId(allowedContentId);
-        content.setProfileId(PROFILE_ID1);
-        content.setSpotifyUri("spotify:artist:bibi");
-        content.setScope(ContentScope.ARTIST);
-        content.setTitle("Bibi & Tina");
-        content.setContentType(ContentType.MUSIC);
-        contentRepository.save(content);
-
-        String albumId = UUID.randomUUID().toString();
-        ResolvedAlbum album = new ResolvedAlbum();
-        album.setId(albumId);
-        album.setAllowedContentId(allowedContentId);
-        album.setSpotifyAlbumUri("spotify:album:bibi-album");
-        album.setTitle("Bibi & Tina Album");
-        album.setContentType(ContentType.MUSIC);
-        album.setResolvedAt(Instant.now());
-        resolvedAlbumRepository.save(album);
-
-        saveResolvedTrack(albumId, "spotify:track:liked-track-1", "Song 1");
-        saveResolvedTrack(albumId, "spotify:track:liked-track-2", "Song 2");
-        saveResolvedTrack(albumId, "spotify:track:liked-track-3", "Song 3");
-        // tracks 4 and 5 are liked by the child but NOT in the whitelist
-
-        // Mock Spotify: return 5 liked songs
+    void importLikedSongs_5_liked_tracks_all_imported_as_favorites_and_allowed_content() throws Exception {
         when(spotifyTokenService.isProfileSpotifyLinked(PROFILE_ID1)).thenReturn(true);
         when(spotifyTokenService.getValidProfileAccessToken(PROFILE_ID1))
                 .thenReturn(Mono.just("profile-token-liked"));
@@ -248,35 +213,40 @@ class ContentImportIntTest extends AbstractIntTest {
         mockSpotify.enqueue(likedSongsResponse(List.of(
                 "spotify:track:liked-track-1",
                 "spotify:track:liked-track-2",
-                "spotify:track:liked-track-not-in-whitelist-1",
                 "spotify:track:liked-track-3",
-                "spotify:track:liked-track-not-in-whitelist-2"
+                "spotify:track:liked-track-4",
+                "spotify:track:liked-track-5"
         )));
 
         Integer imported = spotifyImportService.importLikedSongsAsFavorites(PROFILE_ID1).block();
 
-        assertThat(imported).isEqualTo(3);
+        assertThat(imported).isEqualTo(5);
 
         List<Favorite> favorites = favoriteRepository.findByProfileId(PROFILE_ID1);
-        assertThat(favorites).hasSize(3);
+        assertThat(favorites).hasSize(5);
         assertThat(favorites).extracting(Favorite::getSpotifyTrackUri)
                 .containsExactlyInAnyOrder(
                         "spotify:track:liked-track-1",
                         "spotify:track:liked-track-2",
-                        "spotify:track:liked-track-3"
+                        "spotify:track:liked-track-3",
+                        "spotify:track:liked-track-4",
+                        "spotify:track:liked-track-5"
+                );
+
+        // All liked tracks also added to AllowedContent
+        List<AllowedContent> allowed = contentRepository.findByProfileId(PROFILE_ID1);
+        assertThat(allowed).hasSize(5);
+        assertThat(allowed).extracting(AllowedContent::getSpotifyUri)
+                .containsExactlyInAnyOrder(
+                        "spotify:track:liked-track-1",
+                        "spotify:track:liked-track-2",
+                        "spotify:track:liked-track-3",
+                        "spotify:track:liked-track-4",
+                        "spotify:track:liked-track-5"
                 );
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private void saveResolvedTrack(String albumId, String uri, String title) {
-        ResolvedTrack track = new ResolvedTrack();
-        track.setResolvedAlbumId(albumId);
-        track.setSpotifyTrackUri(uri);
-        track.setTitle(title);
-        track.setArtistName("Bibi & Tina");
-        resolvedTrackRepository.save(track);
-    }
 
     private MockResponse likedSongsResponse(List<String> trackUris) {
         StringBuilder sb = new StringBuilder("{\"items\":[");
