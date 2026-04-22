@@ -38,7 +38,7 @@
 
 <!-- Day data loaded via HTMX -->
 <div id="day-content"
-     th:hx-get="@{'/api/v1/insights/profiles/' + ${profileId} + '/day?date=' + ${date} + '&tz=' + ${tz}}"
+     th:hx-get="@{'/web/insights/profiles/' + ${profileId} + '/day-data?date=' + ${date} + '&tz=' + ${tz}}"
      hx-trigger="load"
      hx-swap="innerHTML">
     <div class="placeholder-glow">

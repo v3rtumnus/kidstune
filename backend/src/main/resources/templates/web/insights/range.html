@@ -49,7 +49,7 @@ var from      = /*[[${from}]]*/     '';
 var to        = /*[[${to}]]*/       '';
 var tz        = /*[[${tz}]]*/       'Europe/Vienna';
 
-fetch('/api/v1/insights/profiles/' + profileId + '/range?from=' + from + '&to=' + to + '&tz=' + tz)
+fetch('/web/insights/profiles/' + profileId + '/range-data?from=' + from + '&to=' + to + '&tz=' + tz)
     .then(function(r) { return r.json(); })
     .then(function(data) { renderRange(data); })
     .catch(function(e) { console.error('Range load failed', e); });

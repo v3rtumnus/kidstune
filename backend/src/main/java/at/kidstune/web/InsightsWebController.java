@@ -1,8 +1,12 @@
 package at.kidstune.web;
 
 import at.kidstune.insights.InsightsService;
+import at.kidstune.insights.dto.DayResponse;
+import at.kidstune.insights.dto.RangeResponse;
 import at.kidstune.profile.ChildProfile;
 import at.kidstune.profile.ProfileRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -10,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -103,6 +108,39 @@ public class InsightsWebController {
             model.addAttribute("to",   today.format(DateTimeFormatter.ISO_LOCAL_DATE));
             return "web/insights/range";
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    // ── JSON data endpoints (called by dashboard JS; session-auth) ───────────
+
+    @GetMapping("/profiles/{profileId}/day-data")
+    @ResponseBody
+    public Mono<ResponseEntity<DayResponse>> dayData(
+            @PathVariable String profileId,
+            @RequestParam(required = false) String date,
+            @RequestParam(defaultValue = "Europe/Vienna") String tz,
+            @AuthenticationPrincipal String familyId) {
+
+        return profileRepository.findById(profileId)
+                .filter(p -> p.getFamilyId().equals(familyId))
+                .map(p -> insightsService.getDay(profileId, date, tz)
+                        .map(ResponseEntity::ok))
+                .orElse(Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).build()));
+    }
+
+    @GetMapping("/profiles/{profileId}/range-data")
+    @ResponseBody
+    public Mono<ResponseEntity<RangeResponse>> rangeData(
+            @PathVariable String profileId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(defaultValue = "Europe/Vienna") String tz,
+            @AuthenticationPrincipal String familyId) {
+
+        return profileRepository.findById(profileId)
+                .filter(p -> p.getFamilyId().equals(familyId))
+                .map(p -> insightsService.getRange(profileId, from, to, tz)
+                        .map(ResponseEntity::ok))
+                .orElse(Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).build()));
     }
 
     // ── HTMX fragments ────────────────────────────────────────────────────────
