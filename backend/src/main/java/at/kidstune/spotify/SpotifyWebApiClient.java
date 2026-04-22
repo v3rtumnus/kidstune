@@ -295,12 +295,15 @@ public class SpotifyWebApiClient {
                                     (h.track() != null ? firstArtistName(h.track().artists()) : null);
                             String ctxType  = h.context() != null ? h.context().type() : null;
                             String ctxUri   = h.context() != null ? h.context().uri()  : null;
+                            // Album name: available on the track's album object; shows use episode.show.name
+                            String ctxName  = isEpisode && h.episode() != null ? h.episode().showName()
+                                    : (h.track() != null && h.track().album() != null ? h.track().album().name() : null);
                             Instant playedAt = Instant.parse(h.playedAt());
-                            String raw = h.toString(); // raw JSON round-trip via toString is not ideal but sufficient
+                            String raw = h.toString();
                             return new RawProfilePlayEvent(
                                     itemId, itemName, artist, durMs,
                                     isEpisode ? "EPISODE" : "TRACK",
-                                    playedAt, ctxType, ctxUri, raw);
+                                    playedAt, ctxType, ctxUri, ctxName, raw);
                         })
                         .toList()));
     }
@@ -353,6 +356,7 @@ public class SpotifyWebApiClient {
         Instant playedAt,
         String contextType,
         String contextUri,
+        String contextName,
         String rawJson
     ) {}
 
@@ -513,13 +517,20 @@ public class SpotifyWebApiClient {
 
     // ── Internal types for profile recently-played + currently-playing ────────
 
+    private record ApiAlbumRef(
+        @JsonProperty("id")   String id,
+        @JsonProperty("name") String name,
+        @JsonProperty("uri")  String uri
+    ) {}
+
     private record ApiTrackFull(
         @JsonProperty("id")          String id,
         @JsonProperty("name")        String name,
         @JsonProperty("uri")         String uri,
         @JsonProperty("type")        String type,
         @JsonProperty("duration_ms") int durationMs,
-        @JsonProperty("artists")     List<ApiArtistRef> artists
+        @JsonProperty("artists")     List<ApiArtistRef> artists,
+        @JsonProperty("album")       ApiAlbumRef album
     ) {}
 
     private record ApiEpisodeFull(

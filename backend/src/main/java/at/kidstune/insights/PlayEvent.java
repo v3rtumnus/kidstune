@@ -49,6 +49,9 @@ public class PlayEvent {
     @Column(name = "context_uri", length = 128)
     private String contextUri;
 
+    @Column(name = "context_name", length = 255)
+    private String contextName;
+
     @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 

@@ -246,7 +246,7 @@ public class InsightsService {
             long[] v = acc.computeIfAbsent(k, x -> new long[2]);
             v[0]++;
             v[1] += e.getDurationMs() / 1000L;
-            names.putIfAbsent(k, e.getContextUri());
+            names.putIfAbsent(k, e.getContextName() != null ? e.getContextName() : e.getContextUri());
         }
         return acc.entrySet().stream()
                 .sorted(Comparator.comparingLong((Map.Entry<Key, long[]> en) -> en.getValue()[0]).reversed())
@@ -268,11 +268,19 @@ public class InsightsService {
             v[0]++;
             v[1] += e.getDurationMs() / 1000L;
         }
+        Map<Key, String> names = new LinkedHashMap<>();
+        for (PlayEvent e : events) {
+            if (!isAudiobook(e)) continue;
+            String uri = e.getContextUri();
+            if (uri == null) uri = "unknown:" + e.getTrackId();
+            names.putIfAbsent(new Key(uri),
+                    e.getContextName() != null ? e.getContextName() : e.getArtistName());
+        }
         return acc.entrySet().stream()
                 .sorted(Comparator.comparingLong((Map.Entry<Key, long[]> en) -> en.getValue()[0]).reversed())
                 .limit(limit)
                 .map(en -> new ContextSummary(en.getKey().uri(), "show",
-                        en.getKey().uri(), (int) en.getValue()[0], en.getValue()[1]))
+                        names.get(en.getKey()), (int) en.getValue()[0], en.getValue()[1]))
                 .toList();
     }
 

@@ -97,6 +97,7 @@ public class RecentlyPlayedPoller {
             event.setItemType(item.itemType());
             event.setContextType(item.contextType());
             event.setContextUri(truncate(item.contextUri(), 128));
+            event.setContextName(truncate(item.contextName(), 255));
             event.setRawJson(item.rawJson());
             event.setCreatedAt(Instant.now());
             eventRepository.save(event);

@@ -7,11 +7,11 @@
     <!-- Timeline: 00:00 → now as coloured blocks -->
     <div class="timeline-container mb-3" id="timeline-strip"
          th:attr="data-profile-id=${profileId},data-tz=${tz},data-date=${todayDate}">
-        <th:block th:each="session : ${today.sessions()}">
+        <th:block th:each="s : ${today.sessions()}">
             <!--/* left/width computed client-side in script below */-->
-            <div th:class="'timeline-block kind-' + ${session.kind()}"
-                 th:attr="data-started=${session.startedAt()},data-ended=${session.endedAt()},
-                           data-profile=${profileId},data-date=${todayDate},title=${session.durationSeconds() / 60 + ' min ' + session.kind()}">
+            <div th:class="'timeline-block kind-' + ${s.kind()}"
+                 th:attr="data-started=${s.startedAt()},data-ended=${s.endedAt()},
+                           data-profile=${profileId},data-date=${todayDate},title=${s.durationSeconds() / 60 + ' min ' + s.kind()}">
             </div>
         </th:block>
     </div>

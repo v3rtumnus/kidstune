@@ -46,15 +46,15 @@ class RecentlyPlayedPollerIntTest extends AbstractIntTest {
         new SpotifyWebApiClient.RawProfilePlayEvent(
             "track1", "Bibi und das Nilpferd", "Hörspiel Studio",
             180_000, "TRACK", Instant.parse("2024-04-21T10:00:00Z"),
-            "album", "spotify:album:abc", "{}"),
+            "album", "spotify:album:abc", "Bibi Blocksberg", "{}"),
         new SpotifyWebApiClient.RawProfilePlayEvent(
             "track2", "Bibi und der Zaubertrank", "Hörspiel Studio",
             210_000, "TRACK", Instant.parse("2024-04-21T09:55:00Z"),
-            "album", "spotify:album:abc", "{}"),
+            "album", "spotify:album:abc", "Bibi Blocksberg", "{}"),
         new SpotifyWebApiClient.RawProfilePlayEvent(
             "ep1", "Kapitel 3: Der Schatz", "Die Schatzinsel",
             600_000, "EPISODE", Instant.parse("2024-04-21T09:00:00Z"),
-            "show", "spotify:show:xyz", "{}")
+            "show", "spotify:show:xyz", "Die Schatzinsel", "{}")
     );
 
     ChildProfile profile;

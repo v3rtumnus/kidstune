@@ -32,3 +32,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/011-insights.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/012-play-event-context-name.yaml
+      relativeToChangelogFile: false
