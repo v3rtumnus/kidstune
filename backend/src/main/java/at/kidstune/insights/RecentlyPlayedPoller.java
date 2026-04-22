@@ -42,7 +42,8 @@ public class RecentlyPlayedPoller {
         this.sessionBuilder   = sessionBuilder;
     }
 
-    @Scheduled(fixedDelayString = "${insights.poller.interval-ms:180000}")
+    @Scheduled(fixedDelayString = "${insights.poller.interval-ms:180000}",
+               initialDelayString = "${insights.poller.initial-delay-ms:300000}")
     public void poll() {
         if (!pollerEnabled) return;
         List<ChildProfile> profiles = profileRepository.findAll().stream()

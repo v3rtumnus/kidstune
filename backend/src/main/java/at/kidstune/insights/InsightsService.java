@@ -159,7 +159,7 @@ public class InsightsService {
 
     // ── Session sweep ─────────────────────────────────────────────────────────
 
-    @Scheduled(fixedDelay = 600_000)
+    @Scheduled(fixedDelay = 600_000, initialDelay = 300_000)
     public void sweepSessions() {
         profileRepository.findAll().stream()
                 .filter(p -> p.getSpotifyRefreshToken() != null)

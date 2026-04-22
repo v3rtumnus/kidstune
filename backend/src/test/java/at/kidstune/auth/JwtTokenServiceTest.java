@@ -72,8 +72,11 @@ class JwtTokenServiceTest {
     @Test
     void validateToken_tamperedSignature_throwsJwtException() {
         String token = jwtTokenService.createDeviceToken("fam-1", "dev-1", DeviceType.PARENT);
-        // Corrupt the last character of the signature segment
-        String tampered = token.substring(0, token.length() - 1) + (token.endsWith("A") ? "B" : "A");
+        // Corrupt the first character of the signature segment (all 6 bits are data — no padding risk)
+        String[] parts = token.split("\\.");
+        String sig = parts[2];
+        String corruptedSig = (sig.charAt(0) == 'A' ? "B" : "A") + sig.substring(1);
+        String tampered = parts[0] + "." + parts[1] + "." + corruptedSig;
 
         assertThatThrownBy(() -> jwtTokenService.validateToken(tampered))
                 .isInstanceOf(JwtException.class);
