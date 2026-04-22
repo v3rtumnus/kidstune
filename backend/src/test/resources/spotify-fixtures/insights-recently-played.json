@@ -1,0 +1,56 @@
+{
+  "items": [
+    {
+      "track": {
+        "id": "track-music-1",
+        "name": "Bibi und der Zaubertrank",
+        "uri": "spotify:track:track-music-1",
+        "type": "track",
+        "explicit": false,
+        "artists": [{"id": "bibi-artist", "name": "Bibi Blocksberg"}],
+        "duration_ms": 180000
+      },
+      "played_at": "2024-04-21T10:05:00.000Z",
+      "context": {
+        "type": "album",
+        "uri": "spotify:album:album-bibi-1"
+      }
+    },
+    {
+      "track": {
+        "id": "track-music-2",
+        "name": "Bibi fliegt nach London",
+        "uri": "spotify:track:track-music-2",
+        "type": "track",
+        "explicit": false,
+        "artists": [{"id": "bibi-artist", "name": "Bibi Blocksberg"}],
+        "duration_ms": 210000
+      },
+      "played_at": "2024-04-21T10:01:00.000Z",
+      "context": {
+        "type": "album",
+        "uri": "spotify:album:album-bibi-1"
+      }
+    },
+    {
+      "track": {
+        "id": "episode-audio-1",
+        "name": "Kapitel 1: Der Drache",
+        "uri": "spotify:episode:episode-audio-1",
+        "type": "episode",
+        "explicit": false,
+        "artists": [],
+        "duration_ms": 600000
+      },
+      "played_at": "2024-04-21T08:00:00.000Z",
+      "context": {
+        "type": "show",
+        "uri": "spotify:show:show-drache-1"
+      }
+    }
+  ],
+  "cursors": {
+    "after": "1713693900000",
+    "before": "1713686400000"
+  }
+}

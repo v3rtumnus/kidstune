@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Statistik – Tag</title>
+    <style>
+        .kind-MUSIC     { background: #0d6efd; }
+        .kind-AUDIOBOOK { background: #198754; }
+        .kind-MIXED     { background: #6f42c1; }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <a th:href="@{/web/insights}" class="text-decoration-none text-muted small">&larr; Statistik</a>
+        <h2 class="mb-0" th:text="${profile != null ? profile.name : 'Profil'} + ' – Tagesansicht'">
+            Tagesansicht
+        </h2>
+    </div>
+    <form method="get" class="d-flex gap-2 align-items-center">
+        <input type="hidden" name="tz" th:value="${tz}">
+        <input type="date" name="date" class="form-control form-control-sm"
+               th:value="${date}" id="dayPicker">
+        <button type="submit" class="btn btn-sm btn-primary">Los</button>
+    </form>
+</div>
+
+<!-- Token expired alert -->
+<div th:if="${profile != null and profile.insightsStatus == 'TOKEN_EXPIRED'}"
+     class="alert alert-warning">
+    Spotify-Verbindung abgelaufen.
+    <a th:href="@{'/web/profiles/' + ${profileId}}" class="alert-link">Neu verbinden</a>
+</div>
+
+<!-- Day data loaded via HTMX -->
+<div id="day-content"
+     th:hx-get="@{'/api/v1/insights/profiles/' + ${profileId} + '/day?date=' + ${date} + '&tz=' + ${tz}}"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <div class="placeholder-glow">
+        <div class="placeholder col-3 mb-3"></div>
+        <div class="placeholder col-12" style="height:32px;border-radius:4px;"></div>
+        <div class="placeholder col-4 mt-2"></div>
+    </div>
+</div>
+
+</th:block>
+
+<th:block layout:fragment="scripts">
+<script th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>
+<script>
+// When HTMX returns JSON for the day endpoint, render it client-side
+document.body.addEventListener('htmx:afterSwap', function (evt) {
+    if (evt.detail.target.id !== 'day-content') return;
+    try {
+        var data = JSON.parse(evt.detail.target.textContent);
+        renderDay(data, evt.detail.target);
+    } catch (e) { /* already HTML fragment */ }
+});
+
+function renderDay(data, container) {
+    if (!data.connected) {
+        container.innerHTML = '<div class="alert alert-warning">Kein Spotify-Account verbunden.</div>';
+        return;
+    }
+    var t = data.totals;
+    var html = '<div class="d-flex gap-2 flex-wrap mb-3">'
+        + '<span class="badge bg-secondary">Gesamt: ' + Math.floor(t.totalSeconds/60) + ' min</span>'
+        + '<span class="badge bg-primary">Musik: ' + Math.floor(t.musicSeconds/60) + ' min</span>'
+        + '<span class="badge bg-success">H&ouml;rbuch: ' + Math.floor(t.audiobookSeconds/60) + ' min</span>'
+        + '<span class="badge bg-light text-dark border">' + t.sessionCount + ' Session(s)</span>'
+        + '</div>';
+
+    if (!data.sessions || data.sessions.length === 0) {
+        html += '<div class="text-muted">Keine Daten für diesen Tag.</div>';
+    } else {
+        data.sessions.forEach(function(s) {
+            var badge = s.kind === 'MUSIC' ? 'bg-primary' : (s.kind === 'AUDIOBOOK' ? 'bg-success' : 'bg-secondary');
+            html += '<div class="card mb-3"><div class="card-header d-flex flex-wrap gap-2 align-items-center">'
+                  + '<span>' + fmtTime(s.startedAt) + ' – ' + fmtTime(s.endedAt) + '</span>'
+                  + '<span class="text-muted small">' + Math.floor(s.durationSeconds/60) + ' min</span>'
+                  + '<span class="badge ' + badge + ' ms-auto">' + s.kind + '</span>'
+                  + '<button class="btn btn-sm btn-outline-secondary" type="button"'
+                  + ' data-bs-toggle="collapse" data-bs-target="#s' + s.startedAt + '">&#9660;</button>'
+                  + '</div><div id="s' + s.startedAt + '" class="collapse"><ul class="list-group list-group-flush">';
+            (s.events || []).forEach(function(ev) {
+                var icon = ev.itemType === 'EPISODE' ? '🎙' : '🎵';
+                html += '<li class="list-group-item d-flex gap-2 py-1 small">'
+                      + icon + ' <span class="flex-grow-1">' + esc(ev.trackName) + '</span>'
+                      + '<span class="text-muted">' + esc(ev.artistName || '') + '</span>'
+                      + '<span class="text-muted">' + Math.floor(ev.durationMs/60000) + ' min</span></li>';
+            });
+            html += '</ul></div></div>';
+        });
+    }
+    container.innerHTML = html;
+}
+
+function fmtTime(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return d.toLocaleTimeString('de-AT', {hour:'2-digit', minute:'2-digit'});
+}
+function esc(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</th:block>
+</body>
+</html>

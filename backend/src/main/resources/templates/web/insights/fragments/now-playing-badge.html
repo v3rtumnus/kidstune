@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Fragment returned by HTMX poll. Replaces the outer span. */-->
+<span th:id="'np-' + ${profileId}"
+      th:hx-get="@{'/web/insights/profiles/' + ${profileId} + '/fragments/now-playing'}"
+      hx-trigger="every 30s[document.visibilityState=='visible']"
+      hx-swap="outerHTML"
+      class="now-playing-badge">
+    <span th:if="${live != null and live.playing()}"
+          class="badge bg-success">
+        &#9654; <span th:text="${live.trackName()}">Track</span>
+    </span>
+</span>
+</body>
+</html>

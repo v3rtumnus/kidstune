@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Reusable session card fragment, th:insert="~{.../session-card :: session-card(session=${s})}" */-->
+<th:block th:fragment="session-card(session)">
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+        <span th:text="${#temporals.format(session.startedAt(), 'HH:mm')} + ' – ' +
+                        ${#temporals.format(session.endedAt(),   'HH:mm')}">
+            00:00 – 00:00
+        </span>
+        <span class="text-muted small" th:text="${session.durationSeconds() / 60} + ' min'"></span>
+        <span th:class="'badge ms-auto kind-' + ${session.kind()}
+                        + (${session.kind() == 'MUSIC'} ? ' bg-primary'
+                        : (${session.kind() == 'AUDIOBOOK'} ? ' bg-success' : ' bg-secondary'))"
+              th:text="${session.kind()}">KIND</span>
+        <span class="badge bg-light text-dark border"
+              th:text="${session.eventCount()} + ' Titel'">0 Titel</span>
+        <!-- HTMX expand toggle -->
+        <button class="btn btn-sm btn-outline-secondary ms-1"
+                type="button"
+                th:attr="data-bs-toggle='collapse',
+                          data-bs-target='#tracks-' + ${session.startedAt().toEpochMilli()}"
+                aria-expanded="false">
+            &#9660;
+        </button>
+    </div>
+    <div th:id="'tracks-' + ${session.startedAt().toEpochMilli()}" class="collapse">
+        <ul class="list-group list-group-flush">
+            <li th:each="event : ${session.events()}"
+                class="list-group-item d-flex align-items-center gap-2 py-1">
+                <span th:if="${event.itemType() == 'EPISODE'}" title="H&ouml;rbuch/Podcast">&#127911;</span>
+                <span th:if="${event.itemType() != 'EPISODE'}" title="Musik">&#127925;</span>
+                <span class="flex-grow-1" th:text="${event.trackName()}">Track</span>
+                <span class="text-muted small" th:text="${event.artistName()}"></span>
+                <span class="text-muted small" th:text="${event.durationMs() / 1000 / 60} + ' min'"></span>
+            </li>
+        </ul>
+    </div>
+</div>
+</th:block>
+</body>
+</html>

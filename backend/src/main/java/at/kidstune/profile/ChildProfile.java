@@ -44,6 +44,9 @@ public class ChildProfile {
     @Column(name = "spotify_refresh_token", columnDefinition = "TEXT")
     private String spotifyRefreshToken;
 
+    @Column(name = "insights_status", length = 32)
+    private String insightsStatus;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -86,6 +89,9 @@ public class ChildProfile {
 
     public String getSpotifyRefreshToken() { return spotifyRefreshToken; }
     public void setSpotifyRefreshToken(String spotifyRefreshToken) { this.spotifyRefreshToken = spotifyRefreshToken; }
+
+    public String getInsightsStatus() { return insightsStatus; }
+    public void setInsightsStatus(String insightsStatus) { this.insightsStatus = insightsStatus; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

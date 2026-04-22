@@ -9,11 +9,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.benmanes.caffeine.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -260,6 +263,109 @@ public class SpotifyWebApiClient {
                 .doOnNext(list -> userPlaylistsCache.put(familyId, list)));
     }
 
+    // ── Profile recently-played (per-child token, full history) ───────────────
+
+    /**
+     * Calls recently-played with a child profile's own access token and an {@code after}
+     * cursor so the caller can page forward incrementally.  Returns richer items than
+     * {@link #getRecentlyPlayed} (includes played_at, context, item_type, raw JSON).
+     * NOT cached — the poller manages its own cursor-based deduplication via the DB.
+     */
+    public Mono<List<RawProfilePlayEvent>> getProfileRecentlyPlayed(String profileId, long afterMillis) {
+        return withCircuitBreaker(() ->
+            tokenService.getValidProfileAccessToken(profileId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/me/player/recently-played")
+                        .queryParam("limit", 50)
+                        .queryParam("after", afterMillis)
+                        .build())
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(ApiPlayHistoryFullPage.class))
+                .map(page -> page.items() == null ? List.<RawProfilePlayEvent>of()
+                    : page.items().stream()
+                        .filter(h -> h.track() != null || h.episode() != null)
+                        .map(h -> {
+                            boolean isEpisode = h.track() == null ||
+                                    "episode".equalsIgnoreCase(h.track().type());
+                            String itemId   = isEpisode && h.episode() != null ? h.episode().id()   : (h.track() != null ? h.track().id()   : "");
+                            String itemName = isEpisode && h.episode() != null ? h.episode().name() : (h.track() != null ? h.track().name() : "");
+                            int    durMs    = isEpisode && h.episode() != null ? h.episode().durationMs() : (h.track() != null ? h.track().durationMs() : 0);
+                            String artist   = isEpisode && h.episode() != null ? h.episode().showName()  :
+                                    (h.track() != null ? firstArtistName(h.track().artists()) : null);
+                            String ctxType  = h.context() != null ? h.context().type() : null;
+                            String ctxUri   = h.context() != null ? h.context().uri()  : null;
+                            Instant playedAt = Instant.parse(h.playedAt());
+                            String raw = h.toString(); // raw JSON round-trip via toString is not ideal but sufficient
+                            return new RawProfilePlayEvent(
+                                    itemId, itemName, artist, durMs,
+                                    isEpisode ? "EPISODE" : "TRACK",
+                                    playedAt, ctxType, ctxUri, raw);
+                        })
+                        .toList()));
+    }
+
+    /**
+     * Returns what the child profile is currently playing, or empty if nothing is playing.
+     * 204 from Spotify maps to {@link Optional#empty()}.
+     * NOT cached — callers must apply their own short-lived cache.
+     */
+    public Mono<Optional<RawCurrentlyPlaying>> getCurrentlyPlayingForProfile(String profileId) {
+        return withCircuitBreaker(() ->
+            tokenService.getValidProfileAccessToken(profileId)
+                .flatMap(token -> spotifyApi.get()
+                    .uri("/v1/me/player/currently-playing")
+                    .header("Authorization", "Bearer " + token)
+                    .exchangeToMono(response -> {
+                        if (response.statusCode() == HttpStatus.NO_CONTENT ||
+                                response.statusCode() == HttpStatus.OK && response.headers()
+                                        .contentLength().orElse(0) == 0) {
+                            return Mono.just(Optional.<RawCurrentlyPlaying>empty());
+                        }
+                        return response.bodyToMono(ApiCurrentlyPlaying.class)
+                                .map(cp -> {
+                                    if (cp == null || (!cp.isPlaying() &&
+                                            cp.item() == null)) {
+                                        return Optional.<RawCurrentlyPlaying>empty();
+                                    }
+                                    boolean isEpisode = cp.item() != null &&
+                                            "episode".equalsIgnoreCase(cp.item().type());
+                                    return Optional.of(new RawCurrentlyPlaying(
+                                            cp.item() != null ? cp.item().id()   : null,
+                                            cp.item() != null ? cp.item().name() : null,
+                                            cp.item() != null ? firstArtistName(cp.item().artists()) : null,
+                                            cp.item() != null ? cp.item().durationMs() : 0,
+                                            cp.progressMs(),
+                                            isEpisode ? "EPISODE" : "TRACK",
+                                            cp.isPlaying()));
+                                });
+                    })));
+    }
+
+    // ── Public transfer types for insights feature ────────────────────────────
+
+    public record RawProfilePlayEvent(
+        String trackId,
+        String trackName,
+        String artistName,
+        int    durationMs,
+        String itemType,
+        Instant playedAt,
+        String contextType,
+        String contextUri,
+        String rawJson
+    ) {}
+
+    public record RawCurrentlyPlaying(
+        String  trackId,
+        String  trackName,
+        String  artistName,
+        int     durationMs,
+        int     progressMs,
+        String  itemType,
+        boolean isPlaying
+    ) {}
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
@@ -403,5 +509,62 @@ public class SpotifyWebApiClient {
         @JsonProperty("artists") ApiArtistsPage artists,
         @JsonProperty("albums") ApiAlbumsPage albums,
         @JsonProperty("playlists") ApiPlaylistsPage playlists
+    ) {}
+
+    // ── Internal types for profile recently-played + currently-playing ────────
+
+    private record ApiTrackFull(
+        @JsonProperty("id")          String id,
+        @JsonProperty("name")        String name,
+        @JsonProperty("uri")         String uri,
+        @JsonProperty("type")        String type,
+        @JsonProperty("duration_ms") int durationMs,
+        @JsonProperty("artists")     List<ApiArtistRef> artists
+    ) {}
+
+    private record ApiEpisodeFull(
+        @JsonProperty("id")          String id,
+        @JsonProperty("name")        String name,
+        @JsonProperty("uri")         String uri,
+        @JsonProperty("type")        String type,
+        @JsonProperty("duration_ms") int durationMs,
+        @JsonProperty("show")        ApiShowRef show
+    ) {
+        String showName() { return show != null ? show.name() : null; }
+    }
+
+    private record ApiShowRef(
+        @JsonProperty("id")   String id,
+        @JsonProperty("name") String name
+    ) {}
+
+    private record ApiContext(
+        @JsonProperty("type") String type,
+        @JsonProperty("uri")  String uri
+    ) {}
+
+    private record ApiPlayHistoryFull(
+        @JsonProperty("track")     ApiTrackFull track,
+        @JsonProperty("episode")   ApiEpisodeFull episode,
+        @JsonProperty("played_at") String playedAt,
+        @JsonProperty("context")   ApiContext context
+    ) {}
+
+    private record ApiPlayHistoryFullPage(
+        @JsonProperty("items") List<ApiPlayHistoryFull> items
+    ) {}
+
+    private record ApiCurrentlyPlayingItem(
+        @JsonProperty("id")          String id,
+        @JsonProperty("name")        String name,
+        @JsonProperty("type")        String type,
+        @JsonProperty("duration_ms") int durationMs,
+        @JsonProperty("artists")     List<ApiArtistRef> artists
+    ) {}
+
+    private record ApiCurrentlyPlaying(
+        @JsonProperty("item")        ApiCurrentlyPlayingItem item,
+        @JsonProperty("is_playing")  boolean isPlaying,
+        @JsonProperty("progress_ms") int progressMs
     ) {}
 }

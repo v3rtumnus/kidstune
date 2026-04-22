@@ -1,0 +1,147 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-1-play-event
+      author: kidstune
+      changes:
+        - createTable:
+            tableName: play_event
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_play_event_profile
+                    references: child_profile(id)
+                    deleteCascade: true
+              - column:
+                  name: played_at
+                  type: "TIMESTAMP(3)"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: track_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: track_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: artist_name
+                  type: VARCHAR(255)
+              - column:
+                  name: duration_ms
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: item_type
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: context_type
+                  type: VARCHAR(32)
+              - column:
+                  name: context_uri
+                  type: VARCHAR(128)
+              - column:
+                  name: raw_json
+                  type: LONGTEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addUniqueConstraint:
+            tableName: play_event
+            columnNames: profile_id, played_at, track_id
+            constraintName: uk_play_event_profile_played_track
+        - createIndex:
+            tableName: play_event
+            indexName: idx_play_event_profile_played
+            columns:
+              - column:
+                  name: profile_id
+              - column:
+                  name: played_at
+
+  - changeSet:
+      id: 011-2-listening-session
+      author: kidstune
+      changes:
+        - createTable:
+            tableName: listening_session
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_session_profile
+                    references: child_profile(id)
+                    deleteCascade: true
+              - column:
+                  name: started_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ended_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: duration_seconds
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: kind
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: event_count
+                  type: INT
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: listening_session
+            columnNames: profile_id, started_at
+            constraintName: uk_session_profile_started
+        - createIndex:
+            tableName: listening_session
+            indexName: idx_session_profile_started
+            columns:
+              - column:
+                  name: profile_id
+              - column:
+                  name: started_at
+
+  - changeSet:
+      id: 011-3-insights-status
+      author: kidstune
+      changes:
+        - addColumn:
+            tableName: child_profile
+            columns:
+              - column:
+                  name: insights_status
+                  type: VARCHAR(32)

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{web/layout}">
+<head>
+    <title>Statistik – Verlauf</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <a th:href="@{/web/insights}" class="text-decoration-none text-muted small">&larr; Statistik</a>
+        <h2 class="mb-0" th:text="${profile != null ? profile.name : 'Profil'} + ' – Verlauf'">
+            Verlauf
+        </h2>
+    </div>
+    <div class="btn-group" role="group">
+        <a th:href="@{'/web/insights/profiles/' + ${profileId} + '/range?period=week&tz=' + ${tz}}"
+           th:class="'btn btn-sm ' + (${period == 'week'} ? 'btn-primary' : 'btn-outline-primary')">Woche</a>
+        <a th:href="@{'/web/insights/profiles/' + ${profileId} + '/range?period=month&tz=' + ${tz}}"
+           th:class="'btn btn-sm ' + (${period == 'month'} ? 'btn-primary' : 'btn-outline-primary')">Monat</a>
+    </div>
+</div>
+
+<!-- Stacked bar chart via Chart.js -->
+<div class="card mb-4">
+    <div class="card-body">
+        <canvas id="rangeChart" height="100"></canvas>
+    </div>
+</div>
+
+<!-- Top lists rendered client-side from JSON -->
+<div id="top-lists">
+    <div class="placeholder-glow">
+        <div class="placeholder col-3"></div>
+        <div class="placeholder col-12 mt-2" style="height:200px;"></div>
+    </div>
+</div>
+
+</th:block>
+
+<th:block layout:fragment="scripts">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script th:inline="javascript">
+var profileId = /*[[${profileId}]]*/ '';
+var from      = /*[[${from}]]*/     '';
+var to        = /*[[${to}]]*/       '';
+var tz        = /*[[${tz}]]*/       'Europe/Vienna';
+
+fetch('/api/v1/insights/profiles/' + profileId + '/range?from=' + from + '&to=' + to + '&tz=' + tz)
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderRange(data); })
+    .catch(function(e) { console.error('Range load failed', e); });
+
+function renderRange(data) {
+    if (!data.connected) {
+        document.getElementById('top-lists').innerHTML =
+            '<div class="alert alert-warning">Kein Spotify-Account verbunden.</div>';
+        return;
+    }
+
+    // Chart
+    var labels = (data.dailySummaries || []).map(function(d) { return d.date; });
+    var music  = (data.dailySummaries || []).map(function(d) { return Math.floor(d.musicSeconds / 60); });
+    var audio  = (data.dailySummaries || []).map(function(d) { return Math.floor(d.audiobookSeconds / 60); });
+
+    new Chart(document.getElementById('rangeChart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Musik (min)',    data: music, backgroundColor: '#0d6efd', stack: 'a' },
+                { label: 'Hörbuch (min)', data: audio, backgroundColor: '#198754', stack: 'a' }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+
+    // Top lists
+    var html = '<div class="row g-4">';
+
+    html += '<div class="col-md-4"><h6 class="fw-semibold">🎵 Top-Musiktitel</h6>';
+    if (!data.topMusicTracks || !data.topMusicTracks.length) {
+        html += '<div class="text-muted small">Keine Daten</div>';
+    } else {
+        html += '<ol class="list-group list-group-numbered">';
+        data.topMusicTracks.forEach(function(t) {
+            html += '<li class="list-group-item d-flex justify-content-between py-2">'
+                  + '<div><div class="fw-semibold small">' + esc(t.trackName) + '</div>'
+                  + '<div class="text-muted" style="font-size:.75rem">' + esc(t.artistName||'') + '</div></div>'
+                  + '<span class="badge bg-primary rounded-pill">' + t.playCount + '×</span></li>';
+        });
+        html += '</ol>';
+    }
+    html += '</div>';
+
+    html += '<div class="col-md-4"><h6 class="fw-semibold">💿 Top-Playlists &amp; Alben</h6>';
+    if (!data.topMusicContexts || !data.topMusicContexts.length) {
+        html += '<div class="text-muted small">Keine Daten</div>';
+    } else {
+        html += '<ol class="list-group list-group-numbered">';
+        data.topMusicContexts.forEach(function(c) {
+            html += '<li class="list-group-item d-flex justify-content-between py-2">'
+                  + '<div><div class="fw-semibold small">' + esc(c.displayName||c.contextUri) + '</div>'
+                  + '<div class="text-muted" style="font-size:.75rem">' + esc(c.contextType||'') + '</div></div>'
+                  + '<span class="badge bg-primary rounded-pill">' + c.playCount + '×</span></li>';
+        });
+        html += '</ol>';
+    }
+    html += '</div>';
+
+    html += '<div class="col-md-4"><h6 class="fw-semibold">📚 Top-Hörbücher</h6>';
+    if (!data.topAudiobookShows || !data.topAudiobookShows.length) {
+        html += '<div class="text-muted small">Keine Daten</div>';
+    } else {
+        html += '<ol class="list-group list-group-numbered">';
+        data.topAudiobookShows.forEach(function(s) {
+            html += '<li class="list-group-item d-flex justify-content-between py-2">'
+                  + '<div class="fw-semibold small">' + esc(s.displayName||s.contextUri) + '</div>'
+                  + '<span class="badge bg-success rounded-pill">' + s.playCount + '×</span></li>';
+        });
+        html += '</ol>';
+    }
+    html += '</div></div>';
+
+    document.getElementById('top-lists').innerHTML = html;
+}
+
+function esc(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</th:block>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "item": {
+    "id": "track-music-1",
+    "name": "Bibi und der Zaubertrank",
+    "type": "track",
+    "duration_ms": 180000,
+    "artists": [{"id": "bibi-artist", "name": "Bibi Blocksberg"}]
+  },
+  "is_playing": true,
+  "progress_ms": 45000
+}

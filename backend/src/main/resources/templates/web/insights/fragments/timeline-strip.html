@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Inserted via hx-swap="innerHTML" into the card-body div */-->
+<th:block th:if="${today != null and today.connected()}">
+
+    <!-- Timeline: 00:00 → now as coloured blocks -->
+    <div class="timeline-container mb-3" id="timeline-strip"
+         th:attr="data-profile-id=${profileId},data-tz=${tz},data-date=${todayDate}">
+        <th:block th:each="session : ${today.sessions()}">
+            <!--/* left/width computed client-side in script below */-->
+            <div th:class="'timeline-block kind-' + ${session.kind()}"
+                 th:attr="data-started=${session.startedAt()},data-ended=${session.endedAt()},
+                           data-profile=${profileId},data-date=${todayDate},title=${session.durationSeconds() / 60 + ' min ' + session.kind()}">
+            </div>
+        </th:block>
+    </div>
+
+    <!-- Totals row -->
+    <div class="d-flex gap-2 flex-wrap">
+        <span class="stat-pill bg-secondary text-white">
+            Gesamt: <strong th:text="${today.totals().totalSeconds() / 60} + ' min'">0 min</strong>
+        </span>
+        <span class="stat-pill" style="background:#cfe2ff">
+            Musik: <strong th:text="${today.totals().musicSeconds() / 60} + ' min'">0 min</strong>
+        </span>
+        <span class="stat-pill" style="background:#d1e7dd">
+            H&ouml;rbuch: <strong th:text="${today.totals().audiobookSeconds() / 60} + ' min'">0 min</strong>
+        </span>
+    </div>
+
+</th:block>
+
+<th:block th:if="${today == null or !today.connected()}">
+    <div class="alert alert-warning mb-0">
+        Kein Spotify-Account verbunden.
+    </div>
+</th:block>
+
+<script>
+(function () {
+    var strip = document.getElementById('timeline-strip');
+    if (!strip) return;
+    var blocks = strip.querySelectorAll('.timeline-block');
+    var tz = strip.dataset.tz || 'Europe/Vienna';
+    var dateStr = strip.dataset.date;
+    var dayStart = new Date(dateStr + 'T00:00:00');
+    var now = new Date();
+    var dayMs = 24 * 60 * 60 * 1000;
+    var width = strip.clientWidth;
+    blocks.forEach(function (b) {
+        var start = new Date(b.dataset.started);
+        var end   = new Date(b.dataset.ended);
+        var left  = Math.max(0, (start - dayStart) / dayMs * 100);
+        var right = Math.min(100, (end - dayStart) / dayMs * 100);
+        b.style.left  = left + '%';
+        b.style.width = (right - left) + '%';
+        b.addEventListener('click', function () {
+            var profId = b.dataset.profile;
+            var d = b.dataset.date;
+            window.location = '/web/insights/profiles/' + profId + '/day?date=' + d;
+        });
+    });
+})();
+</script>
+</body>
+</html>

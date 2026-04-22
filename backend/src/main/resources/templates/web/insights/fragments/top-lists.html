@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="top-lists(range)">
+
+<div class="row g-4 mt-2">
+
+    <!-- Top music tracks -->
+    <div class="col-md-4">
+        <h6 class="fw-semibold mb-2">&#127911; Top-Musiktitel</h6>
+        <div th:if="${#lists.isEmpty(range.topMusicTracks())}" class="text-muted small">Keine Daten</div>
+        <ol class="list-group list-group-numbered" th:unless="${#lists.isEmpty(range.topMusicTracks())}">
+            <li th:each="t : ${range.topMusicTracks()}"
+                class="list-group-item d-flex justify-content-between align-items-start py-2">
+                <div class="ms-2 me-auto">
+                    <div class="fw-semibold small" th:text="${t.trackName()}">Titel</div>
+                    <div class="text-muted" style="font-size:.75rem" th:text="${t.artistName()}"></div>
+                </div>
+                <span class="badge bg-primary rounded-pill"
+                      th:text="${t.playCount()} + '×'">0×</span>
+            </li>
+        </ol>
+    </div>
+
+    <!-- Top music contexts -->
+    <div class="col-md-4">
+        <h6 class="fw-semibold mb-2">&#128191; Top-Playlists &amp; Alben</h6>
+        <div th:if="${#lists.isEmpty(range.topMusicContexts())}" class="text-muted small">Keine Daten</div>
+        <ol class="list-group list-group-numbered" th:unless="${#lists.isEmpty(range.topMusicContexts())}">
+            <li th:each="c : ${range.topMusicContexts()}"
+                class="list-group-item d-flex justify-content-between align-items-start py-2">
+                <div class="ms-2 me-auto">
+                    <div class="fw-semibold small" th:text="${c.displayName() ?: c.contextUri()}">Kontext</div>
+                    <div class="text-muted" style="font-size:.75rem" th:text="${c.contextType()}"></div>
+                </div>
+                <span class="badge bg-primary rounded-pill"
+                      th:text="${c.playCount()} + '×'">0×</span>
+            </li>
+        </ol>
+    </div>
+
+    <!-- Top audiobook shows -->
+    <div class="col-md-4">
+        <h6 class="fw-semibold mb-2">&#128218; Top-H&ouml;rbücher</h6>
+        <div th:if="${#lists.isEmpty(range.topAudiobookShows())}" class="text-muted small">Keine Daten</div>
+        <ol class="list-group list-group-numbered" th:unless="${#lists.isEmpty(range.topAudiobookShows())}">
+            <li th:each="s : ${range.topAudiobookShows()}"
+                class="list-group-item d-flex justify-content-between align-items-start py-2">
+                <div class="ms-2 me-auto">
+                    <div class="fw-semibold small" th:text="${s.displayName() ?: s.contextUri()}">Show</div>
+                </div>
+                <span class="badge bg-success rounded-pill"
+                      th:text="${s.playCount()} + '×'">0×</span>
+            </li>
+        </ol>
+    </div>
+
+</div>
+</th:block>
+</body>
+</html>

@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies that:
  * 1. The Spring application context loads successfully.
- * 2. Liquibase migrations apply cleanly and all 9 tables exist.
+ * 2. Liquibase migrations apply cleanly and all expected tables exist.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class KidstuneApplicationIntTest extends AbstractIntTest {
@@ -47,8 +47,10 @@ class KidstuneApplicationIntTest extends AbstractIntTest {
                 "deletion_log",
                 "family",
                 "favorite",
+                "listening_session",
                 "paired_device",
                 "pairing_code",
+                "play_event",
                 "push_subscription",
                 "remember_me_token",
                 "resolved_album",
