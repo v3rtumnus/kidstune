@@ -17,13 +17,18 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class RecentlyPlayedPoller {
 
     @Value("${insights.poller.enabled:true}")
     private boolean pollerEnabled;
+
+    @Value("${insights.audiobook-patterns:hörspiel,hörbuch,lesung,tkkg,die drei}")
+    private String audiobookPatternsRaw;
 
     private static final Logger log = LoggerFactory.getLogger(RecentlyPlayedPoller.class);
 
@@ -98,6 +103,7 @@ public class RecentlyPlayedPoller {
             event.setContextType(item.contextType());
             event.setContextUri(truncate(item.contextUri(), 128));
             event.setContextName(truncate(item.contextName(), 255));
+            event.setKind(classifyKind(item));
             event.setRawJson(item.rawJson());
             event.setCreatedAt(Instant.now());
             eventRepository.save(event);
@@ -142,6 +148,23 @@ public class RecentlyPlayedPoller {
 
     private static boolean isRateLimit(Throwable e) {
         return e instanceof WebClientResponseException.TooManyRequests;
+    }
+
+    private String classifyKind(RawProfilePlayEvent item) {
+        if ("EPISODE".equals(item.itemType()) ||
+                "audiobook".equals(item.contextType()) ||
+                "show".equals(item.contextType())) {
+            return "AUDIOBOOK";
+        }
+        String haystack = ((item.artistName() != null ? item.artistName() : "") + " " +
+                           (item.contextName() != null ? item.contextName() : ""))
+                          .toLowerCase(Locale.ROOT);
+        for (String pattern : Arrays.stream(audiobookPatternsRaw.split(","))
+                .map(String::trim).map(s -> s.toLowerCase(Locale.ROOT))
+                .filter(s -> !s.isEmpty()).toList()) {
+            if (haystack.contains(pattern)) return "AUDIOBOOK";
+        }
+        return "MUSIC";
     }
 
     private static String truncate(String s, int max) {

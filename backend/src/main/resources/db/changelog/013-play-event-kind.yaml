@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-play-event-kind
+      author: kidstune
+      changes:
+        - addColumn:
+            tableName: play_event
+            columns:
+              - column:
+                  name: kind
+                  type: VARCHAR(10)
+                  defaultValue: MUSIC
+                  constraints:
+                    nullable: false

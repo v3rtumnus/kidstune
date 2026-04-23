@@ -52,6 +52,10 @@ public class PlayEvent {
     @Column(name = "context_name", length = 255)
     private String contextName;
 
+    /** "MUSIC" or "AUDIOBOOK" – set at ingestion time by keyword classifier */
+    @Column(name = "kind", length = 10, nullable = false)
+    private String kind;
+
     @Column(name = "raw_json", columnDefinition = "LONGTEXT")
     private String rawJson;
 

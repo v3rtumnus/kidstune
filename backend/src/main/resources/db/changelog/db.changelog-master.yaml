@@ -35,3 +35,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/012-play-event-context-name.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/013-play-event-kind.yaml
+      relativeToChangelogFile: false

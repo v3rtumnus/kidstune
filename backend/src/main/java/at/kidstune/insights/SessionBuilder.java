@@ -126,6 +126,7 @@ public class SessionBuilder {
     }
 
     private boolean isAudiobook(PlayEvent e) {
+        if (e.getKind() != null) return "AUDIOBOOK".equals(e.getKind());
         return "EPISODE".equals(e.getItemType()) ||
                "audiobook".equals(e.getContextType()) ||
                "show".equals(e.getContextType());

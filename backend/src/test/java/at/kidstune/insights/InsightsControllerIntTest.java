@@ -290,6 +290,8 @@ class InsightsControllerIntTest extends AbstractIntTest {
         e.setItemType(itemType);
         e.setContextType(ctxType);
         e.setContextUri(ctxUri);
+        e.setKind("EPISODE".equals(itemType) || "show".equals(ctxType) || "audiobook".equals(ctxType)
+                ? "AUDIOBOOK" : "MUSIC");
         e.setCreatedAt(Instant.now());
         return e;
     }
