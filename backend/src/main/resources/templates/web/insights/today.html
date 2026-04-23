@@ -47,11 +47,11 @@
               hx-swap="outerHTML"></span>
     </div>
 
-    <!-- Timeline strip polled every 60 s -->
+    <!-- Timeline strip loads immediately and refreshes every 60 s -->
     <div class="card-body"
          th:id="'card-' + ${profile.id}"
          th:hx-get="@{'/web/insights/profiles/' + ${profile.id} + '/fragments/today-card?tz=' + ${tz}}"
-         hx-trigger="every 60s[document.visibilityState=='visible']"
+         hx-trigger="load, every 60s[document.visibilityState=='visible']"
          hx-swap="innerHTML">
 
         <div class="placeholder-glow">
@@ -74,14 +74,6 @@
 
 <th:block layout:fragment="scripts">
 <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>
-<script>
-// Trigger immediate load of profile cards after page load
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('[hx-trigger]').forEach(function (el) {
-        htmx.trigger(el, 'load');
-    });
-});
-</script>
 </th:block>
 </body>
 </html>

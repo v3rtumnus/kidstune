@@ -171,6 +171,7 @@ public class InsightsWebController {
                 model.addAttribute("today", today);
                 model.addAttribute("profileId", profileId);
                 model.addAttribute("tz", tz);
+                model.addAttribute("todayDate", LocalDate.now(parseZone(tz)).format(DateTimeFormatter.ISO_LOCAL_DATE));
                 return "web/insights/fragments/timeline-strip";
             });
     }

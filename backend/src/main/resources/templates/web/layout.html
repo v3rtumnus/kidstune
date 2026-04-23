@@ -183,7 +183,8 @@
 
     // ── Web Push – VAPID subscription ────────────────────────────────────────
 
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
+    if ('serviceWorker' in navigator && 'PushManager' in window &&
+            Notification.permission !== 'denied') {
         navigator.serviceWorker.register('/sw.js').then(function (reg) {
             reg.pushManager.getSubscription().then(function (existing) {
                 if (existing) return; // already subscribed

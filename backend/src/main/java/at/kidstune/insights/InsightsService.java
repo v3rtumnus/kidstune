@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -146,6 +147,7 @@ public class InsightsService {
                 if (disconnected.isPresent())
                     return Mono.just(LiveResponse.disconnected(disconnected.get()));
                 return spotifyClient.getCurrentlyPlayingForProfile(profileId)
+                    .timeout(Duration.ofSeconds(5))
                     .map(opt -> {
                         if (opt.isEmpty()) return LiveResponse.nothing();
                         SpotifyWebApiClient.RawCurrentlyPlaying cp = opt.get();
