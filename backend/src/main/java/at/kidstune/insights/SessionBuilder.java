@@ -36,8 +36,15 @@ public class SessionBuilder {
      */
     @Transactional
     public void rebuildRecent(String profileId) {
-        Optional<Instant> lastSessionEnd = sessionRepo.findMaxEndedAtByProfileId(profileId);
-        Instant from = lastSessionEnd.orElse(Instant.now().minus(48, ChronoUnit.HOURS));
+        // Use lastSessionStart (not lastSessionEnd) so that new events arriving within
+        // the gap window of the previous session's last track get merged into it,
+        // rather than always starting a fresh session from the first event in each poll batch.
+        Optional<Instant> lastSessionStart = sessionRepo.findMaxStartedAtByProfileId(profileId);
+        Instant from = lastSessionStart.orElse(Instant.now().minus(48, ChronoUnit.HOURS));
+
+        // Delete sessions from `from` onwards so they are cleanly rebuilt with the
+        // combined event set (last session events + newly ingested events).
+        sessionRepo.deleteByProfileIdAndStartedAtGreaterThanEqual(profileId, from);
 
         List<PlayEvent> events = eventRepo
                 .findByProfileIdAndPlayedAtGreaterThanEqualOrderByPlayedAtAsc(profileId, from);

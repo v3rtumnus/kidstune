@@ -41,6 +41,7 @@ public class InsightsService {
     private final PlayEventRepository        eventRepository;
     private final ListeningSessionRepository sessionRepository;
     private final SpotifyWebApiClient        spotifyClient;
+    private final SessionBuilder             sessionBuilder;
 
     private final Cache<String, LiveResponse> liveCache;
 
@@ -49,11 +50,13 @@ public class InsightsService {
             PlayEventRepository eventRepository,
             ListeningSessionRepository sessionRepository,
             SpotifyWebApiClient spotifyClient,
+            SessionBuilder sessionBuilder,
             @Value("${insights.live.cache-seconds:20}") int liveCacheSeconds) {
         this.profileRepository = profileRepository;
         this.eventRepository   = eventRepository;
         this.sessionRepository = sessionRepository;
         this.spotifyClient     = spotifyClient;
+        this.sessionBuilder    = sessionBuilder;
         this.liveCache = Caffeine.newBuilder()
                 .expireAfterWrite(liveCacheSeconds, TimeUnit.SECONDS)
                 .build();
@@ -176,14 +179,7 @@ public class InsightsService {
     }
 
     private void rebuildSessionsSync(String profileId) {
-        Optional<Instant> lastEnd = sessionRepository.findMaxEndedAtByProfileId(profileId);
-        if (lastEnd.isEmpty()) return;
-        Instant from = lastEnd.get();
-        List<PlayEvent> events = eventRepository
-                .findByProfileIdAndPlayedAtGreaterThanEqualOrderByPlayedAtAsc(profileId, from);
-        if (!events.isEmpty()) {
-            // delegate to SessionBuilder's existing logic via direct call
-        }
+        sessionBuilder.rebuildRecent(profileId);
     }
 
     // ── Aggregation helpers ───────────────────────────────────────────────────

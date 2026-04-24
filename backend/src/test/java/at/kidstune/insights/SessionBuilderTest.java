@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -160,12 +161,44 @@ class SessionBuilderTest {
     void emptyInputNoSessions() {
         when(eventRepo.findByProfileIdAndPlayedAtGreaterThanEqualOrderByPlayedAtAsc(any(), any()))
             .thenReturn(List.of());
-        when(sessionRepo.findMaxEndedAtByProfileId(PROFILE))
+        when(sessionRepo.findMaxStartedAtByProfileId(PROFILE))
             .thenReturn(Optional.of(BASE));
 
         builder.rebuildRecent(PROFILE);
 
         verify(sessionRepo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("events within gap arriving in a later poll cycle merge into the previous session")
+    void crossPollMergingWithinGapThreshold() {
+        // e1 was already persisted; e2 arrives in the next poll within the gap → should merge
+        PlayEvent e1 = event("t1", BASE,              180_000, "TRACK", null); // ends BASE+3min
+        PlayEvent e2 = event("t2", BASE.plusSeconds(300), 120_000, "TRACK", null); // gap = 2 min < 10 min
+
+        when(sessionRepo.findMaxStartedAtByProfileId(PROFILE)).thenReturn(Optional.of(BASE));
+        when(eventRepo.findByProfileIdAndPlayedAtGreaterThanEqualOrderByPlayedAtAsc(PROFILE, BASE))
+            .thenReturn(List.of(e1, e2));
+
+        builder.rebuildRecent(PROFILE);
+
+        verify(sessionRepo).save(argThat(s -> s.getEventCount() == 2));
+    }
+
+    @Test
+    @DisplayName("events outside gap arriving in a later poll cycle stay in separate sessions")
+    void crossPollNoMergingAboveGapThreshold() {
+        // e1 ends BASE+3min; e2 starts BASE+15min → gap = 12 min > 10 min
+        PlayEvent e1 = event("t1", BASE,              180_000, "TRACK", null);
+        PlayEvent e2 = event("t2", BASE.plusSeconds(900), 120_000, "TRACK", null);
+
+        when(sessionRepo.findMaxStartedAtByProfileId(PROFILE)).thenReturn(Optional.of(BASE));
+        when(eventRepo.findByProfileIdAndPlayedAtGreaterThanEqualOrderByPlayedAtAsc(PROFILE, BASE))
+            .thenReturn(List.of(e1, e2));
+
+        builder.rebuildRecent(PROFILE);
+
+        verify(sessionRepo, times(2)).save(any());
     }
 
     @Test
