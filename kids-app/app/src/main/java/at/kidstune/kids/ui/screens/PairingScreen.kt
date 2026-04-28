@@ -115,7 +115,7 @@ fun PairingScreen(
             DigitDisplay(digits = digits, hasError = errorMsg != null)
 
             // ── Error message ─────────────────────────────────────────────────
-            Box(modifier = Modifier.height(32.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.heightIn(min = 32.dp), contentAlignment = Alignment.Center) {
                 if (errorMsg != null) {
                     Text(
                         text      = errorMsg,

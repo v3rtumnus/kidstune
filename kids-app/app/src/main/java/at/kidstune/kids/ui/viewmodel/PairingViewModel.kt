@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.util.Log
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -96,8 +97,12 @@ class PairingViewModel @Inject constructor(
                         "Ungültiger Code"
                 }
                 _state.value = PairingState.Error(message, digits)
-            } catch (_: Exception) {
-                _state.value = PairingState.Error("Verbindung fehlgeschlagen", digits)
+            } catch (e: Exception) {
+                Log.e("PairingViewModel", "Pairing failed: ${e.javaClass.name}: ${e.message}", e)
+                _state.value = PairingState.Error(
+                    "Verbindung fehlgeschlagen\n${e.javaClass.simpleName}: ${e.message}",
+                    digits
+                )
             }
         }
     }

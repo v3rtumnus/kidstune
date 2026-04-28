@@ -6,6 +6,8 @@ import at.kidstune.device.PairedDevice;
 import at.kidstune.device.PairedDeviceRepository;
 import at.kidstune.profile.ProfileRepository;
 import at.kidstune.profile.dto.ProfileResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -21,6 +23,8 @@ import java.util.List;
 
 @Service
 public class DevicePairingService {
+
+    private static final Logger log = LoggerFactory.getLogger(DevicePairingService.class);
 
     static final int MAX_ACTIVE_CODES = 5;
     static final int CODE_EXPIRY_SECONDS = 5 * 60; // 5 minutes
@@ -81,6 +85,7 @@ public class DevicePairingService {
     }
 
     ConfirmPairingResponse doConfirmPairing(String code, String deviceName) {
+        log.info("Pairing confirm request from device '{}'", deviceName);
         Instant now = Instant.now();
 
         PairingCode pairingCode = pairingCodeRepository.findByCode(code)
@@ -118,6 +123,7 @@ public class DevicePairingService {
                 .map(ProfileResponse::from)
                 .toList();
 
+        log.info("Pairing succeeded for device '{}' (family {}, {} profiles)", deviceName, pairingCode.getFamilyId(), profiles.size());
         return new ConfirmPairingResponse(token, pairingCode.getFamilyId(), profiles);
     }
 
