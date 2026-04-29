@@ -1,6 +1,6 @@
 [versions]
 # Build tools – check https://maven.google.com for latest
-agp             = "8.7.1"
+agp             = "8.8.0"
 kotlin          = "2.1.0"
 ksp             = "2.1.0-1.0.29"
 # Compose – single BOM controls all compose-* versions
