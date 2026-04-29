@@ -11,13 +11,10 @@ pipeline {
         TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE = '/var/run/docker.sock'
         // Disable Ryuk if it cannot bind back to the Jenkins container network.
         TESTCONTAINERS_RYUK_DISABLED         = 'true'
-        // Android SDK – install once on the agent: see README for setup instructions.
-        ANDROID_HOME                         = '/opt/android-sdk'
     }
 
     parameters {
         booleanParam(name: 'FORCE_BACKEND', defaultValue: false, description: 'Force backend build regardless of Git changes')
-        booleanParam(name: 'FORCE_KIDS_APP', defaultValue: false, description: 'Force kids-app build regardless of Git changes')
     }
 
     stages {
@@ -34,9 +31,6 @@ pipeline {
                 script {
                     env.BACKEND_CHANGED = sh(
                         script: "git diff --name-only HEAD~1 | grep '^backend/' || true",
-                        returnStdout: true).trim()
-                    env.KIDS_CHANGED = sh(
-                        script: "git diff --name-only HEAD~1 | grep '^kids-app/\\|^shared/' || true",
                         returnStdout: true).trim()
                 }
             }
@@ -57,26 +51,6 @@ pipeline {
             post {
                 always {
                     junit 'backend/build/test-results/test/*.xml'
-                }
-            }
-        }
-        stage('Kids App') {
-            when { expression { env.KIDS_CHANGED || params.FORCE_KIDS_APP } }
-            steps {
-                dir('kids-app') {
-                    sh 'chmod +x gradlew'
-                    sh 'echo "sdk.dir=${ANDROID_HOME}" > local.properties'
-                    sh './gradlew test'
-                    sh './gradlew assembleRelease'
-                }
-            }
-            post {
-                always {
-                    junit 'kids-app/build/test-results/**/*.xml'
-                }
-                success {
-                    archiveArtifacts artifacts: 'kids-app/build/outputs/apk/release/*.apk',
-                                     fingerprint: true
                 }
             }
         }
