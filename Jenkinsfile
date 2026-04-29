@@ -11,6 +11,8 @@ pipeline {
         TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE = '/var/run/docker.sock'
         // Disable Ryuk if it cannot bind back to the Jenkins container network.
         TESTCONTAINERS_RYUK_DISABLED         = 'true'
+        // Android SDK – install once on the agent: see README for setup instructions.
+        ANDROID_HOME                         = '/opt/android-sdk'
     }
 
     parameters {
@@ -63,6 +65,7 @@ pipeline {
             steps {
                 dir('kids-app') {
                     sh 'chmod +x gradlew'
+                    sh 'echo "sdk.dir=${ANDROID_HOME}" > local.properties'
                     sh './gradlew test'
                     sh './gradlew assembleRelease'
                 }
