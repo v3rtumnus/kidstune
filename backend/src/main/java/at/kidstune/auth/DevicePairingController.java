@@ -1,5 +1,6 @@
 package at.kidstune.auth;
 
+import at.kidstune.auth.dto.BindProfileRequest;
 import at.kidstune.auth.dto.ConfirmPairingRequest;
 import at.kidstune.auth.dto.ConfirmPairingResponse;
 import at.kidstune.auth.dto.PairingCodeResponse;
@@ -37,5 +38,18 @@ public class DevicePairingController {
             @RequestBody @Valid ConfirmPairingRequest request) {
         return devicePairingService.confirmPairing(request.code(), request.deviceName())
                 .map(ResponseEntity::ok);
+    }
+
+    /**
+     * POST /api/v1/auth/pair/bind-profile – device auth required.
+     * Called once after profile selection to bind this device to a profile.
+     * Idempotent: re-binding to the same profile is a no-op.
+     */
+    @PostMapping("/bind-profile")
+    public Mono<ResponseEntity<Void>> bindProfile(
+            @RequestBody @Valid BindProfileRequest request) {
+        return SecurityUtils.getClaims()
+                .flatMap(claims -> devicePairingService.bindProfile(claims.deviceId(), claims.familyId(), request.profileId()))
+                .thenReturn(ResponseEntity.<Void>noContent().build());
     }
 }

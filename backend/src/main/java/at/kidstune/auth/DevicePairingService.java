@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -125,6 +126,26 @@ public class DevicePairingService {
 
         log.info("Pairing succeeded for device '{}' (family {}, {} profiles)", deviceName, pairingCode.getFamilyId(), profiles.size());
         return new ConfirmPairingResponse(token, pairingCode.getFamilyId(), profiles);
+    }
+
+    public Mono<Void> bindProfile(String deviceId, String familyId, String profileId) {
+        return Mono.fromCallable(() ->
+                transactionTemplate.execute(status -> doBindProfile(deviceId, familyId, profileId))
+        ).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    Void doBindProfile(String deviceId, String familyId, String profileId) {
+        if (!profileRepository.existsByIdAndFamilyId(profileId, familyId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
+        }
+
+        PairedDevice device = pairedDeviceRepository.findByIdAndFamilyId(deviceId, familyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device not found"));
+
+        device.setProfileId(profileId);
+        pairedDeviceRepository.save(device);
+        log.info("Device '{}' bound to profile '{}'", deviceId, profileId);
+        return null;
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

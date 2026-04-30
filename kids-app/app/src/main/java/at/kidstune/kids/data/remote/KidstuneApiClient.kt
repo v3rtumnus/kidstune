@@ -78,6 +78,18 @@ class KidstuneApiClient @Inject constructor(
     }
 
     /**
+     * Binds this device to the chosen profile on the backend.
+     * Must be called once after profile selection so the backend allows sync requests.
+     * Corresponds to `POST /api/v1/auth/pair/bind-profile` (device auth required).
+     */
+    suspend fun bindProfile(profileId: String) {
+        httpClient.post("$baseUrl/api/v1/auth/pair/bind-profile") {
+            contentType(ContentType.Application.Json)
+            setBody(mapOf("profileId" to profileId))
+        }
+    }
+
+    /**
      * Exchanges a 6-digit pairing code for a device JWT.
      * Corresponds to `POST /api/v1/auth/pair/confirm` (public – no auth required).
      *

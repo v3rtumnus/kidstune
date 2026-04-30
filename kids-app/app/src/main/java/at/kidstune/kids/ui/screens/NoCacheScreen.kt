@@ -29,13 +29,17 @@ private val PlaneWindow = Color(0xFFE3F2FD)  // near-white
  * and [HomeScreen] transitions back to the normal category grid automatically.
  */
 @Composable
-fun NoCacheScreen(modifier: Modifier = Modifier) {
+fun NoCacheScreen(modifier: Modifier = Modifier, isOffline: Boolean = true) {
+    val title    = if (isOffline) "Bitte mit WLAN verbinden"
+                   else           "Inhalte werden geladen …"
+    val subtitle = if (isOffline) "Für den ersten Start wird eine Internetverbindung benötigt."
+                   else           "Die ersten Inhalte werden synchronisiert. Das dauert nur einen Moment."
     KidsErrorScreen(
         modifier              = modifier,
         contentDescriptionTag = "Kein Cache verfügbar",
         illustration          = { AirplaneIllustration() },
-        title                 = "Bitte mit WLAN verbinden",
-        subtitle              = "Für den ersten Start wird eine Internetverbindung benötigt."
+        title                 = title,
+        subtitle              = subtitle
     )
 }
 
@@ -132,10 +136,18 @@ private fun AirplaneIllustration(modifier: Modifier = Modifier) {
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(name = "NoCacheScreen – offline", showBackground = true, showSystemUi = true)
 @Composable
-private fun NoCacheScreenPreview() {
+private fun NoCacheScreenOfflinePreview() {
     KidstuneTheme {
-        NoCacheScreen()
+        NoCacheScreen(isOffline = true)
+    }
+}
+
+@Preview(name = "NoCacheScreen – syncing", showBackground = true, showSystemUi = true)
+@Composable
+private fun NoCacheScreenSyncingPreview() {
+    KidstuneTheme {
+        NoCacheScreen(isOffline = false)
     }
 }

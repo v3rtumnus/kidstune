@@ -1,11 +1,15 @@
 package at.kidstune.kids.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import at.kidstune.kids.data.preferences.PendingProfilesHolder
 import at.kidstune.kids.data.preferences.ProfilePreferences
+import at.kidstune.kids.data.remote.KidstuneApiClient
 import at.kidstune.kids.domain.model.MockProfile
 import at.kidstune.kids.domain.model.mockProfiles
+import at.kidstune.kids.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +30,9 @@ sealed interface ProfileSelectionIntent {
 @HiltViewModel
 class ProfileSelectionViewModel @Inject constructor(
     private val prefs: ProfilePreferences,
-    private val pendingProfilesHolder: PendingProfilesHolder
+    private val pendingProfilesHolder: PendingProfilesHolder,
+    private val syncManager: SyncManager,
+    private val apiClient: KidstuneApiClient
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -48,6 +54,13 @@ class ProfileSelectionViewModel @Inject constructor(
                 prefs.boundProfileEmoji = profile.emoji
                 pendingProfilesHolder.profiles = null
                 _state.update { it.copy(pendingProfile = null) }
+                viewModelScope.launch {
+                    // Tell the backend which profile this device is bound to, then
+                    // immediately kick off a full sync. Errors are non-fatal: the
+                    // sync will just fail with 404 and WorkManager will retry.
+                    try { apiClient.bindProfile(profile.id) } catch (_: Exception) {}
+                    syncManager.syncNow()
+                }
             }
 
             ProfileSelectionIntent.DismissConfirmation ->

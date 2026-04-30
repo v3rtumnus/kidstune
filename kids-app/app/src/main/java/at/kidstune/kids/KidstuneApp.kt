@@ -32,8 +32,6 @@ class KidstuneApp : Application(), SingletonImageLoader.Factory, Configuration.P
 
     override fun onCreate() {
         super.onCreate()
-        // Register the 15-minute periodic sync. KEEP policy makes this a no-op
-        // if a work chain is already enqueued, so calling on every launch is safe.
         syncManager.registerPeriodicSync()
     }
 

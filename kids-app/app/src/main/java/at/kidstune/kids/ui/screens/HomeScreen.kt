@@ -146,7 +146,7 @@ fun HomeScreen(
                     StorageFullScreen(modifier = Modifier.weight(1f))
 
                 state.cachedContentCount == 0 ->
-                    NoCacheScreen(modifier = Modifier.weight(1f))
+                    NoCacheScreen(modifier = Modifier.weight(1f), isOffline = state.isOffline)
 
                 else -> {
                 // Category buttons – vertically centred in remaining space
