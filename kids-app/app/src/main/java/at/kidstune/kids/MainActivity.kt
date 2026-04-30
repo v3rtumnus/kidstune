@@ -48,6 +48,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         hideSystemBars()
 
+        // Eagerly initialize so its init block runs: binds profile on backend + triggers sync.
+        syncTriggerViewModel
+
         // Connect to Spotify App Remote SDK on startup.
         // The manager handles reconnection automatically on failure.
         spotifyRemote.connect()
