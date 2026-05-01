@@ -127,7 +127,7 @@ class SyncIntTest extends AbstractIntTest {
         // Ensure the device exists with the correct profileId for this JVM run.
         // Delete-then-insert (rather than upsert) so @PrePersist sets created_at.
         // Using a class-unique device ID avoids collisions with other test classes.
-        pairedDeviceRepo.deleteById("sync-kids-device");
+        pairedDeviceRepo.deleteAllByIdInBatch(List.of("sync-kids-device"));
         PairedDevice d = new PairedDevice();
         d.setId("sync-kids-device");
         d.setFamilyId(FAMILY_ID);
