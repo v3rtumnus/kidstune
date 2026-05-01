@@ -56,7 +56,8 @@ class ContentResolverSpotifyClient {
     // ── Artist albums (paginated) ─────────────────────────────────────────────
 
     /**
-     * Returns ALL albums for an artist, paginating through all offset pages.
+     * Returns ALL albums for an artist (all types: album, single, compilation, appears_on),
+     * paginating through all offset pages.
      * Note: album objects from this endpoint do not include genre information.
      */
     Mono<List<AlbumData>> getArtistAlbums(String familyId, String artistId) {
@@ -83,8 +84,7 @@ class ContentResolverSpotifyClient {
     private Mono<ApiAlbumsPage> fetchArtistAlbumsPage(String token, String artistId, int offset) {
         URI uri = URI.create(apiBaseUrl + "/v1/artists/" + artistId
                 + "/albums?limit=" + ARTIST_ALBUMS_PAGE_SIZE
-                + "&offset=" + offset
-                + "&include_groups=album,single");
+                + "&offset=" + offset);
         log.info("[DIAG] built URI: {}", uri);
         return spotifyApi.get()
                 .uri(uri)
