@@ -1,7 +1,9 @@
 package at.kidstune.config;
 
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -12,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class WebClientConfig {
 
     @Bean
+    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     public WebClient.Builder webClientBuilder() {
         // SpotifyRateLimitFilter handles 429 responses with Retry-After-aware backoff.
         // All current WebClient usages are Spotify API calls, so applying it globally is safe.

@@ -5,6 +5,7 @@ import at.kidstune.auth.SpotifyTokenService;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.DefaultUriBuilderFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -39,10 +40,13 @@ class ContentResolverSpotifyClient {
                                   WebClient.Builder builder) {
         this.tokenService = tokenService;
         this.apiBaseUrl   = config.getApiBaseUrl();
-        // No baseUrl here: setting baseUrl forces all uri() calls through DefaultUriBuilderFactory,
-        // which silently drops query strings for certain URI patterns in Spring Framework 7.
-        // All methods in this class use absolute URIs built via URI.create() instead.
-        this.spotifyApi   = builder.build();
+        // EncodingMode.NONE: all URIs in this class are built manually via URI.create() and must
+        // pass through the WebClient pipeline completely untouched. Without this, Spring Framework 7's
+        // DefaultUriBuilderFactory re-encodes the query string and can drop it when a baseUrl is set
+        // on the shared WebClient.Builder singleton (mutated by other WebClient users before us).
+        DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory();
+        factory.setEncodingMode(DefaultUriBuilderFactory.EncodingMode.NONE);
+        this.spotifyApi   = builder.uriBuilderFactory(factory).build();
     }
 
     // ── Artist albums (paginated) ─────────────────────────────────────────────
