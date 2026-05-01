@@ -27,6 +27,8 @@ import java.util.List;
 class ContentResolverSpotifyClient {
 
     static final int PAGE_SIZE = 50;
+    // Spotify reduced the max limit for /v1/artists/{id}/albums to 20
+    static final int ARTIST_ALBUMS_PAGE_SIZE = 20;
 
     private final SpotifyTokenService tokenService;
     private final WebClient spotifyApi;
@@ -75,7 +77,7 @@ class ContentResolverSpotifyClient {
         // rejects with 400.  URI.create() does not percent-encode commas (sub-delimiter),
         // so include_groups=album,single reaches Spotify unmodified.
         URI uri = URI.create(apiBaseUrl + "/v1/artists/" + artistId
-                + "/albums?limit=" + PAGE_SIZE
+                + "/albums?limit=" + ARTIST_ALBUMS_PAGE_SIZE
                 + "&offset=" + offset
                 + "&include_groups=album,single");
         return spotifyApi.get()
