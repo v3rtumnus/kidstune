@@ -39,7 +39,10 @@ class ContentResolverSpotifyClient {
                                   WebClient.Builder builder) {
         this.tokenService = tokenService;
         this.apiBaseUrl   = config.getApiBaseUrl();
-        this.spotifyApi   = builder.baseUrl(apiBaseUrl).build();
+        // No baseUrl here: setting baseUrl forces all uri() calls through DefaultUriBuilderFactory,
+        // which silently drops query strings for certain URI patterns in Spring Framework 7.
+        // All methods in this class use absolute URIs built via URI.create() instead.
+        this.spotifyApi   = builder.build();
     }
 
     // ── Artist albums (paginated) ─────────────────────────────────────────────
@@ -93,7 +96,7 @@ class ContentResolverSpotifyClient {
     Mono<AlbumData> getAlbumDetails(String familyId, String albumId) {
         return tokenService.getValidAccessToken(familyId)
                 .flatMap(token -> spotifyApi.get()
-                        .uri("/v1/albums/{id}", albumId)
+                        .uri(URI.create(apiBaseUrl + "/v1/albums/" + albumId))
                         .header("Authorization", "Bearer " + token)
                         .retrieve()
                         .bodyToMono(ApiAlbumFull.class))
@@ -135,11 +138,10 @@ class ContentResolverSpotifyClient {
     }
 
     private Mono<ApiTracksPage> fetchAlbumTracksPage(String token, String albumId, int offset) {
+        URI uri = URI.create(apiBaseUrl + "/v1/albums/" + albumId
+                + "/tracks?limit=" + PAGE_SIZE + "&offset=" + offset);
         return spotifyApi.get()
-                .uri(u -> u.path("/v1/albums/{id}/tracks")
-                        .queryParam("limit", PAGE_SIZE)
-                        .queryParam("offset", offset)
-                        .build(albumId))
+                .uri(uri)
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .bodyToMono(ApiTracksPage.class);
@@ -178,11 +180,10 @@ class ContentResolverSpotifyClient {
     }
 
     private Mono<ApiPlaylistItemsPage> fetchPlaylistTracksPage(String token, String playlistId, int offset) {
+        URI uri = URI.create(apiBaseUrl + "/v1/playlists/" + playlistId
+                + "/tracks?limit=" + PAGE_SIZE + "&offset=" + offset);
         return spotifyApi.get()
-                .uri(u -> u.path("/v1/playlists/{id}/tracks")
-                        .queryParam("limit", PAGE_SIZE)
-                        .queryParam("offset", offset)
-                        .build(playlistId))
+                .uri(uri)
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .bodyToMono(ApiPlaylistItemsPage.class);
@@ -194,7 +195,7 @@ class ContentResolverSpotifyClient {
     Mono<TrackData> getTrack(String familyId, String trackId) {
         return tokenService.getValidAccessToken(familyId)
                 .flatMap(token -> spotifyApi.get()
-                        .uri("/v1/tracks/{id}", trackId)
+                        .uri(URI.create(apiBaseUrl + "/v1/tracks/" + trackId))
                         .header("Authorization", "Bearer " + token)
                         .retrieve()
                         .bodyToMono(ApiTrackFull.class))
