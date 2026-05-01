@@ -115,74 +115,80 @@ public class SpotifyWebApiClient {
 
     // ── Artist Albums ─────────────────────────────────────────────────────────
 
-    /** Returns all albums for an artist. Cache key: {@code artistId}. */
+    /** Returns all albums for an artist, following pagination. Cache key: {@code artistId}. */
     public Mono<List<SpotifyItemDto>> getArtistAlbums(String familyId, String artistId) {
         List<SpotifyItemDto> cached = artistAlbumsCache.getIfPresent(artistId);
         if (cached != null) return Mono.just(cached);
 
         return withCircuitBreaker(() ->
             tokenService.getValidAccessToken(familyId)
-                .flatMap(token -> spotifyApi.get()
-                    .uri(u -> u.path("/v1/artists/{id}/albums")
-                        .queryParam("limit", 50)
-                        .build(artistId))
+                .flatMapMany(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/artists/{id}/albums").queryParam("limit", 20).build(artistId))
                     .header("Authorization", "Bearer " + token)
                     .retrieve()
-                    .bodyToMono(ApiAlbumsPage.class))
-                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                    : page.items().stream()
-                        .map(a -> new SpotifyItemDto(a.id(), a.name(), extractImage(a.images()), a.uri(),
-                            firstArtistName(a.artists())))
-                        .toList())
+                    .bodyToMono(ApiAlbumsPage.class)
+                    .expand(page -> page.next() == null ? Mono.empty()
+                        : spotifyApi.get().uri(page.next())
+                            .header("Authorization", "Bearer " + token)
+                            .retrieve()
+                            .bodyToMono(ApiAlbumsPage.class)))
+                .flatMapIterable(page -> page.items() == null ? List.<ApiAlbum>of() : page.items())
+                .map(a -> new SpotifyItemDto(a.id(), a.name(), extractImage(a.images()), a.uri(),
+                    firstArtistName(a.artists())))
+                .collectList()
                 .doOnNext(list -> artistAlbumsCache.put(artistId, list)));
     }
 
     // ── Album Tracks ──────────────────────────────────────────────────────────
 
-    /** Returns all tracks in an album. Cache key: {@code albumId}. */
+    /** Returns all tracks in an album, following pagination. Cache key: {@code albumId}. */
     public Mono<List<SpotifyItemDto>> getAlbumTracks(String familyId, String albumId) {
         List<SpotifyItemDto> cached = albumTracksCache.getIfPresent(albumId);
         if (cached != null) return Mono.just(cached);
 
         return withCircuitBreaker(() ->
             tokenService.getValidAccessToken(familyId)
-                .flatMap(token -> spotifyApi.get()
-                    .uri(u -> u.path("/v1/albums/{id}/tracks")
-                        .queryParam("limit", 50)
-                        .build(albumId))
+                .flatMapMany(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/albums/{id}/tracks").queryParam("limit", 50).build(albumId))
                     .header("Authorization", "Bearer " + token)
                     .retrieve()
-                    .bodyToMono(ApiTracksPage.class))
-                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                    : page.items().stream()
-                        .map(t -> new SpotifyItemDto(t.id(), t.name(), null, t.uri(),
-                            firstArtistName(t.artists())))
-                        .toList())
+                    .bodyToMono(ApiTracksPage.class)
+                    .expand(page -> page.next() == null ? Mono.empty()
+                        : spotifyApi.get().uri(page.next())
+                            .header("Authorization", "Bearer " + token)
+                            .retrieve()
+                            .bodyToMono(ApiTracksPage.class)))
+                .flatMapIterable(page -> page.items() == null ? List.<ApiTrack>of() : page.items())
+                .map(t -> new SpotifyItemDto(t.id(), t.name(), null, t.uri(),
+                    firstArtistName(t.artists())))
+                .collectList()
                 .doOnNext(list -> albumTracksCache.put(albumId, list)));
     }
 
     // ── Playlist Tracks ───────────────────────────────────────────────────────
 
-    /** Returns all tracks in a playlist. Cache key: {@code playlistId}. */
+    /** Returns all tracks in a playlist, following pagination. Cache key: {@code playlistId}. */
     public Mono<List<SpotifyItemDto>> getPlaylistTracks(String familyId, String playlistId) {
         List<SpotifyItemDto> cached = playlistTracksCache.getIfPresent(playlistId);
         if (cached != null) return Mono.just(cached);
 
         return withCircuitBreaker(() ->
             tokenService.getValidAccessToken(familyId)
-                .flatMap(token -> spotifyApi.get()
-                    .uri(u -> u.path("/v1/playlists/{id}/tracks")
-                        .queryParam("limit", 50)
-                        .build(playlistId))
+                .flatMapMany(token -> spotifyApi.get()
+                    .uri(u -> u.path("/v1/playlists/{id}/tracks").queryParam("limit", 50).build(playlistId))
                     .header("Authorization", "Bearer " + token)
                     .retrieve()
-                    .bodyToMono(ApiPlaylistItemsPage.class))
-                .map(page -> page.items() == null ? List.<SpotifyItemDto>of()
-                    : page.items().stream()
-                        .filter(pi -> pi.track() != null)
-                        .map(pi -> new SpotifyItemDto(pi.track().id(), pi.track().name(),
-                            null, pi.track().uri(), firstArtistName(pi.track().artists())))
-                        .toList())
+                    .bodyToMono(ApiPlaylistItemsPage.class)
+                    .expand(page -> page.next() == null ? Mono.empty()
+                        : spotifyApi.get().uri(page.next())
+                            .header("Authorization", "Bearer " + token)
+                            .retrieve()
+                            .bodyToMono(ApiPlaylistItemsPage.class)))
+                .flatMapIterable(page -> page.items() == null ? List.<ApiPlaylistItem>of() : page.items())
+                .filter(pi -> pi.track() != null)
+                .map(pi -> new SpotifyItemDto(pi.track().id(), pi.track().name(),
+                    null, pi.track().uri(), firstArtistName(pi.track().artists())))
+                .collectList()
                 .doOnNext(list -> playlistTracksCache.put(playlistId, list)));
     }
 
@@ -490,7 +496,8 @@ public class SpotifyWebApiClient {
     ) {}
 
     private record ApiAlbumsPage(
-        @JsonProperty("items") List<ApiAlbum> items
+        @JsonProperty("items") List<ApiAlbum> items,
+        @JsonProperty("next")  String next
     ) {}
 
     private record ApiPlaylistsPage(
@@ -498,11 +505,13 @@ public class SpotifyWebApiClient {
     ) {}
 
     private record ApiTracksPage(
-        @JsonProperty("items") List<ApiTrack> items
+        @JsonProperty("items") List<ApiTrack> items,
+        @JsonProperty("next")  String next
     ) {}
 
     private record ApiPlaylistItemsPage(
-        @JsonProperty("items") List<ApiPlaylistItem> items
+        @JsonProperty("items") List<ApiPlaylistItem> items,
+        @JsonProperty("next")  String next
     ) {}
 
     private record ApiPlayHistoryPage(
