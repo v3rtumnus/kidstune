@@ -391,9 +391,21 @@ public class AdminWebController {
     public Mono<String> reResolveAll(Model model) {
         return Mono.fromCallable(() -> {
             List<AllowedContent> all = contentRepository.findAll();
-            all.forEach(contentResolver::resolveAsync);
-            model.addAttribute("message", all.size() + " Einträge werden aufgelöst…");
-            return "web/admin/fragments/flash :: success";
+            contentResolver.resolveAllAsync(all);
+            model.addAttribute("progress",
+                    new ContentResolver.ResolutionProgress(true, 0, all.size()));
+            return "web/admin/fragments/resolve-progress :: running";
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/resolved/resolve-progress")
+    public Mono<String> resolveProgress(Model model) {
+        return Mono.fromCallable(() -> {
+            ContentResolver.ResolutionProgress progress = contentResolver.getResolutionProgress();
+            model.addAttribute("progress", progress);
+            return progress.running()
+                    ? "web/admin/fragments/resolve-progress :: running"
+                    : "web/admin/fragments/resolve-progress :: done";
         }).subscribeOn(Schedulers.boundedElastic());
     }
 

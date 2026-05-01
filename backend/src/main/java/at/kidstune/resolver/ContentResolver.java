@@ -52,6 +52,17 @@ public class ContentResolver {
     private final ContentTypeClassifier   classifier;
     private final AtomicInteger activeJobs = new AtomicInteger(0);
 
+    // Progress state for the bulk resolve-all operation
+    private volatile boolean resolveAllRunning = false;
+    private final AtomicInteger progressTotal     = new AtomicInteger(0);
+    private final AtomicInteger progressCompleted = new AtomicInteger(0);
+
+    public record ResolutionProgress(boolean running, int completed, int total) {}
+
+    public ResolutionProgress getResolutionProgress() {
+        return new ResolutionProgress(resolveAllRunning, progressCompleted.get(), progressTotal.get());
+    }
+
     public ContentResolver(ResolvedAlbumRepository albumRepo,
                            ResolvedTrackRepository trackRepo,
                            ContentRepository contentRepo,
@@ -84,6 +95,50 @@ public class ContentResolver {
             resolve(content);
         } finally {
             activeJobs.decrementAndGet();
+        }
+    }
+
+    /**
+     * Resolves a batch of content entries sequentially in a single background thread
+     * with a short pause between items.  Keeps a running progress counter so the
+     * admin UI can poll for status.  Use this instead of scattering N parallel
+     * {@link #resolveAsync} calls – parallel jobs saturate the Spotify rate limit.
+     */
+    @Async
+    public void resolveAllAsync(List<AllowedContent> items) {
+        resolveAllRunning = true;
+        progressTotal.set(items.size());
+        progressCompleted.set(0);
+        log.info("resolveAll: starting {} items sequentially", items.size());
+        try {
+            for (int i = 0; i < items.size(); i++) {
+                AllowedContent content = items.get(i);
+                log.info("resolveAll: [{}/{}] {} {}", i + 1, items.size(),
+                         content.getScope(), content.getSpotifyUri());
+                activeJobs.incrementAndGet();
+                try {
+                    resolve(content);
+                } catch (Exception e) {
+                    log.warn("resolveAll: [{}/{}] failed for {}: {}",
+                             i + 1, items.size(), content.getId(), e.getMessage());
+                } finally {
+                    activeJobs.decrementAndGet();
+                    progressCompleted.incrementAndGet();
+                }
+                if (i < items.size() - 1) {
+                    try {
+                        Thread.sleep(300);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        log.warn("resolveAll interrupted after [{}/{}]", i + 1, items.size());
+                        break;
+                    }
+                }
+            }
+        } finally {
+            resolveAllRunning = false;
+            log.info("resolveAll: done – {}/{} items completed",
+                     progressCompleted.get(), progressTotal.get());
         }
     }
 

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- Running: spinner + progress counter + HTMX poll every 2 s -->
+<span th:fragment="running"
+      id="resolve-progress"
+      class="text-warning d-inline-flex align-items-center gap-2 ms-2"
+      hx-get="/web/admin/resolved/resolve-progress"
+      hx-trigger="every 2s"
+      hx-target="#resolve-progress"
+      hx-swap="outerHTML">
+    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+    <span th:text="'Auflösen: ' + ${progress.completed()} + ' / ' + ${progress.total()} + ' …'"></span>
+</span>
+
+<!-- Done: static success badge, no polling -->
+<span th:fragment="done"
+      id="resolve-progress"
+      class="badge bg-success ms-2"
+      th:text="'Fertig: ' + ${progress.completed()} + ' / ' + ${progress.total()} + ' aufgelöst'">
+</span>
+
+</body>
+</html>
