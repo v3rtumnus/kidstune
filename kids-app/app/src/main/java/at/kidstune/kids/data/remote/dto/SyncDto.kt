@@ -31,12 +31,13 @@ data class SyncContentEntryDto(
     val spotifyUri: String,
     /** One of: TRACK, ALBUM, PLAYLIST, ARTIST */
     val scope: String,
-    /** One of: MUSIC, AUDIOBOOK */
     val contentType: String,
     val title: String,
     val imageUrl: String? = null,
     val artistName: String? = null,
-    val albums: List<SyncAlbumDto> = emptyList()
+    val albums: List<SyncAlbumDto> = emptyList(),
+    /** ISO-8601 UTC timestamp of when the child last listened to this entry, or null. */
+    val lastListenedAt: String? = null
 )
 
 @Serializable

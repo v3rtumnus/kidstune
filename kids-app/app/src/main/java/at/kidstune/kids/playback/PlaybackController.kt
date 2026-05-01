@@ -8,7 +8,6 @@ import at.kidstune.kids.data.local.TrackDao
 import at.kidstune.kids.data.local.entities.LocalFavorite
 import at.kidstune.kids.data.local.entities.LocalPlaybackPosition
 import at.kidstune.kids.data.preferences.ProfilePreferences
-import at.kidstune.kids.domain.model.ContentType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -166,19 +165,9 @@ class PlaybackController @Inject constructor(
             return
         }
 
-        // Look up the track in Room for imageUrl and chapter info
+        // Look up the track in Room for imageUrl
         val localTrack = trackDao.getByUri(trackUri)
         val album = localTrack?.let { albumDao.getById(it.albumId) }
-
-        val chapterIndex: Int?
-        val totalChapters: Int?
-        if (album?.contentType == ContentType.AUDIOBOOK) {
-            chapterIndex  = trackDao.getIndexByUri(trackUri)
-            totalChapters = album.totalTracks
-        } else {
-            chapterIndex  = null
-            totalChapters = null
-        }
 
         // Check favorite status
         val profileId = prefs.boundProfileId
@@ -188,16 +177,14 @@ class PlaybackController @Inject constructor(
 
         _nowPlaying.update {
             it.copy(
-                trackUri      = trackUri,
-                title         = state.trackTitle ?: localTrack?.title,
-                artistName    = state.artistName ?: localTrack?.artistName,
-                imageUrl      = localTrack?.imageUrl ?: album?.imageUrl,
-                durationMs    = state.durationMs.takeIf { d -> d > 0 } ?: (localTrack?.durationMs ?: 0L),
-                positionMs    = state.positionMs,
-                isPlaying     = !state.isPaused,
-                isFavorite    = isFavorite,
-                chapterIndex  = chapterIndex,
-                totalChapters = totalChapters
+                trackUri   = trackUri,
+                title      = state.trackTitle ?: localTrack?.title,
+                artistName = state.artistName ?: localTrack?.artistName,
+                imageUrl   = localTrack?.imageUrl ?: album?.imageUrl,
+                durationMs = state.durationMs.takeIf { d -> d > 0 } ?: (localTrack?.durationMs ?: 0L),
+                positionMs = state.positionMs,
+                isPlaying  = !state.isPaused,
+                isFavorite = isFavorite,
             )
         }
     }

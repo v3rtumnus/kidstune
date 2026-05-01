@@ -23,6 +23,7 @@ object DatabaseModule {
     @Provides @Singleton
     fun provideDatabase(@ApplicationContext ctx: Context): KidstuneDatabase =
         Room.databaseBuilder(ctx, KidstuneDatabase::class.java, "kidstune.db")
+            .addMigrations(KidstuneDatabase.MIGRATION_4_5)
             .fallbackToDestructiveMigration()
             .build()
 

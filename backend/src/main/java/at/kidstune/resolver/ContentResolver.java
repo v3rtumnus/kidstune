@@ -146,7 +146,8 @@ public class ContentResolver {
     private void resolveArtist(AllowedContent content, String familyId) {
         String artistId = idFromUri(content.getSpotifyUri());
         List<AlbumData> albums = spotifyClient.getArtistAlbums(familyId, artistId).block();
-        if (albums == null) return;
+        if (albums == null) throw new IllegalStateException(
+                "Spotify token unavailable for family " + familyId + "; content " + content.getId());
 
         for (AlbumData album : albums) {
             try {
@@ -161,21 +162,25 @@ public class ContentResolver {
     private void resolveAlbum(AllowedContent content, String familyId) {
         String albumId = idFromUri(content.getSpotifyUri());
         AlbumData album = spotifyClient.getAlbumDetails(familyId, albumId).block();
-        if (album == null) return;
+        if (album == null) throw new IllegalStateException(
+                "Spotify token unavailable for family " + familyId + "; content " + content.getId());
         persistAlbumWithTracks(content, familyId, album);
     }
 
     private void resolvePlaylist(AllowedContent content, String familyId) {
         String playlistId = idFromUri(content.getSpotifyUri());
         List<TrackData> tracks = spotifyClient.getPlaylistTracks(familyId, playlistId).block();
-        if (tracks == null || tracks.isEmpty()) return;
+        if (tracks == null) throw new IllegalStateException(
+                "Spotify token unavailable for family " + familyId + "; content " + content.getId());
+        if (tracks.isEmpty()) return;
         persistPlaylistTracks(content, tracks);
     }
 
     private void resolveTrack(AllowedContent content, String familyId) {
         String trackId = idFromUri(content.getSpotifyUri());
         TrackData track = spotifyClient.getTrack(familyId, trackId).block();
-        if (track == null) return;
+        if (track == null) throw new IllegalStateException(
+                "Spotify token unavailable for family " + familyId + "; content " + content.getId());
 
         String albumUri   = track.albumUri()   != null ? track.albumUri()   : content.getSpotifyUri();
         String albumTitle = track.albumTitle() != null ? track.albumTitle() : "Unknown Album";

@@ -10,7 +10,6 @@ import at.kidstune.kids.data.preferences.ProfilePreferences
 import at.kidstune.kids.data.repository.ContentRepository
 import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.domain.model.ContentScope
-import at.kidstune.kids.domain.model.ContentType
 import at.kidstune.kids.playback.PlaybackController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -24,30 +23,24 @@ import javax.inject.Inject
 // ── Navigation event (one-shot, consumed by BrowseScreen) ────────────────────
 
 sealed interface BrowseNavigation {
-    /** Tap on an ARTIST entry → show all albums by that artist. */
     data class ToAlbumGrid(val contentEntryId: String) : BrowseNavigation
-    /** Tap on an ALBUM entry → go straight to the track list for the single album. */
     data class ToTrackList(val albumId: String) : BrowseNavigation
-    /** Tap on a PLAYLIST entry → show all tracks flat, in original playlist order. */
     data class ToPlaylistTrackList(val contentEntryId: String) : BrowseNavigation
-    /** Tap on a TRACK entry or favorite → go to the player. */
     data object ToNowPlaying : BrowseNavigation
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
 
+data class BrowseSection(val scope: ContentScope, val entries: List<LocalContentEntry>)
+
 data class BrowseState(
-    val category: BrowseCategory                    = BrowseCategory.MUSIC,
-    val entries: List<LocalContentEntry>             = emptyList(),
-    val pages: List<List<LocalContentEntry>>         = emptyList(),
-    val favorites: List<LocalFavorite>               = emptyList(),
-    val favoritesPages: List<List<LocalFavorite>>    = emptyList(),
-    val navigation: BrowseNavigation?                = null,
-    /** True when a tap-to-play failed because Spotify is not connected. */
-    val playbackError: Boolean                       = false,
-) {
-    val totalPages: Int get() = if (category == BrowseCategory.FAVORITES) favoritesPages.size else pages.size
-}
+    val category: BrowseCategory                 = BrowseCategory.MUSIC,
+    val sections: List<BrowseSection>            = emptyList(),
+    val favorites: List<LocalFavorite>           = emptyList(),
+    val favoritesPages: List<List<LocalFavorite>> = emptyList(),
+    val navigation: BrowseNavigation?            = null,
+    val playbackError: Boolean                   = false,
+)
 
 // ── Intents ──────────────────────────────────────────────────────────────────
 
@@ -60,7 +53,14 @@ sealed interface BrowseIntent {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-private const val TILES_PER_PAGE = 4
+private const val TILES_PER_PAGE = 8
+
+private val SCOPE_ORDER = listOf(
+    ContentScope.ARTIST,
+    ContentScope.ALBUM,
+    ContentScope.PLAYLIST,
+    ContentScope.TRACK,
+)
 
 @HiltViewModel
 class BrowseViewModel @Inject constructor(
@@ -77,35 +77,8 @@ class BrowseViewModel @Inject constructor(
     private var contentJob: Job? = null
 
     fun init(category: BrowseCategory) {
-        contentJob?.cancel()
-        contentJob = viewModelScope.launch {
-            val profileId = prefs.boundProfileId ?: return@launch
-            when (category) {
-                BrowseCategory.MUSIC, BrowseCategory.AUDIOBOOK -> {
-                    val contentType = if (category == BrowseCategory.MUSIC) ContentType.MUSIC else ContentType.AUDIOBOOK
-                    contentRepository.getByType(profileId, contentType).collect { entries ->
-                        _state.update {
-                            it.copy(
-                                category = category,
-                                entries  = entries,
-                                pages    = entries.chunked(TILES_PER_PAGE)
-                            )
-                        }
-                    }
-                }
-                BrowseCategory.FAVORITES -> {
-                    favoriteDao.getAll(profileId).collect { favs ->
-                        _state.update {
-                            it.copy(
-                                category       = category,
-                                favorites      = favs,
-                                favoritesPages = favs.chunked(TILES_PER_PAGE)
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        _state.update { it.copy(category = category) }
+        loadContent(category)
     }
 
     fun onIntent(intent: BrowseIntent) {
@@ -114,6 +87,34 @@ class BrowseViewModel @Inject constructor(
             is BrowseIntent.FavoriteTapped    -> handleFavoriteTapped(intent.favorite)
             BrowseIntent.NavigationHandled    -> _state.update { it.copy(navigation = null) }
             BrowseIntent.DismissPlaybackError -> _state.update { it.copy(playbackError = false) }
+        }
+    }
+
+    private fun loadContent(category: BrowseCategory) {
+        contentJob?.cancel()
+        contentJob = viewModelScope.launch {
+            val profileId = prefs.boundProfileId ?: return@launch
+            when (category) {
+                BrowseCategory.MUSIC -> {
+                    contentRepository.getMusicOrdered(profileId).collect { entries ->
+                        val sections = SCOPE_ORDER.mapNotNull { s ->
+                            val group = entries.filter { it.scope == s }
+                            if (group.isNotEmpty()) BrowseSection(s, group) else null
+                        }
+                        _state.update { it.copy(sections = sections) }
+                    }
+                }
+                BrowseCategory.FAVORITES -> {
+                    favoriteDao.getAll(profileId).collect { favs ->
+                        _state.update {
+                            it.copy(
+                                favorites      = favs,
+                                favoritesPages = favs.chunked(TILES_PER_PAGE)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -133,7 +134,6 @@ class BrowseViewModel @Inject constructor(
                     BrowseNavigation.ToPlaylistTrackList(entry.id)
 
                 ContentScope.TRACK -> {
-                    // Single track: play directly as a bare URI (similar to favorites)
                     val played = runCatching {
                         playbackController.spotifyRemote.play(entry.spotifyUri)
                     }

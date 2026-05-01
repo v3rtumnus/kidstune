@@ -5,13 +5,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
@@ -39,12 +43,14 @@ import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.data.local.entities.LocalFavorite
 import at.kidstune.kids.data.mock.MockContentProvider
 import at.kidstune.kids.domain.model.BrowseCategory
+import at.kidstune.kids.domain.model.ContentScope
 import at.kidstune.kids.ui.components.ContentTile
 import at.kidstune.kids.ui.components.PageIndicator
 import at.kidstune.kids.ui.components.scopeBadgeFor
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.viewmodel.BrowseIntent
 import at.kidstune.kids.ui.viewmodel.BrowseNavigation
+import at.kidstune.kids.ui.viewmodel.BrowseSection
 import at.kidstune.kids.ui.viewmodel.BrowseState
 import at.kidstune.kids.ui.viewmodel.BrowseViewModel
 
@@ -64,7 +70,6 @@ fun BrowseScreen(
     LaunchedEffect(category) { viewModel.init(category) }
     val state by viewModel.state.collectAsState()
 
-    // Consume one-shot navigation events
     LaunchedEffect(state.navigation) {
         when (val nav = state.navigation) {
             is BrowseNavigation.ToAlbumGrid -> {
@@ -88,10 +93,10 @@ fun BrowseScreen(
     }
 
     BrowseScreen(
-        modifier               = modifier,
-        state                  = state,
-        onIntent               = viewModel::onIntent,
-        onNavigateUp           = onNavigateUp,
+        modifier     = modifier,
+        state        = state,
+        onIntent     = viewModel::onIntent,
+        onNavigateUp = onNavigateUp,
     )
 }
 
@@ -106,7 +111,6 @@ fun BrowseScreen(
 ) {
     val title = when (state.category) {
         BrowseCategory.MUSIC     -> "Musik"
-        BrowseCategory.AUDIOBOOK -> "Hörbücher"
         BrowseCategory.FAVORITES -> "Lieblingssongs"
     }
 
@@ -136,117 +140,131 @@ fun BrowseScreen(
             }
         }
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            when {
-                state.category == BrowseCategory.FAVORITES && state.favorites.isEmpty() ->
-                    FavoritesEmptyState(modifier = Modifier.fillMaxSize())
+        when (state.category) {
+            BrowseCategory.MUSIC ->
+                MusicContent(
+                    sections = state.sections,
+                    onIntent = onIntent,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                )
 
-                state.category == BrowseCategory.FAVORITES && state.favoritesPages.isNotEmpty() -> {
-                    val pagerState = rememberPagerState { state.favoritesPages.size }
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        HorizontalPager(
-                            state         = pagerState,
-                            flingBehavior = PagerDefaults.flingBehavior(
-                                state             = pagerState,
-                                snapAnimationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness    = Spring.StiffnessMedium
-                                )
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .semantics { testTag = "favorites_pager" }
-                        ) { page ->
-                            FavoritesPage(
-                                favorites = state.favoritesPages.getOrElse(page) { emptyList() },
-                                onIntent  = onIntent
-                            )
-                        }
-                        Box(
-                            modifier         = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            PageIndicator(
-                                pageCount   = state.favoritesPages.size,
-                                currentPage = pagerState.currentPage
-                            )
-                        }
-                    }
-                }
+            BrowseCategory.FAVORITES ->
+                FavoritesContent(
+                    favorites      = state.favorites,
+                    favoritesPages = state.favoritesPages,
+                    onIntent       = onIntent,
+                    modifier       = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                )
+        }
+    }
+}
 
-                state.pages.isNotEmpty() -> {
-                    val pagerState = rememberPagerState { state.totalPages }
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        HorizontalPager(
-                            state         = pagerState,
-                            flingBehavior = PagerDefaults.flingBehavior(
-                                state             = pagerState,
-                                snapAnimationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness    = Spring.StiffnessMedium
-                                )
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .semantics { testTag = "browse_pager" }
-                        ) { page ->
-                            BrowsePage(
-                                entries  = state.pages.getOrElse(page) { emptyList() },
-                                onIntent = onIntent
-                            )
-                        }
-                        Box(
-                            modifier         = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            PageIndicator(
-                                pageCount   = state.totalPages,
-                                currentPage = pagerState.currentPage
-                            )
-                        }
-                    }
+// ── Music: grouped sections ───────────────────────────────────────────────────
+
+@Composable
+private fun MusicContent(
+    modifier: Modifier = Modifier,
+    sections: List<BrowseSection>,
+    onIntent: (BrowseIntent) -> Unit,
+) {
+    LazyColumn(
+        modifier            = modifier.padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        sections.forEach { section ->
+            item(key = "header_${section.scope.name}") {
+                SectionHeader(scope = section.scope)
+            }
+            val rows = section.entries.chunked(2)
+            items(rows, key = { row -> "row_${row.first().id}" }) { row ->
+                Row(
+                    modifier              = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    EntryTile(
+                        entry    = row.getOrNull(0),
+                        onIntent = onIntent,
+                        modifier = Modifier.weight(1f).aspectRatio(1f)
+                    )
+                    EntryTile(
+                        entry    = row.getOrNull(1),
+                        onIntent = onIntent,
+                        modifier = Modifier.weight(1f).aspectRatio(1f)
+                    )
                 }
+            }
+            item(key = "spacer_${section.scope.name}") {
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
 }
 
 @Composable
-private fun BrowsePage(
+private fun SectionHeader(scope: ContentScope, modifier: Modifier = Modifier) {
+    val label = when (scope) {
+        ContentScope.ARTIST   -> "Künstler"
+        ContentScope.ALBUM    -> "Alben"
+        ContentScope.PLAYLIST -> "Playlists"
+        ContentScope.TRACK    -> "Songs"
+    }
+    Text(
+        text     = label,
+        style    = MaterialTheme.typography.titleMedium,
+        modifier = modifier.padding(top = 16.dp, bottom = 8.dp)
+    )
+}
+
+// ── Favorites: paginated ──────────────────────────────────────────────────────
+
+@Composable
+private fun FavoritesContent(
     modifier: Modifier = Modifier,
-    entries: List<LocalContentEntry>,
-    onIntent: (BrowseIntent) -> Unit
+    favorites: List<LocalFavorite>,
+    favoritesPages: List<List<LocalFavorite>>,
+    onIntent: (BrowseIntent) -> Unit,
 ) {
-    Column(
-        modifier            = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            EntryTile(entry = entries.getOrNull(0), onIntent = onIntent, modifier = Modifier.weight(1f))
-            EntryTile(entry = entries.getOrNull(1), onIntent = onIntent, modifier = Modifier.weight(1f))
-        }
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            EntryTile(entry = entries.getOrNull(2), onIntent = onIntent, modifier = Modifier.weight(1f))
-            if (entries.size > 3) {
-                EntryTile(entry = entries.getOrNull(3), onIntent = onIntent, modifier = Modifier.weight(1f))
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
+    when {
+        favorites.isEmpty() -> FavoritesEmptyState(modifier = modifier)
+
+        else -> {
+            val pagerState = rememberPagerState { favoritesPages.size }
+            Column(modifier = modifier) {
+                HorizontalPager(
+                    state         = pagerState,
+                    flingBehavior = PagerDefaults.flingBehavior(
+                        state             = pagerState,
+                        snapAnimationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness    = Spring.StiffnessMedium
+                        )
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { testTag = "favorites_pager" }
+                ) { page ->
+                    FavoritesPage(
+                        favorites = favoritesPages.getOrElse(page) { emptyList() },
+                        onIntent  = onIntent
+                    )
+                }
+                Box(
+                    modifier         = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PageIndicator(
+                        pageCount   = favoritesPages.size,
+                        currentPage = pagerState.currentPage
+                    )
+                }
             }
         }
     }
@@ -258,32 +276,36 @@ private fun FavoritesPage(
     favorites: List<LocalFavorite>,
     onIntent: (BrowseIntent) -> Unit
 ) {
+    val rows = favorites.chunked(2)
     Column(
         modifier            = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            FavoriteTile(fav = favorites.getOrNull(0), onIntent = onIntent, modifier = Modifier.weight(1f))
-            FavoriteTile(fav = favorites.getOrNull(1), onIntent = onIntent, modifier = Modifier.weight(1f))
-        }
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            FavoriteTile(fav = favorites.getOrNull(2), onIntent = onIntent, modifier = Modifier.weight(1f))
-            if (favorites.size > 3) {
-                FavoriteTile(fav = favorites.getOrNull(3), onIntent = onIntent, modifier = Modifier.weight(1f))
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
+        rows.forEach { pair ->
+            Row(
+                modifier              = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FavoriteTile(
+                    fav      = pair.getOrNull(0),
+                    onIntent = onIntent,
+                    modifier = Modifier.weight(1f).fillMaxSize()
+                )
+                FavoriteTile(
+                    fav      = pair.getOrNull(1),
+                    onIntent = onIntent,
+                    modifier = Modifier.weight(1f).fillMaxSize()
+                )
             }
         }
     }
 }
+
+// ── Tile composables ──────────────────────────────────────────────────────────
 
 @Composable
 private fun EntryTile(
@@ -306,7 +328,7 @@ private fun EntryTile(
         contentDescription = cd,
         imageUrl           = entry.imageUrl,
         scopeBadgeText     = badge?.first,
-        scopeBadgeColor    = badge?.second ?: androidx.compose.ui.graphics.Color.Transparent,
+        scopeBadgeColor    = badge?.second ?: Color.Transparent,
         onClick            = { onIntent(BrowseIntent.TileTapped(entry)) }
     )
 }
@@ -365,27 +387,16 @@ private fun FavoritesEmptyState(modifier: Modifier = Modifier) {
 @Composable
 private fun BrowseScreenMusicPreview() {
     val entries = MockContentProvider.contentEntries.filter { it.contentType.name == "MUSIC" }
+    val sections = listOf(ContentScope.ARTIST, ContentScope.ALBUM, ContentScope.PLAYLIST, ContentScope.TRACK)
+        .mapNotNull { scope ->
+            val group = entries.filter { it.scope == scope }
+            if (group.isNotEmpty()) BrowseSection(scope, group) else null
+        }
     KidstuneTheme {
         BrowseScreen(
             state = BrowseState(
                 category = BrowseCategory.MUSIC,
-                entries  = entries,
-                pages    = entries.chunked(4)
-            )
-        )
-    }
-}
-
-@Preview(name = "BrowseScreen – Hörbücher", showBackground = true, showSystemUi = true)
-@Composable
-private fun BrowseScreenAudiobooksPreview() {
-    val entries = MockContentProvider.contentEntries.filter { it.contentType.name == "AUDIOBOOK" }
-    KidstuneTheme {
-        BrowseScreen(
-            state = BrowseState(
-                category = BrowseCategory.AUDIOBOOK,
-                entries  = entries,
-                pages    = entries.chunked(4)
+                sections = sections
             )
         )
     }
@@ -399,7 +410,7 @@ private fun BrowseScreenFavoritesPreview() {
             state = BrowseState(
                 category       = BrowseCategory.FAVORITES,
                 favorites      = MockContentProvider.favorites,
-                favoritesPages = MockContentProvider.favorites.chunked(4)
+                favoritesPages = MockContentProvider.favorites.chunked(8)
             )
         )
     }

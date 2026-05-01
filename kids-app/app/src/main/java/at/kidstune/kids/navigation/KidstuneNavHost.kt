@@ -8,18 +8,24 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import at.kidstune.kids.domain.model.BrowseCategory
+import at.kidstune.kids.ui.components.MiniPlayerBar
 import at.kidstune.kids.ui.screens.AlbumGridScreen
 import at.kidstune.kids.ui.screens.BrowseScreen
-import at.kidstune.kids.ui.screens.ChapterListScreen
 import at.kidstune.kids.ui.screens.DiscoverScreen
 import at.kidstune.kids.ui.screens.HomeScreen
 import at.kidstune.kids.ui.screens.NowPlayingScreen
@@ -27,6 +33,8 @@ import at.kidstune.kids.ui.screens.PairingScreen
 import at.kidstune.kids.ui.screens.PlaylistTrackListScreen
 import at.kidstune.kids.ui.screens.ProfileSelectionScreen
 import at.kidstune.kids.ui.screens.TrackListScreen
+import at.kidstune.kids.ui.viewmodel.ShellIntent
+import at.kidstune.kids.ui.viewmodel.ShellViewModel
 import kotlinx.serialization.Serializable
 
 // ── Route definitions (type-safe Compose Navigation) ──────────────────────
@@ -52,13 +60,6 @@ data class AlbumGridRoute(val contentEntryId: String)
 @Serializable
 data class TrackListRoute(val albumId: String)
 
-/**
- * Shows the chapter list for a single AUDIOBOOK album.
- * Each chapter is tappable and resumes from the saved position if applicable.
- */
-@Serializable
-data class ChapterListRoute(val albumId: String)
-
 /** Shows all tracks in a playlist in flat playlist order. */
 @Serializable
 data class PlaylistTrackListRoute(val contentEntryId: String)
@@ -76,19 +77,32 @@ object DiscoverRoute
 fun KidstuneNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    startDestination: Any = HomeRoute
+    startDestination: Any = HomeRoute,
+    shellViewModel: ShellViewModel = hiltViewModel()
 ) {
-    // SharedTransitionLayout enables shared-element transitions between destinations.
-    // LocalSharedTransitionScope is provided to the whole tree so deep composables
-    // (e.g. MiniPlayerBar, NowPlayingScreen) can attach sharedBounds modifiers
-    // without threading SharedTransitionScope through every function signature.
-    SharedTransitionLayout {
-        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
-            NavHost(
-                navController    = navController,
-                startDestination = startDestination,
-                modifier         = modifier
-            ) {
+    val shellState by shellViewModel.state.collectAsState()
+    val currentEntry by navController.currentBackStackEntryAsState()
+    val currentDest = currentEntry?.destination
+
+    // Hide the mini-player on setup screens and on the full-screen NowPlaying screen.
+    val showMiniPlayer = currentDest?.let { dest ->
+        dest.route != PairingRoute::class.qualifiedName &&
+        dest.route != ProfileSelectionRoute::class.qualifiedName &&
+        dest.route != NowPlayingRoute::class.qualifiedName
+    } ?: false
+
+    Column(modifier = modifier.fillMaxSize()) {
+        // SharedTransitionLayout enables shared-element transitions between destinations.
+        // LocalSharedTransitionScope is provided to the whole tree so deep composables
+        // (e.g. NowPlayingScreen) can attach sharedBounds modifiers without threading
+        // SharedTransitionScope through every function signature.
+        SharedTransitionLayout(modifier = Modifier.weight(1f)) {
+            CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+                NavHost(
+                    navController    = navController,
+                    startDestination = startDestination,
+                    modifier         = Modifier.fillMaxSize()
+                ) {
                 composable<PairingRoute> {
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                         PairingScreen(
@@ -114,15 +128,12 @@ fun KidstuneNavHost(
                 }
 
                 composable<HomeRoute> {
-                    // HomeRoute provides AnimatedVisibilityScope so MiniPlayerBar can
-                    // participate in the shared-element transition to NowPlayingRoute.
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                         HomeScreen(
-                            onNavigateToBrowse     = { category ->
+                            onNavigateToBrowse   = { category ->
                                 navController.navigate(BrowseRoute(category.name))
                             },
-                            onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) },
-                            onNavigateToDiscover   = { navController.navigate(DiscoverRoute) }
+                            onNavigateToDiscover = { navController.navigate(DiscoverRoute) }
                         )
                     }
                 }
@@ -151,12 +162,9 @@ fun KidstuneNavHost(
                 composable<AlbumGridRoute> {
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                         AlbumGridScreen(
-                            onNavigateUp            = { navController.navigateUp() },
-                            onNavigateToTrackList   = { albumId ->
+                            onNavigateUp          = { navController.navigateUp() },
+                            onNavigateToTrackList = { albumId ->
                                 navController.navigate(TrackListRoute(albumId))
-                            },
-                            onNavigateToChapterList = { albumId ->
-                                navController.navigate(ChapterListRoute(albumId))
                             }
                         )
                     }
@@ -174,15 +182,6 @@ fun KidstuneNavHost(
                 composable<PlaylistTrackListRoute> {
                     CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                         PlaylistTrackListScreen(
-                            onNavigateUp           = { navController.navigateUp() },
-                            onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
-                        )
-                    }
-                }
-
-                composable<ChapterListRoute> {
-                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-                        ChapterListScreen(
                             onNavigateUp           = { navController.navigateUp() },
                             onNavigateToNowPlaying = { navController.navigate(NowPlayingRoute) }
                         )
@@ -217,7 +216,19 @@ fun KidstuneNavHost(
                         )
                     }
                 }
+                }
             }
+        }  // SharedTransitionLayout
+
+        if (showMiniPlayer) {
+            MiniPlayerBar(
+                title       = shellState.nowPlayingTitle,
+                artistName  = shellState.nowPlayingArtist,
+                imageUrl    = shellState.nowPlayingImageUrl,
+                isPlaying   = shellState.isPlaying,
+                onPlayPause = { shellViewModel.onIntent(ShellIntent.TogglePlayPause) },
+                onExpand    = { navController.navigate(NowPlayingRoute) }
+            )
         }
-    }
+    }  // Column
 }

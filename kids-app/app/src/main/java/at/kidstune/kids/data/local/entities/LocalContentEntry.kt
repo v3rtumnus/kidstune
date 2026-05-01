@@ -36,5 +36,9 @@ data class LocalContentEntry(
     val artistName: String?,
 
     @ColumnInfo(name = "last_synced_at")
-    val lastSyncedAt: Instant = Instant.now()
+    val lastSyncedAt: Instant = Instant.now(),
+
+    /** Most recent time the child listened to this entry, from Spotify recently-played. Null = never. */
+    @ColumnInfo(name = "last_listened_at")
+    val lastListenedAt: Instant? = null
 )

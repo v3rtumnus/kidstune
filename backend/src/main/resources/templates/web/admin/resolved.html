@@ -9,7 +9,17 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">Aufgelöste Inhalte</h1>
-        <span class="badge bg-secondary" th:text="${rows.size()} + ' Einträge'"></span>
+        <div class="d-flex align-items-center gap-3">
+            <span id="re-resolve-all-msg"></span>
+            <button class="btn btn-warning btn-sm"
+                    hx-post="/web/admin/resolved/re-resolve-all"
+                    hx-target="#re-resolve-all-msg"
+                    hx-swap="innerHTML"
+                    hx-confirm="Alle Einträge erneut auflösen? Das kann einige Minuten dauern.">
+                &#8635; Alle re-resolven
+            </button>
+            <span class="badge bg-secondary" th:text="${rows.size()} + ' Einträge'"></span>
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm">

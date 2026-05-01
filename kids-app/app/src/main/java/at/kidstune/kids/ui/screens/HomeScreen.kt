@@ -47,14 +47,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import at.kidstune.kids.domain.model.BrowseCategory
 import at.kidstune.kids.playback.SpotifyConnectionError
-import at.kidstune.kids.ui.components.MiniPlayerBar
-import at.kidstune.kids.ui.theme.AudiobookPrimary
 import at.kidstune.kids.ui.theme.DiscoverPrimary
 import at.kidstune.kids.ui.theme.FavoritePrimary
 import at.kidstune.kids.ui.theme.KidstuneTheme
 import at.kidstune.kids.ui.theme.MusicPrimary
 import at.kidstune.kids.ui.theme.kidsTouchTarget
-import at.kidstune.kids.ui.viewmodel.HomeIntent
 import at.kidstune.kids.ui.viewmodel.HomeState
 import at.kidstune.kids.ui.viewmodel.HomeViewModel
 
@@ -65,17 +62,14 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
     onNavigateToBrowse: (BrowseCategory) -> Unit = {},
-    onNavigateToNowPlaying: () -> Unit = {},
     onNavigateToDiscover: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     HomeScreen(
-        modifier               = modifier,
-        state                  = state,
-        onIntent               = viewModel::onIntent,
-        onNavigateToBrowse     = onNavigateToBrowse,
-        onNavigateToNowPlaying = onNavigateToNowPlaying,
-        onNavigateToDiscover   = onNavigateToDiscover
+        modifier           = modifier,
+        state              = state,
+        onNavigateToBrowse = onNavigateToBrowse,
+        onNavigateToDiscover = onNavigateToDiscover
     )
 }
 
@@ -85,24 +79,10 @@ fun HomeScreen(
 fun HomeScreen(
     modifier: Modifier = Modifier,
     state: HomeState,
-    onIntent: (HomeIntent) -> Unit = {},
     onNavigateToBrowse: (BrowseCategory) -> Unit = {},
-    onNavigateToNowPlaying: () -> Unit = {},
     onNavigateToDiscover: () -> Unit = {}
 ) {
-    Scaffold(
-        modifier  = modifier,
-        bottomBar = {
-            MiniPlayerBar(
-                title      = state.nowPlayingTitle,
-                artistName = state.nowPlayingArtist,
-                imageUrl   = state.nowPlayingImageUrl,
-                isPlaying  = state.isPlaying,
-                onPlayPause = { onIntent(HomeIntent.TogglePlayPause) },
-                onExpand    = onNavigateToNowPlaying
-            )
-        }
-    ) { innerPadding ->
+    Scaffold(modifier = modifier) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -157,26 +137,14 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Music + Audiobooks side-by-side
-                    Row(
-                        modifier              = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CategoryButton(
-                            emoji    = "🎵",
-                            label    = "Musik",
-                            color    = MusicPrimary,
-                            modifier = Modifier.weight(1f),
-                            onClick  = { onNavigateToBrowse(BrowseCategory.MUSIC) }
-                        )
-                        CategoryButton(
-                            emoji    = "📖",
-                            label    = "Hörbücher",
-                            color    = AudiobookPrimary,
-                            modifier = Modifier.weight(1f),
-                            onClick  = { onNavigateToBrowse(BrowseCategory.AUDIOBOOK) }
-                        )
-                    }
+                    // Music – full width
+                    CategoryButton(
+                        emoji    = "🎵",
+                        label    = "Musik",
+                        color    = MusicPrimary,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick  = { onNavigateToBrowse(BrowseCategory.MUSIC) }
+                    )
 
                     Spacer(Modifier.height(12.dp))
 
@@ -357,20 +325,6 @@ private fun HomeScreenStalePreview() {
 private fun HomeScreenNoCachePreview() {
     KidstuneTheme {
         HomeScreen(state = HomeState(isOffline = true, cachedContentCount = 0))
-    }
-}
-
-@Preview(name = "HomeScreen – nothing playing", showBackground = true, showSystemUi = true)
-@Composable
-private fun HomeScreenNothingPlayingPreview() {
-    KidstuneTheme {
-        HomeScreen(
-            state = HomeState(
-                nowPlayingTitle    = null,
-                nowPlayingArtist   = null,
-                nowPlayingImageUrl = null
-            )
-        )
     }
 }
 

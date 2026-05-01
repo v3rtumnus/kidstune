@@ -181,15 +181,16 @@ class SyncRepository @Inject constructor(
         profileId: String,
         syncedAt: Instant
     ) = LocalContentEntry(
-        id           = id,
-        profileId    = profileId,
-        spotifyUri   = spotifyUri,
-        scope        = ContentScope.valueOf(scope),
-        contentType  = ContentType.valueOf(contentType),
-        title        = title,
-        imageUrl     = imageUrl,
-        artistName   = artistName,
-        lastSyncedAt = syncedAt
+        id             = id,
+        profileId      = profileId,
+        spotifyUri     = spotifyUri,
+        scope          = ContentScope.valueOf(scope),
+        contentType    = ContentType.entries.firstOrNull { it.name == contentType } ?: ContentType.MUSIC,
+        title          = title,
+        imageUrl       = imageUrl,
+        artistName     = artistName,
+        lastSyncedAt   = syncedAt,
+        lastListenedAt = lastListenedAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
     )
 
     private suspend fun insertAlbumsAndTracks(

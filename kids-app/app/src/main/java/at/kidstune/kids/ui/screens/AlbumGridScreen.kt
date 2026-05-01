@@ -5,11 +5,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.pager.HorizontalPager
@@ -50,8 +55,7 @@ fun AlbumGridScreen(
     modifier: Modifier = Modifier,
     viewModel: AlbumGridViewModel = hiltViewModel(),
     onNavigateUp: () -> Unit = {},
-    onNavigateToTrackList: (albumId: String) -> Unit = {},
-    onNavigateToChapterList: (albumId: String) -> Unit = {}
+    onNavigateToTrackList: (albumId: String) -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -59,10 +63,6 @@ fun AlbumGridScreen(
         when (val nav = state.navigation) {
             is AlbumGridNavigation.ToTrackList -> {
                 onNavigateToTrackList(nav.albumId)
-                viewModel.onIntent(AlbumGridIntent.NavigationHandled)
-            }
-            is AlbumGridNavigation.ToChapterList -> {
-                onNavigateToChapterList(nav.albumId)
                 viewModel.onIntent(AlbumGridIntent.NavigationHandled)
             }
             null -> Unit
@@ -115,41 +115,67 @@ fun AlbumGridScreen(
         }
     ) { innerPadding ->
         Box(
-            modifier = Modifier
+            modifier         = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
         ) {
-            if (state.pages.isNotEmpty()) {
-                val pagerState = rememberPagerState { state.totalPages }
-                Column(modifier = Modifier.fillMaxSize()) {
-                    HorizontalPager(
-                        state         = pagerState,
-                        flingBehavior = PagerDefaults.flingBehavior(
-                            state             = pagerState,
-                            snapAnimationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness    = Spring.StiffnessMedium
+            when {
+                state.isLoading -> CircularProgressIndicator()
+
+                state.pages.isEmpty() -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(text = "🎵", fontSize = 64.sp)
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text      = "Noch keine Alben verfügbar",
+                        style     = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text      = "Warte kurz – die Inhalte werden geladen.",
+                        style     = MaterialTheme.typography.bodyMedium,
+                        color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier  = Modifier.padding(horizontal = 32.dp)
+                    )
+                }
+
+                else -> {
+                    val pagerState = rememberPagerState { state.totalPages }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        HorizontalPager(
+                            state         = pagerState,
+                            flingBehavior = PagerDefaults.flingBehavior(
+                                state             = pagerState,
+                                snapAnimationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness    = Spring.StiffnessMedium
+                                )
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .semantics { testTag = "album_grid_pager" }
+                        ) { page ->
+                            AlbumPage(
+                                albums   = state.pages.getOrElse(page) { emptyList() },
+                                onIntent = onIntent
                             )
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .semantics { testTag = "album_grid_pager" }
-                    ) { page ->
-                        AlbumPage(
-                            albums   = state.pages.getOrElse(page) { emptyList() },
-                            onIntent = onIntent
-                        )
-                    }
-                    Box(
-                        modifier         = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        PageIndicator(
-                            pageCount   = state.totalPages,
-                            currentPage = pagerState.currentPage
-                        )
+                        }
+                        Box(
+                            modifier         = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PageIndicator(
+                                pageCount   = state.totalPages,
+                                currentPage = pagerState.currentPage
+                            )
+                        }
                     }
                 }
             }
@@ -163,28 +189,30 @@ private fun AlbumPage(
     albums: List<LocalAlbum>,
     onIntent: (AlbumGridIntent) -> Unit
 ) {
+    val rows = albums.chunked(2)
     Column(
         modifier            = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            AlbumTile(album = albums.getOrNull(0), onIntent = onIntent, modifier = Modifier.weight(1f))
-            AlbumTile(album = albums.getOrNull(1), onIntent = onIntent, modifier = Modifier.weight(1f))
-        }
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            AlbumTile(album = albums.getOrNull(2), onIntent = onIntent, modifier = Modifier.weight(1f))
-            if (albums.size > 3) {
-                AlbumTile(album = albums.getOrNull(3), onIntent = onIntent, modifier = Modifier.weight(1f))
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
+        rows.forEach { pair ->
+            Row(
+                modifier              = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AlbumTile(
+                    album    = pair.getOrNull(0),
+                    onIntent = onIntent,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                AlbumTile(
+                    album    = pair.getOrNull(1),
+                    onIntent = onIntent,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
             }
         }
     }
@@ -218,7 +246,7 @@ private fun AlbumGridScreenPreview() {
             state = AlbumGridState(
                 contentEntry = MockContentProvider.contentEntries.first(),
                 albums       = MockContentProvider.albums,
-                pages        = MockContentProvider.albums.chunked(4)
+                pages        = MockContentProvider.albums.chunked(8)
             )
         )
     }

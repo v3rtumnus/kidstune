@@ -11,6 +11,7 @@ import at.kidstune.kids.domain.model.PendingRequest
 import at.kidstune.kids.domain.model.RequestStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,8 @@ import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 
+private const val SEARCH_DEBOUNCE_MS = 500L
+
 data class DiscoverState(
     val query: String = "",
     val suggestions: List<DiscoverTile> = emptyList(),
@@ -29,7 +32,6 @@ data class DiscoverState(
     val requestedUris: Set<String> = emptySet(),
     val isLoadingSuggestions: Boolean = false,
     val isSearching: Boolean = false,
-    val rateLimitMessage: String? = null,
     val showCelebration: Boolean = false,
     /** URIs approved since the last sync — used to highlight tiles in the Discover grid. */
     val newlyApprovedUris: Set<String> = emptySet(),
@@ -85,9 +87,6 @@ sealed interface DiscoverIntent {
     data object RetryAsRequest : DiscoverIntent
 }
 
-/** Minimum gap between two consecutive search calls (rate-limiting). */
-private val SEARCH_DEBOUNCE_MS = 5_000L
-
 @HiltViewModel
 class DiscoverViewModel @Inject constructor(
     private val discoverRepository: DiscoverRepository,
@@ -98,7 +97,6 @@ class DiscoverViewModel @Inject constructor(
     private val _state = MutableStateFlow(DiscoverState())
     val state: StateFlow<DiscoverState> = _state.asStateFlow()
 
-    internal var lastSearchAt: Instant = Instant.EPOCH
     private var searchJob: Job? = null
     private var previousContentCount: Int? = null
 
@@ -175,43 +173,28 @@ class DiscoverViewModel @Inject constructor(
     // ── Private handlers ──────────────────────────────────────────────────────
 
     private fun handleQueryUpdate(q: String) {
-        _state.update { it.copy(query = q, rateLimitMessage = null) }
-
+        _state.update { it.copy(query = q) }
+        searchJob?.cancel()
         if (q.isEmpty()) {
-            searchJob?.cancel()
             _state.update { it.copy(searchResults = emptyList(), isSearching = false) }
             return
         }
-
-        // Rate limiting: block if a search ran within SEARCH_DEBOUNCE_MS
-        val elapsed = Duration.between(lastSearchAt, Instant.now()).toMillis()
-        if (elapsed < SEARCH_DEBOUNCE_MS) {
-            _state.update {
-                it.copy(rateLimitMessage = "Bitte warte kurz bevor du erneut suchst!")
-            }
-            return
-        }
-
-        // Cancel any pending search before starting a new one
-        searchJob?.cancel()
         searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
             performSearch(q)
         }
     }
 
-    private fun performSearch(q: String) {
+    private suspend fun performSearch(q: String) {
         val profileId = prefs.boundProfileId ?: return
-        lastSearchAt = Instant.now()
-        viewModelScope.launch {
-            _state.update { it.copy(isSearching = true, searchError = false) }
-            val result = discoverRepository.search(profileId, q)
-            _state.update {
-                it.copy(
-                    searchResults = result.getOrDefault(emptyList()),
-                    isSearching   = false,
-                    searchError   = result.isFailure,
-                )
-            }
+        _state.update { it.copy(isSearching = true, searchError = false) }
+        val result = discoverRepository.search(profileId, q)
+        _state.update {
+            it.copy(
+                searchResults = result.getOrDefault(emptyList()),
+                isSearching   = false,
+                searchError   = result.isFailure,
+            )
         }
     }
 

@@ -155,14 +155,8 @@ fun NowPlayingScreen(
                         overflow  = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.height(4.dp))
-                    // Chapter subtitle for audiobooks: "Kapitel N von M"
-                    val chapterText = if (state.chapterIndex != null && state.totalChapters != null) {
-                        "Kapitel ${state.chapterIndex + 1} von ${state.totalChapters}"
-                    } else {
-                        state.artistName ?: ""
-                    }
                     Text(
-                        text  = chapterText,
+                        text  = state.artistName ?: "",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -277,25 +271,6 @@ private fun NowPlayingScreenPlayingPreview() {
                 isPlaying  = true,
                 durationMs = 225_000L,
                 positionMs = 83_000L
-            )
-        )
-    }
-}
-
-@Preview(name = "NowPlayingScreen – audiobook chapter", showBackground = true, showSystemUi = true)
-@Composable
-private fun NowPlayingScreenChapterPreview() {
-    KidstuneTheme {
-        NowPlayingScreen(
-            state = NowPlayingState(
-                title         = "TKKG 200 – Teil 2",
-                artistName    = "TKKG",
-                imageUrl      = null,
-                isPlaying     = true,
-                durationMs    = 1_200_000L,
-                positionMs    = 300_000L,
-                chapterIndex  = 1,
-                totalChapters = 3
             )
         )
     }

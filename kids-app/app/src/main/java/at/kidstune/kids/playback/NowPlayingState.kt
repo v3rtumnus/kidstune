@@ -18,11 +18,4 @@ data class NowPlayingState(
     val positionMs: Long      = 0L,
     val isPlaying: Boolean    = false,
     val isFavorite: Boolean   = false,
-    /**
-     * 0-based chapter index within the parent album, non-null for AUDIOBOOK content.
-     * Populated by looking up [trackUri] in Room after a player-state update.
-     */
-    val chapterIndex: Int?    = null,
-    /** Total chapters in the parent album; non-null when [chapterIndex] is non-null. */
-    val totalChapters: Int?   = null
 )

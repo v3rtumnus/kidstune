@@ -7,7 +7,6 @@ import at.kidstune.kids.data.local.AlbumDao
 import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.data.repository.ContentRepository
-import at.kidstune.kids.domain.model.ContentType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +20,7 @@ data class AlbumGridState(
     val albums: List<LocalAlbum>         = emptyList(),
     val pages: List<List<LocalAlbum>>    = emptyList(),
     val navigation: AlbumGridNavigation? = null,
+    val isLoading: Boolean               = true,
 ) {
     val totalPages: Int get() = pages.size
 }
@@ -31,13 +31,10 @@ sealed interface AlbumGridIntent {
 }
 
 sealed interface AlbumGridNavigation {
-    /** MUSIC album tapped – show the track list before playing. */
     data class ToTrackList(val albumId: String) : AlbumGridNavigation
-    /** AUDIOBOOK album tapped – show chapter list for deliberate selection. */
-    data class ToChapterList(val albumId: String) : AlbumGridNavigation
 }
 
-private const val ALBUMS_PER_PAGE = 4
+private const val ALBUMS_PER_PAGE = 8
 
 @HiltViewModel
 class AlbumGridViewModel @Inject constructor(
@@ -59,7 +56,8 @@ class AlbumGridViewModel @Inject constructor(
                     it.copy(
                         contentEntry = entry,
                         albums       = albums,
-                        pages        = albums.chunked(ALBUMS_PER_PAGE)
+                        pages        = albums.chunked(ALBUMS_PER_PAGE),
+                        isLoading    = false,
                     )
                 }
             }
@@ -74,13 +72,6 @@ class AlbumGridViewModel @Inject constructor(
     }
 
     private fun handleAlbumTapped(albumId: String) {
-        viewModelScope.launch {
-            val album = albumDao.getById(albumId) ?: return@launch
-            if (album.contentType == ContentType.MUSIC) {
-                _state.update { it.copy(navigation = AlbumGridNavigation.ToTrackList(albumId)) }
-            } else {
-                _state.update { it.copy(navigation = AlbumGridNavigation.ToChapterList(albumId)) }
-            }
-        }
+        _state.update { it.copy(navigation = AlbumGridNavigation.ToTrackList(albumId)) }
     }
 }

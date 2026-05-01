@@ -11,6 +11,7 @@ import at.kidstune.resolver.ResolvedAlbum;
 import at.kidstune.resolver.ResolvedAlbumRepository;
 import at.kidstune.resolver.ResolvedTrack;
 import at.kidstune.resolver.ResolvedTrackRepository;
+import at.kidstune.spotify.SpotifyWebApiClient;
 import at.kidstune.sync.dto.DeltaSyncPayload;
 import at.kidstune.sync.dto.FullSyncPayload;
 import at.kidstune.sync.dto.SyncAlbumDto;
@@ -18,6 +19,8 @@ import at.kidstune.sync.dto.SyncContentEntryDto;
 import at.kidstune.sync.dto.SyncFavoriteDto;
 import at.kidstune.sync.dto.SyncProfileDto;
 import at.kidstune.sync.dto.SyncTrackDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -38,13 +41,16 @@ import java.util.stream.Collectors;
 @Service
 public class SyncService {
 
-    private final ProfileRepository      profileRepo;
-    private final FamilyRepository       familyRepo;
-    private final ContentRepository      contentRepo;
+    private static final Logger log = LoggerFactory.getLogger(SyncService.class);
+
+    private final ProfileRepository       profileRepo;
+    private final FamilyRepository        familyRepo;
+    private final ContentRepository       contentRepo;
     private final ResolvedAlbumRepository albumRepo;
     private final ResolvedTrackRepository trackRepo;
-    private final FavoriteRepository     favoriteRepo;
-    private final DeletionLogRepository  deletionLogRepo;
+    private final FavoriteRepository      favoriteRepo;
+    private final DeletionLogRepository   deletionLogRepo;
+    private final SpotifyWebApiClient     spotifyClient;
 
     public SyncService(ProfileRepository profileRepo,
                        FamilyRepository familyRepo,
@@ -52,14 +58,16 @@ public class SyncService {
                        ResolvedAlbumRepository albumRepo,
                        ResolvedTrackRepository trackRepo,
                        FavoriteRepository favoriteRepo,
-                       DeletionLogRepository deletionLogRepo) {
-        this.profileRepo    = profileRepo;
-        this.familyRepo     = familyRepo;
-        this.contentRepo    = contentRepo;
-        this.albumRepo      = albumRepo;
-        this.trackRepo      = trackRepo;
-        this.favoriteRepo   = favoriteRepo;
+                       DeletionLogRepository deletionLogRepo,
+                       SpotifyWebApiClient spotifyClient) {
+        this.profileRepo     = profileRepo;
+        this.familyRepo      = familyRepo;
+        this.contentRepo     = contentRepo;
+        this.albumRepo       = albumRepo;
+        this.trackRepo       = trackRepo;
+        this.favoriteRepo    = favoriteRepo;
         this.deletionLogRepo = deletionLogRepo;
+        this.spotifyClient   = spotifyClient;
     }
 
     // ── Full sync ──────────────────────────────────────────────────────────────
@@ -73,8 +81,10 @@ public class SyncService {
         ChildProfile profile = profileRepo.findById(profileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found"));
 
+        Map<String, Instant> contextLastPlayed = fetchContextLastPlayed(profileId);
+
         List<AllowedContent> entries = contentRepo.findByProfileId(profileId);
-        List<SyncContentEntryDto> content = buildContentTree(entries);
+        List<SyncContentEntryDto> content = buildContentTree(entries, contextLastPlayed);
 
         List<SyncFavoriteDto> favorites = favoriteRepo.findByProfileId(profileId)
                 .stream().map(SyncFavoriteDto::from).toList();
@@ -97,9 +107,11 @@ public class SyncService {
         ChildProfile profile = profileRepo.findById(profileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found"));
 
+        Map<String, Instant> contextLastPlayed = fetchContextLastPlayed(profileId);
+
         // ── Added: entries created after `since` ───────────────────────────────
         List<AllowedContent> addedEntries = contentRepo.findByProfileIdAndCreatedAtAfter(profileId, since);
-        List<SyncContentEntryDto> added = buildContentTree(addedEntries);
+        List<SyncContentEntryDto> added = buildContentTree(addedEntries, contextLastPlayed);
 
         // ── Updated: existing entries with re-resolved albums since `since` ────
         Set<String> addedIds = addedEntries.stream().map(AllowedContent::getId).collect(Collectors.toSet());
@@ -125,7 +137,7 @@ public class SyncService {
                         .map(byId::get)
                         .filter(e -> e != null)
                         .toList();
-                updated = buildContentTree(updatedEntries);
+                updated = buildContentTree(updatedEntries, contextLastPlayed);
             }
         }
 
@@ -159,8 +171,12 @@ public class SyncService {
     /**
      * Builds a content tree for the given entries using exactly 3 DB queries regardless
      * of how many entries/albums/tracks there are (batch IN queries).
+     *
+     * @param contextLastPlayed  contextUri → most recent Instant from Spotify recently-played;
+     *                           may be empty if the profile has no token or the call failed
      */
-    private List<SyncContentEntryDto> buildContentTree(List<AllowedContent> entries) {
+    private List<SyncContentEntryDto> buildContentTree(List<AllowedContent> entries,
+                                                        Map<String, Instant> contextLastPlayed) {
         if (entries.isEmpty()) return List.of();
 
         List<String> contentIds = entries.stream().map(AllowedContent::getId).toList();
@@ -180,17 +196,76 @@ public class SyncService {
                     .add(SyncTrackDto.from(t));
         }
 
-        // Index albums by contentId
+        // Index albums by contentId; also collect album URIs per contentId for last-listened lookup
         Map<String, List<SyncAlbumDto>> albumsByContentId = new LinkedHashMap<>();
+        Map<String, List<String>> albumUrisByContentId = new LinkedHashMap<>();
         for (ResolvedAlbum a : allAlbums) {
             List<SyncTrackDto> tracks = tracksByAlbumId.getOrDefault(a.getId(), List.of());
             albumsByContentId.computeIfAbsent(a.getAllowedContentId(), k -> new ArrayList<>())
                     .add(SyncAlbumDto.from(a, tracks));
+            albumUrisByContentId.computeIfAbsent(a.getAllowedContentId(), k -> new ArrayList<>())
+                    .add(a.getSpotifyAlbumUri());
         }
 
         // Build final list preserving input order
         return entries.stream()
-                .map(e -> SyncContentEntryDto.from(e, albumsByContentId.getOrDefault(e.getId(), List.of())))
+                .map(e -> {
+                    Instant lastListenedAt = resolveLastListened(
+                            e.getSpotifyUri(),
+                            albumUrisByContentId.getOrDefault(e.getId(), List.of()),
+                            contextLastPlayed);
+                    return SyncContentEntryDto.from(
+                            e,
+                            albumsByContentId.getOrDefault(e.getId(), List.of()),
+                            lastListenedAt);
+                })
                 .toList();
+    }
+
+    /**
+     * Finds the most recent play time for a content entry by checking its own URI first,
+     * then any of its resolved album URIs (for ARTIST scope entries).
+     */
+    private Instant resolveLastListened(String entryUri,
+                                        List<String> albumUris,
+                                        Map<String, Instant> contextLastPlayed) {
+        if (contextLastPlayed.isEmpty()) return null;
+
+        Instant direct = contextLastPlayed.get(entryUri);
+        if (direct != null && albumUris.isEmpty()) return direct;
+
+        Instant viaAlbum = albumUris.stream()
+                .map(contextLastPlayed::get)
+                .filter(t -> t != null)
+                .max(Instant::compareTo)
+                .orElse(null);
+
+        if (direct == null) return viaAlbum;
+        if (viaAlbum == null) return direct;
+        return direct.isAfter(viaAlbum) ? direct : viaAlbum;
+    }
+
+    /**
+     * Fetches the recently-played context URIs for the profile and builds a map of
+     * contextUri → most recent playedAt. Returns an empty map if the profile has no
+     * Spotify token or the Spotify call fails.
+     */
+    private Map<String, Instant> fetchContextLastPlayed(String profileId) {
+        try {
+            List<SpotifyWebApiClient.RawProfilePlayEvent> events =
+                    spotifyClient.getProfileRecentlyPlayed(profileId, 0).block();
+            if (events == null || events.isEmpty()) return Map.of();
+
+            Map<String, Instant> result = new LinkedHashMap<>();
+            for (SpotifyWebApiClient.RawProfilePlayEvent e : events) {
+                if (e.contextUri() == null) continue;
+                result.merge(e.contextUri(), e.playedAt(),
+                        (existing, newVal) -> newVal.isAfter(existing) ? newVal : existing);
+            }
+            return result;
+        } catch (Exception ex) {
+            log.debug("Could not fetch recently-played for profile {}: {}", profileId, ex.getMessage());
+            return Map.of();
+        }
     }
 }

@@ -118,7 +118,27 @@
       "Bash(./gradlew compileTestJava:*)",
       "Bash(grep -r \"FAILED\\\\|PASSED\\\\|tests run\" /c/Users/micha/Development/kidstune/backend/build/test-results/test/*.xml)",
       "Bash(grep -h \"tests=\\\\|failures=\\\\|errors=\" /c/Users/micha/Development/kidstune/backend/build/test-results/test/*.xml)",
-      "Bash(grep -h \"failures=\\\\|errors=\" /c/Users/micha/Development/kidstune/backend/build/test-results/test/*.xml)"
+      "Bash(grep -h \"failures=\\\\|errors=\" /c/Users/micha/Development/kidstune/backend/build/test-results/test/*.xml)",
+      "Bash(./gradlew :backend:test --info)",
+      "Bash(xargs -I{} bash -c 'echo \"=== {} ===\"; grep -A3 \"<failure\" {} | head -30')",
+      "Bash(./gradlew -p C:/Users/micha/Development/kidstune/backend test --tests \"at.kidstune.profile.ProfileServiceTest\" --tests \"at.kidstune.requests.ContentRequestConcurrencyIntTest\" --tests \"at.kidstune.spotify.SpotifySuggestionsIntTest\" --tests \"at.kidstune.web.ApproveTokenIntTest\")",
+      "Bash(./gradlew :backend:compileJava)",
+      "Bash(./gradlew :backend:clean :backend:test --tests \"at.kidstune.content.PinApproveIntTest\")",
+      "Bash(../gradlew clean:*)",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.content.PinApproveIntTest\")",
+      "Bash(./gradlew :backend:test --tests \"at.kidstune.web.e2e.SettingsE2eTest\" --rerun)",
+      "Bash(./gradlew :backend:e2eTest)",
+      "Bash(./gradlew :backend:e2eTest --tests \"at.kidstune.web.e2e.DashboardE2eTest\" --rerun)",
+      "Bash(./gradlew :backend:e2eTest --tests \"at.kidstune.web.e2e.SettingsE2eTest.shouldShowSettingsPage\" --rerun)",
+      "Bash(grep -v \"^$\")",
+      "Bash(./gradlew :backend:e2eTest --tests \"at.kidstune.web.e2e.SettingsE2eTest\" --rerun)",
+      "Bash(./gradlew :backend:e2eTest --tests \"at.kidstune.web.e2e.SettingsE2eTest.shouldShowSettingsPage\" --tests \"at.kidstune.web.e2e.SettingsE2eTest.shouldShowErrorOnShortPin\" --tests \"at.kidstune.web.e2e.SettingsE2eTest.shouldClearPinSuccessfully\" --rerun --info)",
+      "Bash(./gradlew :backend:e2eTest --tests \"at.kidstune.web.e2e.SettingsE2eTest.shouldShowErrorOnShortPin\" --tests \"at.kidstune.web.e2e.SettingsE2eTest.shouldClearPinSuccessfully\" --rerun --info)",
+      "Bash(./gradlew :backend:e2eTest --tests \"at.kidstune.web.e2e.SettingsE2eTest\" --rerun --info)",
+      "Bash(./gradlew :backend:e2eTest --tests \"at.kidstune.web.e2e.SettingsE2eTest.shouldClearPinSuccessfully\" --rerun --info)",
+      "Bash(./gradlew cleanTest test --tests \"at.kidstune.sync.SyncIntTest\" --tests \"at.kidstune.web.ApproveTokenIntTest\")",
+      "Bash(./gradlew cleanTest test --tests \"at.kidstune.sync.SyncIntTest\" --tests \"at.kidstune.web.ApproveTokenIntTest\" --tests \"at.kidstune.profile.ProfileServiceTest\" --tests \"at.kidstune.spotify.SpotifySuggestionsIntTest\" --tests \"at.kidstune.requests.ContentRequestConcurrencyIntTest\")",
+      "Bash(xargs cat:*)"
     ]
   }
 }

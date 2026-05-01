@@ -387,6 +387,16 @@ public class AdminWebController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    @PostMapping("/resolved/re-resolve-all")
+    public Mono<String> reResolveAll(Model model) {
+        return Mono.fromCallable(() -> {
+            List<AllowedContent> all = contentRepository.findAll();
+            all.forEach(contentResolver::resolveAsync);
+            model.addAttribute("message", all.size() + " Einträge werden aufgelöst…");
+            return "web/admin/fragments/flash :: success";
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
     // ── Admin Favorites ───────────────────────────────────────────────────────
 
     @GetMapping("/favorites")

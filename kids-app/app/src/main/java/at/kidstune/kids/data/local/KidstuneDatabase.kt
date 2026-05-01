@@ -3,6 +3,8 @@ package at.kidstune.kids.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import at.kidstune.kids.data.local.entities.LocalAlbum
 import at.kidstune.kids.data.local.entities.LocalContentEntry
 import at.kidstune.kids.data.local.entities.LocalContentRequest
@@ -19,8 +21,8 @@ import at.kidstune.kids.data.local.entities.LocalTrack
         LocalPlaybackPosition::class,
         LocalContentRequest::class,
     ],
-    version = 4,
-    exportSchema = true
+    version = 5,
+    exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class KidstuneDatabase : RoomDatabase() {
@@ -30,4 +32,12 @@ abstract class KidstuneDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
     abstract fun playbackPositionDao(): PlaybackPositionDao
     abstract fun contentRequestDao(): ContentRequestDao
+
+    companion object {
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE local_content_entry ADD COLUMN last_listened_at INTEGER DEFAULT NULL")
+            }
+        }
+    }
 }

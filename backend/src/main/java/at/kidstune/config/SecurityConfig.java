@@ -130,8 +130,9 @@ public class SecurityConfig {
                         .pathMatchers("/api/v1/profiles/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/content/**").hasRole(PARENT_ROLE)
 
-                        // suggestions accessible by KIDS device (must precede the /spotify/** catch-all)
+                        // suggestions + search accessible by KIDS device (must precede the /spotify/** catch-all)
                         .pathMatchers(HttpMethod.GET, "/api/v1/spotify/suggestions").hasAnyRole(KIDS_ROLE, PARENT_ROLE)
+                        .pathMatchers(HttpMethod.GET, "/api/v1/spotify/search").hasAnyRole(KIDS_ROLE, PARENT_ROLE)
                         .pathMatchers("/api/v1/spotify/**").hasRole(PARENT_ROLE)
                         .pathMatchers("/api/v1/content-requests", "/api/v1/content-requests/**").hasRole(PARENT_ROLE)
 

@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -176,20 +177,41 @@ fun DiscoverScreen(
                     )
                 }
 
-                // ── Rate-limit message ────────────────────────────────────────
-                if (state.rateLimitMessage != null) {
+                // ── Loading / error states ───────────────────────────────────
+                if (state.isLoadingSuggestions || state.isSearching) {
+                    item {
+                        Box(
+                            modifier         = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                } else if (state.suggestionsError && state.query.isEmpty()) {
                     item {
                         Text(
-                            text     = state.rateLimitMessage,
-                            style    = MaterialTheme.typography.bodySmall,
-                            color    = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                            text      = "Keine Verbindung. Bitte versuche es später nochmal.",
+                            style     = MaterialTheme.typography.bodyMedium,
+                            color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier  = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp)
+                        )
+                    }
+                } else if (state.searchError && state.query.isNotEmpty()) {
+                    item {
+                        Text(
+                            text      = "Suche fehlgeschlagen. Bitte versuche es nochmal.",
+                            style     = MaterialTheme.typography.bodyMedium,
+                            color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier  = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp)
                         )
                     }
                 }
 
                 // ── Tile grid (2-column) ─────────────────────────────────────
-                val rows = tiles.chunked(2)
+                val showTiles = !state.isLoadingSuggestions && !state.isSearching
+                val rows = if (showTiles) tiles.chunked(2) else emptyList()
                 items(rows, key = { row -> row.first().spotifyUri }) { row ->
                     DiscoverTileRow(
                         tiles          = row,
@@ -391,6 +413,7 @@ private fun DiscoverTileCard(
 
     Column(modifier = modifier) {
         ContentTile(
+            modifier           = Modifier.aspectRatio(1f),
             title              = tile.title,
             contentDescription = "${tile.title} von ${tile.artistName}",
             imageUrl           = tile.imageUrl,

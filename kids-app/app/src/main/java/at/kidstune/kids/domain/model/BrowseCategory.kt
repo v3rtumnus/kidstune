@@ -1,7 +1,7 @@
 package at.kidstune.kids.domain.model
 
 enum class BrowseCategory {
-    MUSIC, AUDIOBOOK, FAVORITES;
+    MUSIC, FAVORITES;
 
     companion object {
         fun fromString(value: String): BrowseCategory =

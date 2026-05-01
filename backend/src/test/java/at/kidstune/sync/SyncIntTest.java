@@ -10,6 +10,7 @@ import at.kidstune.content.ContentRepository;
 import at.kidstune.content.ContentScope;
 import at.kidstune.content.ContentType;
 import at.kidstune.content.SpotifyApiClient;
+import at.kidstune.spotify.SpotifyWebApiClient;
 import at.kidstune.family.Family;
 import at.kidstune.family.FamilyRepository;
 import at.kidstune.favorites.Favorite;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +57,9 @@ class SyncIntTest extends AbstractIntTest {
     // ContentService (and its @Async resolver trigger) tries to look up Spotify URI info.
     // Mock it here to prevent real HTTP calls when we use the content DELETE endpoint.
     @MockitoBean SpotifyApiClient spotifyApiClient;
+
+    // SyncService calls getProfileRecentlyPlayed to populate lastListenedAt — return empty in tests.
+    @MockitoBean SpotifyWebApiClient spotifyWebApiClient;
 
     static final String FAMILY_ID  = UUID.randomUUID().toString();
     static final String PROFILE_ID = UUID.randomUUID().toString();
@@ -108,6 +113,9 @@ class SyncIntTest extends AbstractIntTest {
         favoriteRepo.deleteAll(favoriteRepo.findByProfileId(PROFILE_ID));
         deletionLogRepo.deleteAll(deletionLogRepo.findAll().stream()
                 .filter(d -> PROFILE_ID.equals(d.getProfileId())).toList());
+
+        when(spotifyWebApiClient.getProfileRecentlyPlayed(anyString(), anyLong()))
+                .thenReturn(Mono.just(List.of()));
 
         when(spotifyApiClient.getAlbumUriForTrack(anyString()))
                 .thenReturn(Mono.just("spotify:album:no-match"));

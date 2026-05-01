@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import at.kidstune.kids.data.local.entities.LocalContentEntry
+import at.kidstune.kids.domain.model.ContentScope
 import at.kidstune.kids.domain.model.ContentType
 import kotlinx.coroutines.flow.Flow
 
@@ -19,6 +20,20 @@ interface ContentDao {
 
     @Query("SELECT * FROM local_content_entry WHERE profile_id = :profileId AND content_type = :type ORDER BY title ASC")
     fun getByType(profileId: String, type: ContentType): Flow<List<LocalContentEntry>>
+
+    @Query("""
+        SELECT * FROM local_content_entry
+        WHERE profile_id = :profileId AND content_type = :type
+        ORDER BY last_listened_at DESC, title ASC
+    """)
+    fun getByTypeOrderedByLastListened(profileId: String, type: ContentType): Flow<List<LocalContentEntry>>
+
+    @Query("""
+        SELECT * FROM local_content_entry
+        WHERE profile_id = :profileId AND content_type = :type AND scope = :scope
+        ORDER BY last_listened_at DESC, title ASC
+    """)
+    fun getByTypeAndScopeOrdered(profileId: String, type: ContentType, scope: ContentScope): Flow<List<LocalContentEntry>>
 
     @Query("SELECT * FROM local_content_entry WHERE id = :id")
     suspend fun getById(id: String): LocalContentEntry?
