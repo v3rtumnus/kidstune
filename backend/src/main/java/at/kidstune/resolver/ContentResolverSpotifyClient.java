@@ -65,12 +65,11 @@ class ContentResolverSpotifyClient {
     }
 
     private Mono<ApiAlbumsPage> fetchArtistAlbumsPage(String token, String artistId, int offset) {
+        // Use a URI template string so the comma in "album,single" is not percent-encoded.
+        // UriBuilder.queryParam() encodes commas to %2C which Spotify rejects with 400.
         return spotifyApi.get()
-                .uri(u -> u.path("/v1/artists/{id}/albums")
-                        .queryParam("limit", PAGE_SIZE)
-                        .queryParam("offset", offset)
-                        .queryParam("include_groups", "album,single")
-                        .build(artistId))
+                .uri("/v1/artists/{id}/albums?limit={limit}&offset={offset}&include_groups=album,single",
+                        artistId, PAGE_SIZE, offset)
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .bodyToMono(ApiAlbumsPage.class);
