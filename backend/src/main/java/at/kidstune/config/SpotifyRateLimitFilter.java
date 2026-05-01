@@ -32,6 +32,9 @@ public class SpotifyRateLimitFilter implements ExchangeFilterFunction {
     /** Maximum extra jitter added on top of Retry-After to spread retries. */
     static final long MAX_JITTER_MS = 500L;
 
+    /** If Spotify asks us to wait longer than this, fail fast instead of blocking. */
+    private static final long MAX_RETRY_SECONDS = 30L;
+
     @Override
     public Mono<ClientResponse> filter(ClientRequest request, ExchangeFunction next) {
         return next.exchange(request)
@@ -42,8 +45,15 @@ public class SpotifyRateLimitFilter implements ExchangeFilterFunction {
 
                     long waitSeconds = parseRetryAfter(
                             response.headers().asHttpHeaders().getFirst("Retry-After"));
-                    long jitterMs    = ThreadLocalRandom.current().nextLong(0, MAX_JITTER_MS + 1);
-                    Duration delay   = Duration.ofSeconds(waitSeconds).plusMillis(jitterMs);
+
+                    if (waitSeconds > MAX_RETRY_SECONDS) {
+                        log.warn("Spotify rate limit (429) on {} – Retry-After {}s exceeds cap ({}s), propagating error",
+                                request.url().getPath(), waitSeconds, MAX_RETRY_SECONDS);
+                        return Mono.just(response);
+                    }
+
+                    long jitterMs = ThreadLocalRandom.current().nextLong(0, MAX_JITTER_MS + 1);
+                    Duration delay = Duration.ofSeconds(waitSeconds).plusMillis(jitterMs);
 
                     log.warn("Spotify rate limit (429) on {} – retrying after {}ms ({}s + {}ms jitter)",
                             request.url().getPath(), delay.toMillis(), waitSeconds, jitterMs);
