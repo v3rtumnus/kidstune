@@ -3,6 +3,8 @@ package at.kidstune.resolver;
 import at.kidstune.auth.SpotifyConfig;
 import at.kidstune.auth.SpotifyTokenService;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.DefaultUriBuilderFactory;
@@ -26,6 +28,8 @@ import java.util.List;
  */
 @Component
 class ContentResolverSpotifyClient {
+
+    private static final Logger log = LoggerFactory.getLogger(ContentResolverSpotifyClient.class);
 
     static final int PAGE_SIZE = 50;
     // Spotify reduced the max limit for /v1/artists/{id}/albums to 20
@@ -77,21 +81,22 @@ class ContentResolverSpotifyClient {
     }
 
     private Mono<ApiAlbumsPage> fetchArtistAlbumsPage(String token, String artistId, int offset) {
-        // Build the absolute URI as a plain string and pass via URI.create() to bypass
-        // Spring's UriBuilderFactory entirely. When base-URL + relative template are
-        // combined by DefaultUriBuilderFactory the query string is silently dropped for
-        // certain path patterns in Spring Framework 7, producing a bare URL that Spotify
-        // rejects with 400.  URI.create() does not percent-encode commas (sub-delimiter),
-        // so include_groups=album,single reaches Spotify unmodified.
         URI uri = URI.create(apiBaseUrl + "/v1/artists/" + artistId
                 + "/albums?limit=" + ARTIST_ALBUMS_PAGE_SIZE
                 + "&offset=" + offset
                 + "&include_groups=album,single");
+        log.info("[DIAG] built URI: {}", uri);
         return spotifyApi.get()
                 .uri(uri)
+                .attribute("diagUri", uri.toString())
                 .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .bodyToMono(ApiAlbumsPage.class);
+                .exchangeToMono(response -> {
+                    log.info("[DIAG] Spotify responded {} to GET {}", response.statusCode(), uri);
+                    if (response.statusCode().is2xxSuccessful()) {
+                        return response.bodyToMono(ApiAlbumsPage.class);
+                    }
+                    return response.createError();
+                });
     }
 
     // ── Full album (with genres) ───────────────────────────────────────────────
