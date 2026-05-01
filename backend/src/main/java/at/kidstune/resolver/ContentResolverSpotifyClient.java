@@ -3,11 +3,8 @@ package at.kidstune.resolver;
 import at.kidstune.auth.SpotifyConfig;
 import at.kidstune.auth.SpotifyTokenService;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.DefaultUriBuilderFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -29,11 +26,9 @@ import java.util.List;
 @Component
 class ContentResolverSpotifyClient {
 
-    private static final Logger log = LoggerFactory.getLogger(ContentResolverSpotifyClient.class);
-
     static final int PAGE_SIZE = 50;
-    // Spotify reduced the max limit for /v1/artists/{id}/albums to 20
-    static final int ARTIST_ALBUMS_PAGE_SIZE = 20;
+    // Spotify's /v1/artists/{id}/albums caps limit at 10; other list endpoints allow 50.
+    static final int ARTIST_ALBUMS_PAGE_SIZE = 10;
 
     private final SpotifyTokenService tokenService;
     private final WebClient spotifyApi;
@@ -44,20 +39,13 @@ class ContentResolverSpotifyClient {
                                   WebClient.Builder builder) {
         this.tokenService = tokenService;
         this.apiBaseUrl   = config.getApiBaseUrl();
-        // EncodingMode.NONE: all URIs in this class are built manually via URI.create() and must
-        // pass through the WebClient pipeline completely untouched. Without this, Spring Framework 7's
-        // DefaultUriBuilderFactory re-encodes the query string and can drop it when a baseUrl is set
-        // on the shared WebClient.Builder singleton (mutated by other WebClient users before us).
-        DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory();
-        factory.setEncodingMode(DefaultUriBuilderFactory.EncodingMode.NONE);
-        this.spotifyApi   = builder.uriBuilderFactory(factory).build();
+        this.spotifyApi   = builder.baseUrl(apiBaseUrl).build();
     }
 
     // ── Artist albums (paginated) ─────────────────────────────────────────────
 
     /**
-     * Returns ALL albums for an artist (all types: album, single, compilation, appears_on),
-     * paginating through all offset pages.
+     * Returns ALL albums for an artist, paginating through all offset pages.
      * Note: album objects from this endpoint do not include genre information.
      */
     Mono<List<AlbumData>> getArtistAlbums(String familyId, String artistId) {
@@ -84,19 +72,13 @@ class ContentResolverSpotifyClient {
     private Mono<ApiAlbumsPage> fetchArtistAlbumsPage(String token, String artistId, int offset) {
         URI uri = URI.create(apiBaseUrl + "/v1/artists/" + artistId
                 + "/albums?limit=" + ARTIST_ALBUMS_PAGE_SIZE
-                + "&offset=" + offset);
-        log.info("[DIAG] built URI: {}", uri);
+                + "&offset=" + offset
+                + "&include_groups=album,single");
         return spotifyApi.get()
                 .uri(uri)
-                .attribute("diagUri", uri.toString())
                 .header("Authorization", "Bearer " + token)
-                .exchangeToMono(response -> {
-                    log.info("[DIAG] Spotify responded {} to GET {}", response.statusCode(), uri);
-                    if (response.statusCode().is2xxSuccessful()) {
-                        return response.bodyToMono(ApiAlbumsPage.class);
-                    }
-                    return response.createError();
-                });
+                .retrieve()
+                .bodyToMono(ApiAlbumsPage.class);
     }
 
     // ── Full album (with genres) ───────────────────────────────────────────────
@@ -105,7 +87,7 @@ class ContentResolverSpotifyClient {
     Mono<AlbumData> getAlbumDetails(String familyId, String albumId) {
         return tokenService.getValidAccessToken(familyId)
                 .flatMap(token -> spotifyApi.get()
-                        .uri(URI.create(apiBaseUrl + "/v1/albums/" + albumId))
+                        .uri("/v1/albums/{id}", albumId)
                         .header("Authorization", "Bearer " + token)
                         .retrieve()
                         .bodyToMono(ApiAlbumFull.class))
@@ -147,10 +129,11 @@ class ContentResolverSpotifyClient {
     }
 
     private Mono<ApiTracksPage> fetchAlbumTracksPage(String token, String albumId, int offset) {
-        URI uri = URI.create(apiBaseUrl + "/v1/albums/" + albumId
-                + "/tracks?limit=" + PAGE_SIZE + "&offset=" + offset);
         return spotifyApi.get()
-                .uri(uri)
+                .uri(u -> u.path("/v1/albums/{id}/tracks")
+                        .queryParam("limit", PAGE_SIZE)
+                        .queryParam("offset", offset)
+                        .build(albumId))
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .bodyToMono(ApiTracksPage.class);
@@ -189,10 +172,11 @@ class ContentResolverSpotifyClient {
     }
 
     private Mono<ApiPlaylistItemsPage> fetchPlaylistTracksPage(String token, String playlistId, int offset) {
-        URI uri = URI.create(apiBaseUrl + "/v1/playlists/" + playlistId
-                + "/tracks?limit=" + PAGE_SIZE + "&offset=" + offset);
         return spotifyApi.get()
-                .uri(uri)
+                .uri(u -> u.path("/v1/playlists/{id}/tracks")
+                        .queryParam("limit", PAGE_SIZE)
+                        .queryParam("offset", offset)
+                        .build(playlistId))
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .bodyToMono(ApiPlaylistItemsPage.class);
@@ -204,7 +188,7 @@ class ContentResolverSpotifyClient {
     Mono<TrackData> getTrack(String familyId, String trackId) {
         return tokenService.getValidAccessToken(familyId)
                 .flatMap(token -> spotifyApi.get()
-                        .uri(URI.create(apiBaseUrl + "/v1/tracks/" + trackId))
+                        .uri("/v1/tracks/{id}", trackId)
                         .header("Authorization", "Bearer " + token)
                         .retrieve()
                         .bodyToMono(ApiTrackFull.class))

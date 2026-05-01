@@ -123,7 +123,7 @@ public class SpotifyWebApiClient {
         return withCircuitBreaker(() ->
             tokenService.getValidAccessToken(familyId)
                 .flatMapMany(token -> spotifyApi.get()
-                    .uri(u -> u.path("/v1/artists/{id}/albums").queryParam("limit", 20).build(artistId))
+                    .uri(u -> u.path("/v1/artists/{id}/albums").queryParam("limit", 10).build(artistId))
                     .header("Authorization", "Bearer " + token)
                     .retrieve()
                     .bodyToMono(ApiAlbumsPage.class)
