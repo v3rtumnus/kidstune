@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -164,6 +165,9 @@ public class ContentResolver {
             }
             content.setResolvedAt(Instant.now());
             contentRepo.save(content);
+        } catch (WebClientResponseException e) {
+            log.error("Resolution failed for content {}: {} – Spotify response: {}",
+                    content.getId(), e.getMessage(), e.getResponseBodyAsString(), e);
         } catch (Exception e) {
             log.error("Resolution failed for content {}: {}", content.getId(), e.getMessage(), e);
         }

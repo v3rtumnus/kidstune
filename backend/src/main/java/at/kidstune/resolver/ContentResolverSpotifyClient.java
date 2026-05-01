@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
 import java.util.List;
 
 /**
@@ -29,12 +30,14 @@ class ContentResolverSpotifyClient {
 
     private final SpotifyTokenService tokenService;
     private final WebClient spotifyApi;
+    private final String apiBaseUrl;
 
     ContentResolverSpotifyClient(SpotifyTokenService tokenService,
                                   SpotifyConfig config,
                                   WebClient.Builder builder) {
         this.tokenService = tokenService;
-        this.spotifyApi   = builder.baseUrl(config.getApiBaseUrl()).build();
+        this.apiBaseUrl   = config.getApiBaseUrl();
+        this.spotifyApi   = builder.baseUrl(apiBaseUrl).build();
     }
 
     // ── Artist albums (paginated) ─────────────────────────────────────────────
@@ -65,11 +68,18 @@ class ContentResolverSpotifyClient {
     }
 
     private Mono<ApiAlbumsPage> fetchArtistAlbumsPage(String token, String artistId, int offset) {
-        // Use a URI template string so the comma in "album,single" is not percent-encoded.
-        // UriBuilder.queryParam() encodes commas to %2C which Spotify rejects with 400.
+        // Build the absolute URI as a plain string and pass via URI.create() to bypass
+        // Spring's UriBuilderFactory entirely. When base-URL + relative template are
+        // combined by DefaultUriBuilderFactory the query string is silently dropped for
+        // certain path patterns in Spring Framework 7, producing a bare URL that Spotify
+        // rejects with 400.  URI.create() does not percent-encode commas (sub-delimiter),
+        // so include_groups=album,single reaches Spotify unmodified.
+        URI uri = URI.create(apiBaseUrl + "/v1/artists/" + artistId
+                + "/albums?limit=" + PAGE_SIZE
+                + "&offset=" + offset
+                + "&include_groups=album,single");
         return spotifyApi.get()
-                .uri("/v1/artists/{id}/albums?limit={limit}&offset={offset}&include_groups=album,single",
-                        artistId, PAGE_SIZE, offset)
+                .uri(uri)
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .bodyToMono(ApiAlbumsPage.class);
