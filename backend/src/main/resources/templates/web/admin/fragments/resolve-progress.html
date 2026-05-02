@@ -14,11 +14,13 @@
     <span th:text="'Auflösen: ' + ${progress.completed()} + ' / ' + ${progress.total()} + ' …'"></span>
 </span>
 
-<!-- Done: static success badge, no polling -->
+<!-- Done: success or partial-failure badge, no polling -->
 <span th:fragment="done"
       id="resolve-progress"
-      class="badge bg-success ms-2"
-      th:text="'Fertig: ' + ${progress.completed()} + ' / ' + ${progress.total()} + ' aufgelöst'">
+      th:class="'badge ms-2 ' + (${progress.failed() > 0} ? 'bg-warning text-dark' : 'bg-success')"
+      th:text="${progress.failed() > 0}
+               ? 'Fertig: ' + ${progress.completed()} + ' / ' + ${progress.total()} + ' aufgelöst, ' + ${progress.failed()} + ' fehlgeschlagen'
+               : 'Fertig: ' + ${progress.completed()} + ' / ' + ${progress.total()} + ' aufgelöst'">
 </span>
 
 </body>

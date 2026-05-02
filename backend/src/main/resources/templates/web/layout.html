@@ -149,6 +149,19 @@
     </div>
 </div>
 
+<!-- Global error toast – surfaced by JS on any HTMX error response -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1100">
+    <div id="kt-error-toast"
+         class="toast align-items-center text-bg-danger border-0"
+         role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold" id="kt-error-toast-body"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                    data-bs-dismiss="toast" aria-label="Schließen"></button>
+        </div>
+    </div>
+</div>
+
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
 <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>
 <th:block layout:fragment="scripts"></th:block>
@@ -156,6 +169,33 @@
 <script>
 (function () {
     'use strict';
+
+    // ── Global HTMX error notifications ──────────────────────────────────────
+
+    function ktShowError(msg) {
+        var el = document.getElementById('kt-error-toast');
+        if (!el) return;
+        document.getElementById('kt-error-toast-body').textContent = msg;
+        bootstrap.Toast.getOrCreateInstance(el, { delay: 8000 }).show();
+    }
+
+    // Server returned a non-2xx response to an HTMX request.
+    document.body.addEventListener('htmx:responseError', function (evt) {
+        var xhr    = evt.detail.xhr;
+        var status = xhr ? xhr.status : 0;
+        var msg    = 'Fehler ' + status + '. Bitte versuche es erneut.';
+        try {
+            var json = JSON.parse(xhr.responseText);
+            if (json.error)   msg = json.error;
+            else if (json.message) msg = json.message;
+        } catch (_) {}
+        ktShowError(msg);
+    });
+
+    // Network failure – request never reached the server.
+    document.body.addEventListener('htmx:sendError', function () {
+        ktShowError('Keine Verbindung zum Server. Bitte Seite neu laden.');
+    });
 
     // ── SSE – live pending-count badge ────────────────────────────────────────
 

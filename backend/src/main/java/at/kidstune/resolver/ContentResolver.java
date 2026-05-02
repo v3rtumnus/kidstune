@@ -57,11 +57,12 @@ public class ContentResolver {
     private volatile boolean resolveAllRunning = false;
     private final AtomicInteger progressTotal     = new AtomicInteger(0);
     private final AtomicInteger progressCompleted = new AtomicInteger(0);
+    private final AtomicInteger progressFailed    = new AtomicInteger(0);
 
-    public record ResolutionProgress(boolean running, int completed, int total) {}
+    public record ResolutionProgress(boolean running, int completed, int total, int failed) {}
 
     public ResolutionProgress getResolutionProgress() {
-        return new ResolutionProgress(resolveAllRunning, progressCompleted.get(), progressTotal.get());
+        return new ResolutionProgress(resolveAllRunning, progressCompleted.get(), progressTotal.get(), progressFailed.get());
     }
 
     public ContentResolver(ResolvedAlbumRepository albumRepo,
@@ -110,6 +111,7 @@ public class ContentResolver {
         resolveAllRunning = true;
         progressTotal.set(items.size());
         progressCompleted.set(0);
+        progressFailed.set(0);
         log.info("resolveAll: starting {} items sequentially", items.size());
         try {
             for (int i = 0; i < items.size(); i++) {
@@ -122,6 +124,7 @@ public class ContentResolver {
                 } catch (Exception e) {
                     log.warn("resolveAll: [{}/{}] failed for {}: {}",
                              i + 1, items.size(), content.getId(), e.getMessage());
+                    progressFailed.incrementAndGet();
                 } finally {
                     activeJobs.decrementAndGet();
                     progressCompleted.incrementAndGet();

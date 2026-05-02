@@ -381,8 +381,8 @@ public class AdminWebController {
         return Mono.fromCallable(() -> {
             AllowedContent content = contentRepository.findById(entryId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            contentResolver.resolveAsync(content);
-            model.addAttribute("message", "Re-Resolve gestartet");
+            contentResolver.resolve(content);   // synchronous – errors surface as HTTP 500
+            model.addAttribute("message", "Erfolgreich aufgelöst");
             return "web/admin/fragments/flash :: success";
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -393,7 +393,7 @@ public class AdminWebController {
             List<AllowedContent> all = contentRepository.findAll();
             contentResolver.resolveAllAsync(all);
             model.addAttribute("progress",
-                    new ContentResolver.ResolutionProgress(true, 0, all.size()));
+                    new ContentResolver.ResolutionProgress(true, 0, all.size(), 0));
             return "web/admin/fragments/resolve-progress :: running";
         }).subscribeOn(Schedulers.boundedElastic());
     }

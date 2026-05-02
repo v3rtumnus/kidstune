@@ -138,7 +138,9 @@
       "Bash(./gradlew :backend:e2eTest --tests \"at.kidstune.web.e2e.SettingsE2eTest.shouldClearPinSuccessfully\" --rerun --info)",
       "Bash(./gradlew cleanTest test --tests \"at.kidstune.sync.SyncIntTest\" --tests \"at.kidstune.web.ApproveTokenIntTest\")",
       "Bash(./gradlew cleanTest test --tests \"at.kidstune.sync.SyncIntTest\" --tests \"at.kidstune.web.ApproveTokenIntTest\" --tests \"at.kidstune.profile.ProfileServiceTest\" --tests \"at.kidstune.spotify.SpotifySuggestionsIntTest\" --tests \"at.kidstune.requests.ContentRequestConcurrencyIntTest\")",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\micha\\\\Development\\\\kidstune\" -Recurse -Directory)",
+      "Bash(Select-Object -First 30 FullName)"
     ]
   }
 }
