@@ -55,14 +55,15 @@ public class ContentResolver {
 
     // Progress state for the bulk resolve-all operation
     private volatile boolean resolveAllRunning = false;
+    private volatile String  abortReason       = null;
     private final AtomicInteger progressTotal     = new AtomicInteger(0);
     private final AtomicInteger progressCompleted = new AtomicInteger(0);
     private final AtomicInteger progressFailed    = new AtomicInteger(0);
 
-    public record ResolutionProgress(boolean running, int completed, int total, int failed) {}
+    public record ResolutionProgress(boolean running, int completed, int total, int failed, String abortReason) {}
 
     public ResolutionProgress getResolutionProgress() {
-        return new ResolutionProgress(resolveAllRunning, progressCompleted.get(), progressTotal.get(), progressFailed.get());
+        return new ResolutionProgress(resolveAllRunning, progressCompleted.get(), progressTotal.get(), progressFailed.get(), abortReason);
     }
 
     public ContentResolver(ResolvedAlbumRepository albumRepo,
@@ -95,6 +96,8 @@ public class ContentResolver {
         activeJobs.incrementAndGet();
         try {
             resolve(content);
+        } catch (Exception e) {
+            // already logged in resolve()
         } finally {
             activeJobs.decrementAndGet();
         }
@@ -109,6 +112,7 @@ public class ContentResolver {
     @Async
     public void resolveAllAsync(List<AllowedContent> items) {
         resolveAllRunning = true;
+        abortReason = null;
         progressTotal.set(items.size());
         progressCompleted.set(0);
         progressFailed.set(0);
@@ -121,6 +125,19 @@ public class ContentResolver {
                 activeJobs.incrementAndGet();
                 try {
                     resolve(content);
+                } catch (WebClientResponseException e) {
+                    progressFailed.incrementAndGet();
+                    if (e.getStatusCode().value() == 429) {
+                        String retryAfter = e.getHeaders().getFirst("Retry-After");
+                        abortReason = "Spotify rate limit (Retry-After: "
+                                + (retryAfter != null ? retryAfter + "s" : "unbekannt")
+                                + ") – restliche Einträge übersprungen";
+                        log.warn("resolveAll: aborting at [{}/{}] due to Spotify 429 (Retry-After {})",
+                                 i + 1, items.size(), retryAfter);
+                        break;
+                    }
+                    log.warn("resolveAll: [{}/{}] failed for {}: {}",
+                             i + 1, items.size(), content.getId(), e.getMessage());
                 } catch (Exception e) {
                     log.warn("resolveAll: [{}/{}] failed for {}: {}",
                              i + 1, items.size(), content.getId(), e.getMessage());
@@ -129,9 +146,10 @@ public class ContentResolver {
                     activeJobs.decrementAndGet();
                     progressCompleted.incrementAndGet();
                 }
+                if (abortReason != null) break;
                 if (i < items.size() - 1) {
                     try {
-                        Thread.sleep(300);
+                        Thread.sleep(1000);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         log.warn("resolveAll interrupted after [{}/{}]", i + 1, items.size());
@@ -141,8 +159,9 @@ public class ContentResolver {
             }
         } finally {
             resolveAllRunning = false;
-            log.info("resolveAll: done – {}/{} items completed",
-                     progressCompleted.get(), progressTotal.get());
+            log.info("resolveAll: done – {}/{} items completed{}",
+                     progressCompleted.get(), progressTotal.get(),
+                     abortReason != null ? " (aborted: " + abortReason + ")" : "");
         }
     }
 
@@ -170,7 +189,8 @@ public class ContentResolver {
             contentRepo.save(content);
         } catch (WebClientResponseException e) {
             log.error("Resolution failed for content {}: {} – Spotify response: {}",
-                    content.getId(), e.getMessage(), e.getResponseBodyAsString(), e);
+                    content.getId(), e.getMessage(), e.getResponseBodyAsString());
+            throw e;
         } catch (Exception e) {
             log.error("Resolution failed for content {}: {}", content.getId(), e.getMessage(), e);
         }

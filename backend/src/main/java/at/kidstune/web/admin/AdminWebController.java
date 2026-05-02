@@ -393,7 +393,7 @@ public class AdminWebController {
             List<AllowedContent> all = contentRepository.findAll();
             contentResolver.resolveAllAsync(all);
             model.addAttribute("progress",
-                    new ContentResolver.ResolutionProgress(true, 0, all.size(), 0));
+                    new ContentResolver.ResolutionProgress(true, 0, all.size(), 0, null));
             return "web/admin/fragments/resolve-progress :: running";
         }).subscribeOn(Schedulers.boundedElastic());
     }
