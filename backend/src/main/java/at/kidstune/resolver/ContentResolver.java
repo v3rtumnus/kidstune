@@ -214,13 +214,34 @@ public class ContentResolver {
         }
 
         log.info("Re-resolution: {} ARTIST/PLAYLIST entries to process", entries.size());
-        for (AllowedContent content : entries) {
+        for (int i = 0; i < entries.size(); i++) {
+            AllowedContent content = entries.get(i);
+            log.info("Re-resolution: [{}/{}] {} {}", i + 1, entries.size(),
+                     content.getScope(), content.getSpotifyUri());
             try {
                 reResolve(content);
+            } catch (WebClientResponseException e) {
+                if (e.getStatusCode().value() == 429) {
+                    String retryAfter = e.getHeaders().getFirst("Retry-After");
+                    log.warn("Re-resolution: aborting at [{}/{}] due to Spotify 429 (Retry-After {}s) – remaining entries skipped",
+                             i + 1, entries.size(), retryAfter);
+                    return;
+                }
+                log.warn("Re-resolution failed for content {}: {}", content.getId(), e.getMessage());
             } catch (Exception e) {
                 log.warn("Re-resolution failed for content {}: {}", content.getId(), e.getMessage());
             }
+            if (i < entries.size() - 1) {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Re-resolution interrupted after [{}/{}]", i + 1, entries.size());
+                    return;
+                }
+            }
         }
+        log.info("Re-resolution: done – {} entries processed", entries.size());
     }
 
     // ── Scope handlers ─────────────────────────────────────────────────────────
@@ -320,6 +341,10 @@ public class ContentResolver {
             if (!existingByUri.containsKey(album.uri())) {
                 try {
                     persistAlbumWithTracks(content, familyId, album);
+                } catch (WebClientResponseException e) {
+                    if (e.getStatusCode().value() == 429) throw e; // let scheduler abort
+                    log.warn("Skipping new album {} during artist re-resolution: {}",
+                             album.uri(), e.getMessage());
                 } catch (Exception e) {
                     log.warn("Skipping new album {} during artist re-resolution: {}",
                              album.uri(), e.getMessage());
