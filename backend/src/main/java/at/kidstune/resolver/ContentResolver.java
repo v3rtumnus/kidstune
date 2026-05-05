@@ -18,6 +18,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,19 +109,38 @@ public class ContentResolver {
      * with a short pause between items.  Keeps a running progress counter so the
      * admin UI can poll for status.  Use this instead of scattering N parallel
      * {@link #resolveAsync} calls – parallel jobs saturate the Spotify rate limit.
+     *
+     * <p>Already-resolved items (resolvedAt != null) are skipped so that re-triggering
+     * after a 429 abort only processes the remaining unresolved entries.  Items are
+     * sorted cheapest-first (TRACK → ALBUM → PLAYLIST → ARTIST) to maximise throughput
+     * before any rate-limiting kicks in.
+     *
+     * <p>On a 429 with a Retry-After that exceeds the cap the offending item is skipped
+     * (its resolvedAt stays null, so the next trigger will retry it) and processing
+     * continues with the next item rather than aborting the entire run.
      */
     @Async
     public void resolveAllAsync(List<AllowedContent> items) {
+        // Skip items that are already resolved – re-triggering after a partial run
+        // should only process the remainder, not replay every Spotify call from scratch.
+        List<ContentScope> scopeOrder = List.of(
+                ContentScope.TRACK, ContentScope.ALBUM, ContentScope.PLAYLIST, ContentScope.ARTIST);
+        List<AllowedContent> pending = items.stream()
+                .filter(c -> c.getResolvedAt() == null)
+                .sorted(Comparator.comparingInt(c -> scopeOrder.indexOf(c.getScope())))
+                .collect(Collectors.toList());
+
         resolveAllRunning = true;
         abortReason = null;
-        progressTotal.set(items.size());
+        progressTotal.set(pending.size());
         progressCompleted.set(0);
         progressFailed.set(0);
-        log.info("resolveAll: starting {} items sequentially", items.size());
+        log.info("resolveAll: {} unresolved items to process ({} already resolved, skipped)",
+                 pending.size(), items.size() - pending.size());
         try {
-            for (int i = 0; i < items.size(); i++) {
-                AllowedContent content = items.get(i);
-                log.info("resolveAll: [{}/{}] {} {}", i + 1, items.size(),
+            for (int i = 0; i < pending.size(); i++) {
+                AllowedContent content = pending.get(i);
+                log.info("resolveAll: [{}/{}] {} {}", i + 1, pending.size(),
                          content.getScope(), content.getSpotifyUri());
                 activeJobs.incrementAndGet();
                 try {
@@ -129,40 +149,57 @@ public class ContentResolver {
                     progressFailed.incrementAndGet();
                     if (e.getStatusCode().value() == 429) {
                         String retryAfter = e.getHeaders().getFirst("Retry-After");
-                        abortReason = "Spotify rate limit (Retry-After: "
-                                + (retryAfter != null ? retryAfter + "s" : "unbekannt")
-                                + ") – restliche Einträge übersprungen";
-                        log.warn("resolveAll: aborting at [{}/{}] due to Spotify 429 (Retry-After {})",
-                                 i + 1, items.size(), retryAfter);
-                        break;
+                        long waitSeconds = retryAfter != null ? parseLong(retryAfter, 30L) : 30L;
+                        if (waitSeconds > 300) {
+                            // Retry-After > 5 min means Spotify has issued a prolonged ban;
+                            // abort the run – the item stays unresolved for the next trigger.
+                            abortReason = "Spotify rate limit (Retry-After: " + waitSeconds
+                                    + "s) – verbleibende Einträge werden beim nächsten Lauf nachgeholt";
+                            log.warn("resolveAll: aborting at [{}/{}] – Spotify Retry-After {}s > 5min",
+                                     i + 1, pending.size(), waitSeconds);
+                            break;
+                        }
+                        // Short rate limit: sleep and continue rather than aborting the entire run.
+                        log.warn("resolveAll: [{}/{}] rate-limited (Retry-After {}s), sleeping then continuing",
+                                 i + 1, pending.size(), waitSeconds);
+                        Thread.sleep(waitSeconds * 1000 + 500);
+                        continue;
                     }
                     log.warn("resolveAll: [{}/{}] failed for {}: {}",
-                             i + 1, items.size(), content.getId(), e.getMessage());
+                             i + 1, pending.size(), content.getId(), e.getMessage());
                 } catch (Exception e) {
                     log.warn("resolveAll: [{}/{}] failed for {}: {}",
-                             i + 1, items.size(), content.getId(), e.getMessage());
+                             i + 1, pending.size(), content.getId(), e.getMessage());
                     progressFailed.incrementAndGet();
                 } finally {
                     activeJobs.decrementAndGet();
                     progressCompleted.incrementAndGet();
                 }
                 if (abortReason != null) break;
-                if (i < items.size() - 1) {
+                if (i < pending.size() - 1) {
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(2000);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
-                        log.warn("resolveAll interrupted after [{}/{}]", i + 1, items.size());
+                        log.warn("resolveAll interrupted after [{}/{}]", i + 1, pending.size());
                         break;
                     }
                 }
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("resolveAll interrupted");
         } finally {
             resolveAllRunning = false;
             log.info("resolveAll: done – {}/{} items completed{}",
                      progressCompleted.get(), progressTotal.get(),
                      abortReason != null ? " (aborted: " + abortReason + ")" : "");
         }
+    }
+
+    private static long parseLong(String s, long fallback) {
+        try { return Math.max(1L, Long.parseLong(s.trim())); }
+        catch (NumberFormatException e) { return fallback; }
     }
 
     /**
