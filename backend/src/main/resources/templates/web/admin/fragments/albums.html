@@ -27,7 +27,8 @@
                     th:text="${album.releaseDate}"></td>
                 <td class="text-end">
                     <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none"
-                            th:attr="hx-get=@{/web/admin/resolved/albums/{id}/tracks(id=${album.id})},hx-target=|#tracks-for-${album.id}|,hx-swap='innerHTML'">
+                            hx-swap="innerHTML"
+                            th:attr="hx-get=|/web/admin/resolved/albums/${album.id}/tracks|,hx-target=|#tracks-for-${album.id}|">
                         <span th:text="${trackCounts.getOrDefault(album.id, 0)}"></span> Titel ▾
                     </button>
                 </td>

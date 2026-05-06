@@ -62,7 +62,8 @@
                             </td>
                             <td class="align-middle text-end">
                                 <button type="button" class="btn btn-sm btn-outline-primary"
-                                        th:attr="hx-get=@{/web/admin/resolved/{id}/albums(id=${row.content().id})},hx-target=|#albums-for-${row.content().id}|,hx-swap='innerHTML'">
+                                        hx-swap="innerHTML"
+                                        th:attr="hx-get=|/web/admin/resolved/${row.content().id}/albums|,hx-target=|#albums-for-${row.content().id}|">
                                     <span th:text="${row.albumCount()}"></span> Alben ▾
                                 </button>
                             </td>
@@ -75,8 +76,9 @@
                             </td>
                             <td class="align-middle text-end">
                                 <button type="button" class="btn btn-sm btn-outline-warning"
+                                        hx-swap="innerHTML"
                                         th:id="|re-resolve-btn-${row.content().id}|"
-                                        th:attr="hx-post=@{/web/admin/resolved/{id}/re-resolve(id=${row.content().id})},hx-target=|#re-resolve-msg-${row.content().id}|,hx-swap='innerHTML'">
+                                        th:attr="hx-post=|/web/admin/resolved/${row.content().id}/re-resolve|,hx-target=|#re-resolve-msg-${row.content().id}|">
                                     &#8635; Re-Resolve
                                 </button>
                                 <span th:id="'re-resolve-msg-' + ${row.content().id}"></span>
