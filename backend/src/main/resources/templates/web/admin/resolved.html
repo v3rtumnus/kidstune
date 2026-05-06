@@ -57,21 +57,17 @@
                                       th:text="${row.content().scope}"></span>
                             </td>
                             <td class="align-middle text-end">
-                                <button class="btn btn-sm btn-outline-primary"
-                                        th:attr="hx-get=@{/web/admin/resolved/{id}/albums(id=${row.content().id})},
-                                                 hx-target='#albums-for-' + ${row.content().id},
-                                                 hx-swap='innerHTML'">
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        th:attr="hx-get=@{/web/admin/resolved/{id}/albums(id=${row.content().id})},hx-target=|#albums-for-${row.content().id}|,hx-swap='innerHTML'">
                                     <span th:text="${row.albumCount()}"></span> Alben ▾
                                 </button>
                             </td>
                             <td class="align-middle d-none d-md-table-cell text-muted"
                                 th:text="${row.content().resolvedAt != null ? #temporals.format(row.content().resolvedAt, 'dd.MM.yyyy HH:mm') : '–'}"></td>
                             <td class="align-middle text-end">
-                                <button class="btn btn-sm btn-outline-warning"
-                                        th:id="'re-resolve-btn-' + ${row.content().id}"
-                                        th:attr="hx-post=@{/web/admin/resolved/{id}/re-resolve(id=${row.content().id})},
-                                                 hx-target='#re-resolve-msg-' + ${row.content().id},
-                                                 hx-swap='innerHTML'">
+                                <button type="button" class="btn btn-sm btn-outline-warning"
+                                        th:id="|re-resolve-btn-${row.content().id}|"
+                                        th:attr="hx-post=@{/web/admin/resolved/{id}/re-resolve(id=${row.content().id})},hx-target=|#re-resolve-msg-${row.content().id}|,hx-swap='innerHTML'">
                                     &#8635; Re-Resolve
                                 </button>
                                 <span th:id="'re-resolve-msg-' + ${row.content().id}"></span>
