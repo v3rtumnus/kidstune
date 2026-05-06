@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-allowed-content-error-code
+      author: kidstune
+      changes:
+        - addColumn:
+            tableName: allowed_content
+            columns:
+              - column:
+                  name: resolution_error_code
+                  type: INT
+                  constraints:
+                    nullable: true

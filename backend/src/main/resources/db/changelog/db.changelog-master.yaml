@@ -38,3 +38,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/013-play-event-kind.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/014-allowed-content-error-code.yaml
+      relativeToChangelogFile: false

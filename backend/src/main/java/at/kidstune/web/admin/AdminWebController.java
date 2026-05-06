@@ -39,6 +39,8 @@ import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -387,13 +389,22 @@ public class AdminWebController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    private static final DateTimeFormatter COOLDOWN_FMT =
+            DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
+
     @PostMapping("/resolved/re-resolve-all")
     public Mono<String> reResolveAll(Model model) {
         return Mono.fromCallable(() -> {
+            ContentResolver.ResolutionProgress current = contentResolver.getResolutionProgress();
+            if (current.rateLimitCooldownUntil() != null) {
+                model.addAttribute("progress", current);
+                model.addAttribute("cooldownUntil", COOLDOWN_FMT.format(current.rateLimitCooldownUntil()));
+                return "web/admin/fragments/resolve-progress :: cooldown";
+            }
             List<AllowedContent> all = contentRepository.findAll();
             contentResolver.resolveAllAsync(all);
             model.addAttribute("progress",
-                    new ContentResolver.ResolutionProgress(true, 0, all.size(), 0, null));
+                    new ContentResolver.ResolutionProgress(true, 0, all.size(), 0, null, null));
             return "web/admin/fragments/resolve-progress :: running";
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -403,9 +414,12 @@ public class AdminWebController {
         return Mono.fromCallable(() -> {
             ContentResolver.ResolutionProgress progress = contentResolver.getResolutionProgress();
             model.addAttribute("progress", progress);
-            return progress.running()
-                    ? "web/admin/fragments/resolve-progress :: running"
-                    : "web/admin/fragments/resolve-progress :: done";
+            if (progress.running()) return "web/admin/fragments/resolve-progress :: running";
+            if (progress.rateLimitCooldownUntil() != null) {
+                model.addAttribute("cooldownUntil", COOLDOWN_FMT.format(progress.rateLimitCooldownUntil()));
+                return "web/admin/fragments/resolve-progress :: cooldown";
+            }
+            return "web/admin/fragments/resolve-progress :: done";
         }).subscribeOn(Schedulers.boundedElastic());
     }
 

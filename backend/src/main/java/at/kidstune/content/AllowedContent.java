@@ -50,6 +50,9 @@ public class AllowedContent {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
+    @Column(name = "resolution_error_code")
+    private Integer resolutionErrorCode;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -93,6 +96,9 @@ public class AllowedContent {
 
     public Instant getResolvedAt()                 { return resolvedAt; }
     public void setResolvedAt(Instant resolvedAt)  { this.resolvedAt = resolvedAt; }
+
+    public Integer getResolutionErrorCode()                          { return resolutionErrorCode; }
+    public void setResolutionErrorCode(Integer resolutionErrorCode)  { this.resolutionErrorCode = resolutionErrorCode; }
 
     public Instant getCreatedAt()                  { return createdAt; }
     public void setCreatedAt(Instant createdAt)    { this.createdAt = createdAt; }

@@ -14,6 +14,15 @@
     <span th:text="'Auflösen: ' + ${progress.completed()} + ' / ' + ${progress.total()} + ' …'"></span>
 </span>
 
+<!-- Cooldown: Spotify rate-limit ban still active -->
+<span th:fragment="cooldown"
+      id="resolve-progress"
+      class="ms-2 d-inline-flex align-items-center gap-1">
+    <span class="badge bg-warning text-dark"
+          th:text="'Spotify Sperre aktiv bis ' + ${cooldownUntil} + ' – bitte warten'">
+    </span>
+</span>
+
 <!-- Done: success or partial-failure badge, no polling -->
 <span th:fragment="done"
       id="resolve-progress"

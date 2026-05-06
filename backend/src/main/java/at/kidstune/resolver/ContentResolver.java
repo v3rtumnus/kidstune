@@ -55,16 +55,20 @@ public class ContentResolver {
     private final AtomicInteger activeJobs = new AtomicInteger(0);
 
     // Progress state for the bulk resolve-all operation
-    private volatile boolean resolveAllRunning = false;
-    private volatile String  abortReason       = null;
+    private volatile boolean resolveAllRunning      = false;
+    private volatile String  abortReason            = null;
+    private volatile Instant rateLimitCooldownUntil = Instant.MIN;
     private final AtomicInteger progressTotal     = new AtomicInteger(0);
     private final AtomicInteger progressCompleted = new AtomicInteger(0);
     private final AtomicInteger progressFailed    = new AtomicInteger(0);
 
-    public record ResolutionProgress(boolean running, int completed, int total, int failed, String abortReason) {}
+    public record ResolutionProgress(boolean running, int completed, int total, int failed,
+                                     String abortReason, Instant rateLimitCooldownUntil) {}
 
     public ResolutionProgress getResolutionProgress() {
-        return new ResolutionProgress(resolveAllRunning, progressCompleted.get(), progressTotal.get(), progressFailed.get(), abortReason);
+        Instant cooldown = Instant.now().isBefore(rateLimitCooldownUntil) ? rateLimitCooldownUntil : null;
+        return new ResolutionProgress(resolveAllRunning, progressCompleted.get(), progressTotal.get(),
+                progressFailed.get(), abortReason, cooldown);
     }
 
     public ContentResolver(ResolvedAlbumRepository albumRepo,
@@ -121,12 +125,21 @@ public class ContentResolver {
      */
     @Async
     public void resolveAllAsync(List<AllowedContent> items) {
+        // Refuse to start if we're still within a Spotify-issued rate-limit cooldown window.
+        if (Instant.now().isBefore(rateLimitCooldownUntil)) {
+            log.info("resolveAll: skipped – still in Spotify rate-limit cooldown until {}", rateLimitCooldownUntil);
+            return;
+        }
+
         // Skip items that are genuinely resolved (resolvedAt set AND have at least one
         // resolved album child). Items marked resolved but with no children are re-queued.
+        // Items with a permanent error code (e.g. 403) are excluded; they can be retried
+        // individually via the per-item re-resolve button.
         List<ContentScope> scopeOrder = List.of(
                 ContentScope.TRACK, ContentScope.ALBUM, ContentScope.PLAYLIST, ContentScope.ARTIST);
         Set<String> contentIdsWithAlbums = albumRepo.findAllowedContentIdsWithAlbums();
         List<AllowedContent> pending = items.stream()
+                .filter(c -> c.getResolutionErrorCode() == null)
                 .filter(c -> c.getResolvedAt() == null || !contentIdsWithAlbums.contains(c.getId()))
                 .sorted(Comparator.comparingInt(c -> scopeOrder.indexOf(c.getScope())))
                 .collect(Collectors.toList());
@@ -153,11 +166,13 @@ public class ContentResolver {
                         long waitSeconds = retryAfter != null ? parseLong(retryAfter, 30L) : 30L;
                         if (waitSeconds > 300) {
                             // Retry-After > 5 min means Spotify has issued a prolonged ban;
-                            // abort the run – the item stays unresolved for the next trigger.
+                            // record the cooldown window, abort the run – the item stays
+                            // unresolved for the next trigger.
+                            rateLimitCooldownUntil = Instant.now().plusSeconds(waitSeconds);
                             abortReason = "Spotify rate limit (Retry-After: " + waitSeconds
                                     + "s) – verbleibende Einträge werden beim nächsten Lauf nachgeholt";
-                            log.warn("resolveAll: aborting at [{}/{}] – Spotify Retry-After {}s > 5min",
-                                     i + 1, pending.size(), waitSeconds);
+                            log.warn("resolveAll: aborting at [{}/{}] – Spotify Retry-After {}s > 5min, cooldown until {}",
+                                     i + 1, pending.size(), waitSeconds, rateLimitCooldownUntil);
                             break;
                         }
                         // Short rate limit: sleep and continue rather than aborting the entire run.
@@ -224,10 +239,15 @@ public class ContentResolver {
                 case TRACK    -> resolveTrack(content, familyId);
             }
             content.setResolvedAt(Instant.now());
+            content.setResolutionErrorCode(null);
             contentRepo.save(content);
         } catch (WebClientResponseException e) {
             log.error("Resolution failed for content {}: {} – Spotify response: {}",
                     content.getId(), e.getMessage(), e.getResponseBodyAsString());
+            if (e.getStatusCode().value() == 403) {
+                content.setResolutionErrorCode(403);
+                contentRepo.save(content);
+            }
             throw e;
         } catch (Exception e) {
             log.error("Resolution failed for content {}: {}", content.getId(), e.getMessage(), e);
