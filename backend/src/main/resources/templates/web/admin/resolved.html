@@ -38,8 +38,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="row : ${rows}"
-                            th:id="'resolved-row-' + ${row.content().id}"
+                        <th:block th:each="row : ${rows}">
+                        <tr th:id="'resolved-row-' + ${row.content().id}"
                             th:classappend="${row.content().resolutionErrorCode != null ? 'table-warning' : ''}">
                             <td class="align-middle">
                                 <div class="d-flex align-items-center gap-2">
@@ -84,12 +84,13 @@
                                 <span th:id="'re-resolve-msg-' + ${row.content().id}"></span>
                             </td>
                         </tr>
-                        <!-- Expandable album rows (loaded via HTMX) -->
-                        <tr th:each="row : ${rows}" class="table-light">
+                        <!-- Expandable album row immediately below its parent -->
+                        <tr class="table-light">
                             <td colspan="7" class="p-0">
                                 <div th:id="'albums-for-' + ${row.content().id}"></div>
                             </td>
                         </tr>
+                        </th:block>
                     </tbody>
                 </table>
             </div>
