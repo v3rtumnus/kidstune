@@ -121,12 +121,13 @@ public class ContentResolver {
      */
     @Async
     public void resolveAllAsync(List<AllowedContent> items) {
-        // Skip items that are already resolved – re-triggering after a partial run
-        // should only process the remainder, not replay every Spotify call from scratch.
+        // Skip items that are genuinely resolved (resolvedAt set AND have at least one
+        // resolved album child). Items marked resolved but with no children are re-queued.
         List<ContentScope> scopeOrder = List.of(
                 ContentScope.TRACK, ContentScope.ALBUM, ContentScope.PLAYLIST, ContentScope.ARTIST);
+        Set<String> contentIdsWithAlbums = albumRepo.findAllowedContentIdsWithAlbums();
         List<AllowedContent> pending = items.stream()
-                .filter(c -> c.getResolvedAt() == null)
+                .filter(c -> c.getResolvedAt() == null || !contentIdsWithAlbums.contains(c.getId()))
                 .sorted(Comparator.comparingInt(c -> scopeOrder.indexOf(c.getScope())))
                 .collect(Collectors.toList());
 

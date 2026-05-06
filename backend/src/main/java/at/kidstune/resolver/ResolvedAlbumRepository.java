@@ -7,10 +7,15 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 public interface ResolvedAlbumRepository extends JpaRepository<ResolvedAlbum, String> {
 
     List<ResolvedAlbum> findByAllowedContentId(String allowedContentId);
+
+    /** Returns the set of allowedContentIds that have at least one resolved album. */
+    @Query("SELECT DISTINCT a.allowedContentId FROM ResolvedAlbum a")
+    Set<String> findAllowedContentIdsWithAlbums();
 
     void deleteByAllowedContentId(String allowedContentId);
 
