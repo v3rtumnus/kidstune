@@ -291,7 +291,7 @@ public class ContentResolver {
             }
             if (i < entries.size() - 1) {
                 try {
-                    Thread.sleep(2000);
+                    Thread.sleep(10_000);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     log.warn("Re-resolution interrupted after [{}/{}]", i + 1, entries.size());
@@ -413,9 +413,17 @@ public class ContentResolver {
 
     private void reResolvePlaylist(AllowedContent content, String familyId,
                                     Map<String, ResolvedAlbum> existingByUri) {
+        String playlistId = idFromUri(content.getSpotifyUri());
+        String freshSnapshot = spotifyClient.getPlaylistSnapshotId(familyId, playlistId).block();
+        if (freshSnapshot != null && freshSnapshot.equals(content.getSpotifySnapshotId())) {
+            log.info("Playlist {} snapshot unchanged ({}), skipping re-resolution",
+                     content.getSpotifyUri(), freshSnapshot);
+            return;
+        }
         // Full delete + re-fetch: playlist order/composition may have changed entirely
         existingByUri.values().forEach(albumRepo::delete);
         resolvePlaylist(content, familyId);
+        content.setSpotifySnapshotId(freshSnapshot);
     }
 
     private void removeStaleAlbums(Map<String, ResolvedAlbum> existingByUri, Set<String> freshUris) {

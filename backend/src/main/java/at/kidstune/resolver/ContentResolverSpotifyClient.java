@@ -27,8 +27,11 @@ import java.util.List;
 class ContentResolverSpotifyClient {
 
     static final int PAGE_SIZE = 50;
-    // Spotify's /v1/artists/{id}/albums caps limit at 10; other list endpoints allow 50.
-    static final int ARTIST_ALBUMS_PAGE_SIZE = 10;
+    // Spotify allows up to 50 for /v1/artists/{id}/albums (same as other list endpoints).
+    static final int ARTIST_ALBUMS_PAGE_SIZE = 50;
+
+    // Small delay injected between pagination requests to avoid rapid-fire bursts.
+    private static final java.time.Duration INTER_PAGE_DELAY = java.time.Duration.ofMillis(300);
 
     private final SpotifyTokenService tokenService;
     private final WebClient spotifyApi;
@@ -53,7 +56,8 @@ class ContentResolverSpotifyClient {
                 .flatMapMany(token ->
                         fetchArtistAlbumsPage(token, artistId, 0)
                                 .expand(page -> page.next() != null
-                                        ? fetchArtistAlbumsPage(token, artistId, nextOffset(page.offset(), page.limit()))
+                                        ? Mono.delay(INTER_PAGE_DELAY)
+                                                .then(fetchArtistAlbumsPage(token, artistId, nextOffset(page.offset(), page.limit())))
                                         : Mono.empty())
                                 .flatMap(page -> page.items() == null
                                         ? Flux.empty()
@@ -115,7 +119,8 @@ class ContentResolverSpotifyClient {
                 .flatMapMany(token ->
                         fetchAlbumTracksPage(token, albumId, 0)
                                 .expand(page -> page.next() != null
-                                        ? fetchAlbumTracksPage(token, albumId, nextOffset(page.offset(), page.limit()))
+                                        ? Mono.delay(INTER_PAGE_DELAY)
+                                                .then(fetchAlbumTracksPage(token, albumId, nextOffset(page.offset(), page.limit())))
                                         : Mono.empty())
                                 .flatMap(page -> page.items() == null
                                         ? Flux.empty()
@@ -151,7 +156,8 @@ class ContentResolverSpotifyClient {
                 .flatMapMany(token ->
                         fetchPlaylistTracksPage(token, playlistId, 0)
                                 .expand(page -> page.next() != null
-                                        ? fetchPlaylistTracksPage(token, playlistId, nextOffset(page.offset(), page.limit()))
+                                        ? Mono.delay(INTER_PAGE_DELAY)
+                                                .then(fetchPlaylistTracksPage(token, playlistId, nextOffset(page.offset(), page.limit())))
                                         : Mono.empty())
                                 .flatMap(page -> page.items() == null
                                         ? Flux.empty()
@@ -201,6 +207,24 @@ class ContentResolverSpotifyClient {
                             t.durationMs(), t.trackNumber(), t.discNumber(),
                             albumUri, albumTitle, albumImg);
                 });
+    }
+
+    // ── Playlist snapshot_id ─────────────────────────────────────────────────
+
+    /**
+     * Fetches only the {@code snapshot_id} of a playlist.
+     * Used before a full re-fetch to skip unchanged playlists without loading all tracks.
+     */
+    Mono<String> getPlaylistSnapshotId(String familyId, String playlistId) {
+        return tokenService.getValidAccessToken(familyId)
+                .flatMap(token -> spotifyApi.get()
+                        .uri(u -> u.path("/v1/playlists/{id}")
+                                .queryParam("fields", "snapshot_id")
+                                .build(playlistId))
+                        .header("Authorization", "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(ApiPlaylistMeta.class))
+                .map(ApiPlaylistMeta::snapshotId);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -295,6 +319,10 @@ class ContentResolverSpotifyClient {
 
     private record ApiPlaylistItem(
             @JsonProperty("track") ApiPlaylistTrack track
+    ) {}
+
+    private record ApiPlaylistMeta(
+            @JsonProperty("snapshot_id") String snapshotId
     ) {}
 
     /** Paginated envelope for /v1/artists/{id}/albums */

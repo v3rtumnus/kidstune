@@ -140,7 +140,8 @@
       "Bash(./gradlew cleanTest test --tests \"at.kidstune.sync.SyncIntTest\" --tests \"at.kidstune.web.ApproveTokenIntTest\" --tests \"at.kidstune.profile.ProfileServiceTest\" --tests \"at.kidstune.spotify.SpotifySuggestionsIntTest\" --tests \"at.kidstune.requests.ContentRequestConcurrencyIntTest\")",
       "Bash(xargs cat:*)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\micha\\\\Development\\\\kidstune\" -Recurse -Directory)",
-      "Bash(Select-Object -First 30 FullName)"
+      "Bash(Select-Object -First 30 FullName)",
+      "Bash(xargs -I{} unzip -l {})"
     ]
   }
 }

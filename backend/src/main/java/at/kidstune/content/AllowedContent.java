@@ -53,6 +53,9 @@ public class AllowedContent {
     @Column(name = "resolution_error_code")
     private Integer resolutionErrorCode;
 
+    @Column(name = "spotify_snapshot_id")
+    private String spotifySnapshotId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -99,6 +102,9 @@ public class AllowedContent {
 
     public Integer getResolutionErrorCode()                          { return resolutionErrorCode; }
     public void setResolutionErrorCode(Integer resolutionErrorCode)  { this.resolutionErrorCode = resolutionErrorCode; }
+
+    public String getSpotifySnapshotId()                          { return spotifySnapshotId; }
+    public void setSpotifySnapshotId(String spotifySnapshotId)    { this.spotifySnapshotId = spotifySnapshotId; }
 
     public Instant getCreatedAt()                  { return createdAt; }
     public void setCreatedAt(Instant createdAt)    { this.createdAt = createdAt; }
