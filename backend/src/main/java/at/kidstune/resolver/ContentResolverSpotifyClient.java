@@ -8,7 +8,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.net.URI;
 import java.util.List;
 
 /**
@@ -74,12 +73,12 @@ class ContentResolverSpotifyClient {
     }
 
     private Mono<ApiAlbumsPage> fetchArtistAlbumsPage(String token, String artistId, int offset) {
-        URI uri = URI.create(apiBaseUrl + "/v1/artists/" + artistId
-                + "/albums?limit=" + ARTIST_ALBUMS_PAGE_SIZE
-                + "&offset=" + offset
-                + "&include_groups=album,single");
         return spotifyApi.get()
-                .uri(uri)
+                .uri(u -> u.path("/v1/artists/{id}/albums")
+                        .queryParam("limit", ARTIST_ALBUMS_PAGE_SIZE)
+                        .queryParam("offset", offset)
+                        .queryParam("include_groups", "album,single")
+                        .build(artistId))
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .bodyToMono(ApiAlbumsPage.class);

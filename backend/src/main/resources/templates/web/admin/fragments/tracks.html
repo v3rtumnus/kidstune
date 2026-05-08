@@ -18,7 +18,7 @@
                 <td th:text="${track.title}"></td>
                 <td class="text-muted d-none d-sm-table-cell" th:text="${track.artistName}"></td>
                 <td class="text-muted d-none d-md-table-cell text-end"
-                    th:text="${track.durationMs != null ? (track.durationMs / 60000) + ':' + #strings.leftPad('' + ((track.durationMs % 60000) / 1000), 2, '0') : '–'}"></td>
+                    th:text="${track.durationMs != null ? '' + (track.durationMs / 60000) + ':' + #numbers.formatInteger((track.durationMs % 60000) / 1000, 2) : '–'}"></td>
             </tr>
         </tbody>
     </table>
