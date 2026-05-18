@@ -94,7 +94,7 @@
         <div class="px-2 mt-3">
             <small class="text-white-50 d-block text-truncate px-2 mb-2"
                    th:if="${familyId != null}"
-                   th:text="${'ID: ' + #strings.substring(familyId, 0, 8) + '...'}"></small>
+                   th:text="${#strings.length(familyId) > 8 ? 'ID: ' + #strings.substring(familyId, 0, 8) + '...' : 'ID: ' + familyId}"></small>
             <form th:action="@{/web/logout}" method="post">
                 <button type="submit" class="btn btn-outline-light btn-sm w-100">Abmelden</button>
             </form>
