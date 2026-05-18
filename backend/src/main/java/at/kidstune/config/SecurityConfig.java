@@ -10,14 +10,22 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
+import org.springframework.security.web.server.authentication.ServerAuthenticationConverter;
+import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.OrServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.PathPatternParserServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
@@ -49,8 +57,50 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    // ── Authelia SSO forward-auth (header-based) ─────────────────────────────
+    // Order(0): highest priority; only matches /web/** requests that already
+    // carry the Remote-User header injected by Authelia via Traefik forward-auth.
+    // When the header is absent the matcher returns NOT_MATCH and the request
+    // falls through to the @Order(1) form-login chain unchanged.
+
+    @Bean
+    @Order(0)
+    public SecurityWebFilterChain autheliaFilterChain(ServerHttpSecurity http) {
+        ServerWebExchangeMatcher remoteUserHeaderMatcher = exchange ->
+                exchange.getRequest().getHeaders().getFirst("Remote-User") != null
+                        ? ServerWebExchangeMatcher.MatchResult.match()
+                        : ServerWebExchangeMatcher.MatchResult.notMatch();
+
+        ServerAuthenticationConverter converter = exchange -> {
+            String remoteUser = exchange.getRequest().getHeaders().getFirst("Remote-User");
+            if (remoteUser == null || remoteUser.isBlank()) return Mono.empty();
+            return Mono.just(new PreAuthenticatedAuthenticationToken(remoteUser, "N/A"));
+        };
+
+        ReactiveAuthenticationManager manager = authentication ->
+                Mono.just(new UsernamePasswordAuthenticationToken(
+                        authentication.getPrincipal(), null,
+                        AuthorityUtils.createAuthorityList("ROLE_" + PARENT_ROLE)
+                ));
+
+        AuthenticationWebFilter autheliaFilter = new AuthenticationWebFilter(manager);
+        autheliaFilter.setServerAuthenticationConverter(converter);
+
+        return http
+                .securityMatcher(new AndServerWebExchangeMatcher(
+                        new PathPatternParserServerWebExchangeMatcher("/web/**"),
+                        remoteUserHeaderMatcher
+                ))
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .addFilterAt(autheliaFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                .authorizeExchange(exchanges -> exchanges.anyExchange().authenticated())
+                .build();
+    }
+
     // ── Web dashboard security (session-based) ───────────────────────────────
-    // Order(1): evaluated first; only matches /web/** requests.
+    // Order(1): evaluated when Remote-User header is absent (direct browser access).
     // The RememberMeWebFilter runs before SECURITY_CONTEXT_SERVER_WEB_EXCHANGE
     // so it can populate the session before the security context is loaded.
 
